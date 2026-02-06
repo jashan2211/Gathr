@@ -1,0 +1,905 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		/* App */
+		A1000001001 /* GatherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000001001; };
+		A1000001002 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000001002; };
+
+		/* Core/Models */
+		A1000002001 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000002001; };
+		A1000002002 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000002002; };
+		A1000002003 /* Guest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000002003; };
+		A1000002004 /* Comment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000002004; };
+
+		/* Core/Services */
+		A1000003001 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000003001; };
+
+		/* DesignSystem */
+		A1000004001 /* Colors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000004001; };
+		A1000004002 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000004002; };
+		A1000004003 /* Spacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000004003; };
+		A1000004004 /* GatherButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000004004; };
+		A1000004005 /* GatherTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000004005; };
+		A1000004006 /* EventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000004006; };
+
+		/* Features/Auth */
+		A1000005001 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000005001; };
+
+		/* Features/Home */
+		A1000006001 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000006001; };
+
+		/* Features/Events */
+		A1000007001 /* CreateEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000007001; };
+		A1000007002 /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000007002; };
+		A1000007003 /* MyEventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000007003; };
+		A1000007004 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000007004; };
+		A1000007005 /* GuestListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000007005; };
+
+		/* Features/RSVP */
+		A1000008001 /* RSVPSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000008001; };
+
+		/* Features/Guests */
+		A1000009001 /* ContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000009001; };
+
+		/* Features/Profile */
+		A1000010001 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000010001; };
+
+		/* Resources */
+		A1000011001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0000011001; };
+
+		/* Tests */
+		A1000012001 /* EventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000012001; };
+		A1000012002 /* GuestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000012002; };
+		A1000012003 /* UserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000012003; };
+
+		/* UI Tests */
+		A1000013001 /* GatherUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000013001; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A2000001001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A3000001001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4000001001;
+			remoteInfo = Gather;
+		};
+		A2000001002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A3000001001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4000001001;
+			remoteInfo = Gather;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		/* App */
+		A0000001001 /* GatherApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherApp.swift; sourceTree = "<group>"; };
+		A0000001002 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+
+		/* Core/Models */
+		A0000002001 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		A0000002002 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
+		A0000002003 /* Guest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Guest.swift; sourceTree = "<group>"; };
+		A0000002004 /* Comment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comment.swift; sourceTree = "<group>"; };
+
+		/* Core/Services */
+		A0000003001 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+
+		/* DesignSystem */
+		A0000004001 /* Colors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Colors.swift; sourceTree = "<group>"; };
+		A0000004002 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
+		A0000004003 /* Spacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Spacing.swift; sourceTree = "<group>"; };
+		A0000004004 /* GatherButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherButton.swift; sourceTree = "<group>"; };
+		A0000004005 /* GatherTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherTextField.swift; sourceTree = "<group>"; };
+		A0000004006 /* EventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventCard.swift; sourceTree = "<group>"; };
+
+		/* Features/Auth */
+		A0000005001 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+
+		/* Features/Home */
+		A0000006001 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+
+		/* Features/Events */
+		A0000007001 /* CreateEventView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEventView.swift; sourceTree = "<group>"; };
+		A0000007002 /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
+		A0000007003 /* MyEventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyEventsView.swift; sourceTree = "<group>"; };
+		A0000007004 /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		A0000007005 /* GuestListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestListSheet.swift; sourceTree = "<group>"; };
+
+		/* Features/RSVP */
+		A0000008001 /* RSVPSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSVPSheet.swift; sourceTree = "<group>"; };
+
+		/* Features/Guests */
+		A0000009001 /* ContactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsView.swift; sourceTree = "<group>"; };
+
+		/* Features/Profile */
+		A0000010001 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+
+		/* Resources */
+		A0000011001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A0000011002 /* Gather.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Gather.entitlements; sourceTree = "<group>"; };
+
+		/* Tests */
+		A0000012001 /* EventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTests.swift; sourceTree = "<group>"; };
+		A0000012002 /* GuestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestTests.swift; sourceTree = "<group>"; };
+		A0000012003 /* UserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserTests.swift; sourceTree = "<group>"; };
+
+		/* UI Tests */
+		A0000013001 /* GatherUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherUITests.swift; sourceTree = "<group>"; };
+
+		/* Products */
+		A5000001001 /* Gather.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Gather.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A5000001002 /* GatherTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GatherTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A5000001003 /* GatherUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GatherUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A6000001001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6000001002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A6000001003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A7000001001 = {
+			isa = PBXGroup;
+			children = (
+				A7000002001 /* Gather */,
+				A7000003001 /* GatherTests */,
+				A7000004001 /* GatherUITests */,
+				A7000005001 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A7000002001 /* Gather */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002002 /* App */,
+				A7000002003 /* Core */,
+				A7000002004 /* DesignSystem */,
+				A7000002005 /* Features */,
+				A7000002006 /* Resources */,
+				A0000011002 /* Gather.entitlements */,
+			);
+			path = Gather;
+			sourceTree = "<group>";
+		};
+		A7000002002 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A0000001001 /* GatherApp.swift */,
+				A0000001002 /* MainTabView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A7000002003 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002007 /* Models */,
+				A7000002008 /* Services */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A7000002007 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A0000002001 /* User.swift */,
+				A0000002002 /* Event.swift */,
+				A0000002003 /* Guest.swift */,
+				A0000002004 /* Comment.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A7000002008 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A0000003001 /* AuthManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A7000002004 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				A0000004001 /* Colors.swift */,
+				A0000004002 /* Typography.swift */,
+				A0000004003 /* Spacing.swift */,
+				A7000002009 /* Components */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		A7000002009 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				A0000004004 /* GatherButton.swift */,
+				A0000004005 /* GatherTextField.swift */,
+				A0000004006 /* EventCard.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		A7000002005 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002010 /* Auth */,
+				A7000002011 /* Home */,
+				A7000002012 /* Events */,
+				A7000002013 /* RSVP */,
+				A7000002014 /* Guests */,
+				A7000002015 /* Profile */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A7000002010 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002016 /* Views */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		A7000002016 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A0000005001 /* AuthView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A7000002011 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002017 /* Views */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		A7000002017 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A0000006001 /* HomeView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A7000002012 /* Events */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002018 /* Create */,
+				A7000002019 /* Detail */,
+				A7000002020 /* List */,
+			);
+			path = Events;
+			sourceTree = "<group>";
+		};
+		A7000002018 /* Create */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002021 /* Views */,
+			);
+			path = Create;
+			sourceTree = "<group>";
+		};
+		A7000002021 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A0000007001 /* CreateEventView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A7000002019 /* Detail */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002022 /* Views */,
+			);
+			path = Detail;
+			sourceTree = "<group>";
+		};
+		A7000002022 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A0000007002 /* EventDetailView.swift */,
+				A0000007004 /* ShareSheet.swift */,
+				A0000007005 /* GuestListSheet.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A7000002020 /* List */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002023 /* Views */,
+			);
+			path = List;
+			sourceTree = "<group>";
+		};
+		A7000002023 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A0000007003 /* MyEventsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A7000002013 /* RSVP */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002024 /* Views */,
+			);
+			path = RSVP;
+			sourceTree = "<group>";
+		};
+		A7000002024 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A0000008001 /* RSVPSheet.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A7000002014 /* Guests */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002025 /* Views */,
+			);
+			path = Guests;
+			sourceTree = "<group>";
+		};
+		A7000002025 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A0000009001 /* ContactsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A7000002015 /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				A7000002026 /* Views */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		A7000002026 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A0000010001 /* ProfileView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A7000002006 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A0000011001 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A7000003001 /* GatherTests */ = {
+			isa = PBXGroup;
+			children = (
+				A0000012001 /* EventTests.swift */,
+				A0000012002 /* GuestTests.swift */,
+				A0000012003 /* UserTests.swift */,
+			);
+			path = GatherTests;
+			sourceTree = "<group>";
+		};
+		A7000004001 /* GatherUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A0000013001 /* GatherUITests.swift */,
+			);
+			path = GatherUITests;
+			sourceTree = "<group>";
+		};
+		A7000005001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A5000001001 /* Gather.app */,
+				A5000001002 /* GatherTests.xctest */,
+				A5000001003 /* GatherUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A4000001001 /* Gather */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A8000001001 /* Build configuration list for PBXNativeTarget "Gather" */;
+			buildPhases = (
+				A9000001001 /* Sources */,
+				A6000001001 /* Frameworks */,
+				AA000001001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Gather;
+			productName = Gather;
+			productReference = A5000001001 /* Gather.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A4000001002 /* GatherTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A8000001002 /* Build configuration list for PBXNativeTarget "GatherTests" */;
+			buildPhases = (
+				A9000001002 /* Sources */,
+				A6000001002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A2000001001 /* PBXContainerItemProxy */,
+			);
+			name = GatherTests;
+			productName = GatherTests;
+			productReference = A5000001002 /* GatherTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A4000001003 /* GatherUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A8000001003 /* Build configuration list for PBXNativeTarget "GatherUITests" */;
+			buildPhases = (
+				A9000001003 /* Sources */,
+				A6000001003 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A2000001002 /* PBXContainerItemProxy */,
+			);
+			name = GatherUITests;
+			productName = GatherUITests;
+			productReference = A5000001003 /* GatherUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A3000001001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					A4000001001 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					A4000001002 = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = A4000001001;
+					};
+					A4000001003 = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = A4000001001;
+					};
+				};
+			};
+			buildConfigurationList = AB000001001 /* Build configuration list for PBXProject "Gather" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A7000001001;
+			productRefGroup = A7000005001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A4000001001 /* Gather */,
+				A4000001002 /* GatherTests */,
+				A4000001003 /* GatherUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA000001001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000011001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A9000001001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000001001 /* GatherApp.swift in Sources */,
+				A1000001002 /* MainTabView.swift in Sources */,
+				A1000002001 /* User.swift in Sources */,
+				A1000002002 /* Event.swift in Sources */,
+				A1000002003 /* Guest.swift in Sources */,
+				A1000002004 /* Comment.swift in Sources */,
+				A1000003001 /* AuthManager.swift in Sources */,
+				A1000004001 /* Colors.swift in Sources */,
+				A1000004002 /* Typography.swift in Sources */,
+				A1000004003 /* Spacing.swift in Sources */,
+				A1000004004 /* GatherButton.swift in Sources */,
+				A1000004005 /* GatherTextField.swift in Sources */,
+				A1000004006 /* EventCard.swift in Sources */,
+				A1000005001 /* AuthView.swift in Sources */,
+				A1000006001 /* HomeView.swift in Sources */,
+				A1000007001 /* CreateEventView.swift in Sources */,
+				A1000007002 /* EventDetailView.swift in Sources */,
+				A1000007003 /* MyEventsView.swift in Sources */,
+				A1000007004 /* ShareSheet.swift in Sources */,
+				A1000007005 /* GuestListSheet.swift in Sources */,
+				A1000008001 /* RSVPSheet.swift in Sources */,
+				A1000009001 /* ContactsView.swift in Sources */,
+				A1000010001 /* ProfileView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A9000001002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000012001 /* EventTests.swift in Sources */,
+				A1000012002 /* GuestTests.swift in Sources */,
+				A1000012003 /* UserTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A9000001003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000013001 /* GatherUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AC000001001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4000001001 /* Gather */;
+			targetProxy = A2000001001 /* PBXContainerItemProxy */;
+		};
+		AC000001002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4000001001 /* Gather */;
+			targetProxy = A2000001002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AD000001001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AD000001002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		AE000001001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Gather/Gather.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Gather;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gather.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AE000001002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Gather/Gather.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Gather;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gather.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AF000001001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gather.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Gather.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Gather";
+			};
+			name = Debug;
+		};
+		AF000001002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gather.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Gather.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Gather";
+			};
+			name = Release;
+		};
+		B0000001001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gather.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Gather;
+			};
+			name = Debug;
+		};
+		B0000001002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gather.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Gather;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AB000001001 /* Build configuration list for PBXProject "Gather" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AD000001001 /* Debug */,
+				AD000001002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A8000001001 /* Build configuration list for PBXNativeTarget "Gather" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE000001001 /* Debug */,
+				AE000001002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A8000001002 /* Build configuration list for PBXNativeTarget "GatherTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF000001001 /* Debug */,
+				AF000001002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A8000001003 /* Build configuration list for PBXNativeTarget "GatherUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B0000001001 /* Debug */,
+				B0000001002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A3000001001 /* Project object */;
+}

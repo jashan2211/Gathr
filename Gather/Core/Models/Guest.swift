@@ -16,9 +16,8 @@ final class Guest {
     var invitedAt: Date
     var respondedAt: Date?
 
-    // Relationships
-    var event: Event?
-    var user: User?
+    // Store user ID for reference
+    var userId: UUID?
 
     init(
         id: UUID = UUID(),
@@ -29,8 +28,7 @@ final class Guest {
         plusOneCount: Int = 0,
         role: GuestRole = .guest,
         metadata: GuestMetadata? = nil,
-        event: Event? = nil,
-        user: User? = nil
+        userId: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -41,8 +39,7 @@ final class Guest {
         self.role = role
         self.metadata = metadata
         self.invitedAt = Date()
-        self.event = event
-        self.user = user
+        self.userId = userId
     }
 }
 
@@ -105,7 +102,7 @@ enum GuestRole: String, Codable, CaseIterable {
 
 // MARK: - Guest Metadata
 
-struct GuestMetadata: Codable, Equatable {
+struct GuestMetadata: Codable, Equatable, Hashable {
     var mealChoice: String?
     var dietaryRestrictions: String?
     var notes: String?

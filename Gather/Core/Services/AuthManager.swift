@@ -27,7 +27,7 @@ class AuthManager: ObservableObject {
 
     private func checkExistingAuth() {
         // Check if user is already signed in
-        if let userId = userDefaults.string(forKey: userIdKey) {
+        if userDefaults.string(forKey: userIdKey) != nil {
             // In production, fetch user from CloudKit/local storage
             // For now, mark as authenticated if we have a stored ID
             isAuthenticated = true
@@ -40,34 +40,28 @@ class AuthManager: ObservableObject {
         isLoading = true
         authError = nil
 
-        do {
-            // Extract user info from Apple credential
-            let userId = credential.user
-            let email = credential.email
-            let fullName = [
-                credential.fullName?.givenName,
-                credential.fullName?.familyName
-            ].compactMap { $0 }.joined(separator: " ")
+        // Extract user info from Apple credential
+        let userId = credential.user
+        let email = credential.email
+        let fullName = [
+            credential.fullName?.givenName,
+            credential.fullName?.familyName
+        ].compactMap { $0 }.joined(separator: " ")
 
-            // Create or fetch user
-            let user = User(
-                name: fullName.isEmpty ? "User" : fullName,
-                email: email,
-                authProviders: [.apple]
-            )
+        // Create or fetch user
+        let user = User(
+            name: fullName.isEmpty ? "User" : fullName,
+            email: email,
+            authProviders: [.apple]
+        )
 
-            // Store user ID
-            userDefaults.set(userId, forKey: userIdKey)
+        // Store user ID
+        userDefaults.set(userId, forKey: userIdKey)
 
-            // Update state
-            currentUser = user
-            isAuthenticated = true
-            isLoading = false
-
-        } catch {
-            authError = .signInFailed(error.localizedDescription)
-            isLoading = false
-        }
+        // Update state
+        currentUser = user
+        isAuthenticated = true
+        isLoading = false
     }
 
     // MARK: - Google Sign In

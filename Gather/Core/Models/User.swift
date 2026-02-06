@@ -15,13 +15,6 @@ final class User {
     var createdAt: Date
     var updatedAt: Date
 
-    // Relationships
-    @Relationship(deleteRule: .cascade, inverse: \Event.host)
-    var hostedEvents: [Event] = []
-
-    @Relationship(deleteRule: .cascade, inverse: \Guest.user)
-    var guestRecords: [Guest] = []
-
     init(
         id: UUID = UUID(),
         name: String,
@@ -53,14 +46,14 @@ enum AuthProvider: String, Codable, CaseIterable {
 
 // MARK: - User Settings
 
-struct UserSettings: Codable {
-    var defaultEventPrivacy: EventPrivacy = .inviteOnly
+struct UserSettings: Codable, Hashable {
+    var defaultEventPrivacy: String = "inviteOnly"
     var showMeAsAttending: Bool = true
     var notificationsEnabled: Bool = true
     var calendarSyncEnabled: Bool = true
 
     init(
-        defaultEventPrivacy: EventPrivacy = .inviteOnly,
+        defaultEventPrivacy: String = "inviteOnly",
         showMeAsAttending: Bool = true,
         notificationsEnabled: Bool = true,
         calendarSyncEnabled: Bool = true

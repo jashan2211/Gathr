@@ -9,24 +9,21 @@ final class Comment {
     var text: String
     var createdAt: Date
 
-    // Relationships
-    var event: Event?
-    var author: User?
-
-    @Relationship(deleteRule: .cascade, inverse: \MediaItem.comment)
-    var attachments: [MediaItem] = []
+    // Store references as IDs
+    var eventId: UUID?
+    var authorId: UUID?
 
     init(
         id: UUID = UUID(),
         text: String,
-        event: Event? = nil,
-        author: User? = nil
+        eventId: UUID? = nil,
+        authorId: UUID? = nil
     ) {
         self.id = id
         self.text = text
         self.createdAt = Date()
-        self.event = event
-        self.author = author
+        self.eventId = eventId
+        self.authorId = authorId
     }
 }
 
@@ -40,28 +37,25 @@ final class MediaItem {
     var thumbnailURL: URL?
     var createdAt: Date
 
-    // Relationships
-    var event: Event?
-    var uploader: User?
-    var comment: Comment?
+    // Store references as IDs
+    var eventId: UUID?
+    var uploaderId: UUID?
 
     init(
         id: UUID = UUID(),
         type: MediaType,
         url: URL,
         thumbnailURL: URL? = nil,
-        event: Event? = nil,
-        uploader: User? = nil,
-        comment: Comment? = nil
+        eventId: UUID? = nil,
+        uploaderId: UUID? = nil
     ) {
         self.id = id
         self.type = type
         self.url = url
         self.thumbnailURL = thumbnailURL
         self.createdAt = Date()
-        self.event = event
-        self.uploader = uploader
-        self.comment = comment
+        self.eventId = eventId
+        self.uploaderId = uploaderId
     }
 }
 

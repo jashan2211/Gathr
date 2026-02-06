@@ -199,7 +199,13 @@ struct EmailSignInSheet: View {
                             .font(GatherFont.headline)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(email.isEmpty ? Color.gatherSecondaryBackground : LinearGradient.gatherAccentGradient)
+                            .background {
+                                if email.isEmpty {
+                                    Color.gatherSecondaryBackground
+                                } else {
+                                    LinearGradient.gatherAccentGradient
+                                }
+                            }
                             .foregroundStyle(email.isEmpty ? Color.gatherSecondaryText : .white)
                             .cornerRadius(CornerRadius.md)
                     }

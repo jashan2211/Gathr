@@ -22,23 +22,17 @@ final class Event {
     var createdAt: Date
     var updatedAt: Date
 
-    // Relationships
-    var host: User?
+    // Store host ID for reference
+    var hostId: UUID?
 
-    @Relationship(deleteRule: .cascade, inverse: \Guest.event)
+    @Relationship(deleteRule: .cascade)
     var guests: [Guest] = []
-
-    @Relationship(deleteRule: .cascade, inverse: \Comment.event)
-    var comments: [Comment] = []
-
-    @Relationship(deleteRule: .cascade, inverse: \MediaItem.event)
-    var media: [MediaItem] = []
 
     init(
         id: UUID = UUID(),
         title: String,
         eventDescription: String? = nil,
-        startDate: Date,
+        startDate: Date = Date(),
         endDate: Date? = nil,
         timezone: String = TimeZone.current.identifier,
         recurrence: RecurrenceRule? = nil,
@@ -49,7 +43,7 @@ final class Event {
         heroMediaURL: URL? = nil,
         password: String? = nil,
         requiresApproval: Bool = false,
-        host: User? = nil
+        hostId: UUID? = nil
     ) {
         self.id = id
         self.title = title
@@ -65,7 +59,7 @@ final class Event {
         self.heroMediaURL = heroMediaURL
         self.password = password
         self.requiresApproval = requiresApproval
-        self.host = host
+        self.hostId = hostId
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -113,7 +107,7 @@ enum GuestListVisibility: String, Codable, CaseIterable {
 
 // MARK: - Recurrence Rule
 
-struct RecurrenceRule: Codable, Equatable {
+struct RecurrenceRule: Codable, Equatable, Hashable {
     var frequency: RecurrenceFrequency
     var interval: Int
     var daysOfWeek: [Int]?
@@ -153,7 +147,7 @@ enum RecurrenceFrequency: String, Codable, CaseIterable {
 
 // MARK: - Event Location
 
-struct EventLocation: Codable, Equatable {
+struct EventLocation: Codable, Equatable, Hashable {
     var name: String
     var address: String?
     var latitude: Double?
@@ -191,7 +185,7 @@ extension Event {
     }
 
     var isPast: Bool {
-        endDate ?? startDate < Date()
+        (endDate ?? startDate) < Date()
     }
 
     var isOngoing: Bool {
@@ -200,19 +194,19 @@ extension Event {
     }
 
     var attendingCount: Int {
-        guests.filter { $0.status == .attending }.count
+        guests.filter { $0.status == RSVPStatus.attending }.count
     }
 
     var maybeCount: Int {
-        guests.filter { $0.status == .maybe }.count
+        guests.filter { $0.status == RSVPStatus.maybe }.count
     }
 
     var declinedCount: Int {
-        guests.filter { $0.status == .declined }.count
+        guests.filter { $0.status == RSVPStatus.declined }.count
     }
 
     var pendingCount: Int {
-        guests.filter { $0.status == .pending }.count
+        guests.filter { $0.status == RSVPStatus.pending }.count
     }
 
     var spotsRemaining: Int? {
@@ -223,5 +217,15 @@ extension Event {
     var isFull: Bool {
         guard let remaining = spotsRemaining else { return false }
         return remaining == 0
+    }
+
+    // Placeholder for comments - will be fetched separately
+    var comments: [Comment] {
+        return []
+    }
+
+    // Placeholder for host - will be fetched separately
+    var host: User? {
+        return nil
     }
 }

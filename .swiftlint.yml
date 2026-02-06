@@ -1,0 +1,104 @@
+# SwiftLint Configuration for Gather
+
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - file_length
+  - function_body_length
+  - type_body_length
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - joined_default_parameter
+  - last_where
+  - literal_expression_end_indentation
+  - modifier_order
+  - multiline_arguments
+  - multiline_parameters
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prefer_self_type_over_type_of_self
+  - private_action
+  - private_outlet
+  - prohibited_super_call
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - sorted_first_last
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+excluded:
+  - build
+  - DerivedData
+  - Pods
+  - Packages
+  - .build
+  - Tests/LinuxMain.swift
+  - "**/Generated"
+
+# Rules configuration
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 50
+    error: 60
+  excluded:
+    - id
+    - x
+    - y
+    - i
+    - j
+    - to
+
+type_name:
+  min_length:
+    warning: 3
+    error: 2
+  max_length:
+    warning: 50
+    error: 60
+
+nesting:
+  type_level:
+    warning: 2
+    error: 3
+  function_level:
+    warning: 3
+    error: 4
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+large_tuple:
+  warning: 4
+  error: 5
+
+# Custom rules
+custom_rules:
+  no_print:
+    name: "No print statements"
+    regex: "\\bprint\\s*\\("
+    message: "Use Logger instead of print()"
+    severity: warning
+    match_kinds:
+      - identifier
+
+  force_https:
+    name: "Force HTTPS"
+    regex: "http://"
+    message: "Use HTTPS instead of HTTP"
+    severity: error
+    match_kinds:
+      - string
+
+reporter: xcode

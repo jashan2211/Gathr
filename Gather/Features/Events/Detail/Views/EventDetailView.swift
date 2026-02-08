@@ -1,55 +1,85 @@
 import SwiftUI
+import SwiftData
 import MapKit
 
+// MARK: - Event Detail Tab
+
+enum EventDetailTab: String, CaseIterable {
+    case overview = "Overview"
+    case activity = "Activity"
+    case functions = "Functions"
+    case guests = "Guests"
+    case photos = "Photos"
+    case budget = "Finance"
+
+    var icon: String {
+        switch self {
+        case .overview: return "house.fill"
+        case .activity: return "bubble.left.and.bubble.right.fill"
+        case .functions: return "calendar.badge.clock"
+        case .guests: return "person.2.fill"
+        case .photos: return "photo.on.rectangle.angled"
+        case .budget: return "chart.bar.fill"
+        }
+    }
+
+    // Check if tab should be visible for a given event
+    func isVisible(for event: Event) -> Bool {
+        switch self {
+        case .overview:
+            return true
+        case .activity:
+            return event.hasActivity
+        case .functions:
+            return event.hasFunctions
+        case .guests:
+            return event.hasGuestManagement
+        case .photos:
+            return event.hasPhotos
+        case .budget:
+            return event.hasBudget
+        }
+    }
+}
+
+// MARK: - Event Detail View
+
 struct EventDetailView: View {
-    let event: Event
+    @Bindable var event: Event
+    @State private var selectedTab: EventDetailTab = .overview
     @State private var showRSVPSheet = false
+    @State private var showManageRSVPSheet = false
     @State private var showShareSheet = false
     @State private var showGuestList = false
+    @State private var showEditSheet = false
+    @State private var showAddGuest = false
+    @State private var showBudget = false
+    @State private var showSeatingChart = false
+    @State private var showTicketPurchase = false
+    @State private var showWaitlist = false
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allTickets: [Ticket]
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // Hero Section
+        VStack(spacing: 0) {
+            // Hero + Floating Tab Bar
+            ZStack(alignment: .bottom) {
                 heroSection
-
-                // Content
-                VStack(alignment: .leading, spacing: Spacing.lg) {
-                    // Title & Host
-                    titleSection
-
-                    Divider()
-
-                    // Date & Time
-                    dateTimeSection
-
-                    // Location
-                    if let location = event.location {
-                        locationSection(location)
-                    }
-
-                    Divider()
-
-                    // Description
-                    if let description = event.eventDescription {
-                        descriptionSection(description)
-                        Divider()
-                    }
-
-                    // Guest List Preview
-                    guestListSection
-
-                    // Comments Section (placeholder)
-                    commentsSection
-                }
-                .horizontalPadding()
-                .padding(.bottom, 120) // Space for floating RSVP button
+                floatingTabBar
+                    .offset(y: 20)
             }
+            .zIndex(1)
+
+            // Tab Content
+            tabContent
+                .padding(.top, 24)
         }
         .ignoresSafeArea(edges: .top)
-        .overlay(alignment: .bottom) {
-            rsvpButton
+        .safeAreaInset(edge: .bottom) {
+            if shouldShowRSVPButton {
+                rsvpButtonBar
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -63,9 +93,21 @@ struct EventDetailView: View {
 
                     if isHost {
                         Button {
-                            // Edit event
+                            showEditSheet = true
                         } label: {
                             Label("Edit Event", systemImage: "pencil")
+                        }
+
+                        Button {
+                            showAddGuest = true
+                        } label: {
+                            Label("Add Guest", systemImage: "person.badge.plus")
+                        }
+
+                        Button {
+                            showSeatingChart = true
+                        } label: {
+                            Label("Seating Chart", systemImage: "tablecells")
                         }
                     }
                 } label: {
@@ -78,11 +120,35 @@ struct EventDetailView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showManageRSVPSheet) {
+            if let guest = currentUserGuest {
+                ManageRSVPSheet(
+                    event: event,
+                    guest: guest,
+                    ticket: currentUserTicket
+                )
+            }
+        }
+        .sheet(isPresented: $showTicketPurchase) {
+            TicketPurchaseSheet(event: event)
+        }
+        .sheet(isPresented: $showWaitlist) {
+            WaitlistSheet(event: event, tier: nil)
+        }
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(event: event)
         }
         .sheet(isPresented: $showGuestList) {
             GuestListSheet(event: event)
+        }
+        .sheet(isPresented: $showEditSheet) {
+            EditEventView(event: event)
+        }
+        .sheet(isPresented: $showAddGuest) {
+            AddGuestSheet(event: event)
+        }
+        .sheet(isPresented: $showSeatingChart) {
+            SeatingChartView(event: event)
         }
     }
 
@@ -97,336 +163,420 @@ struct EventDetailView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } placeholder: {
-                    heroPlaceholder
+                    CategoryMeshBackground(category: event.category)
                 }
             } else {
-                heroPlaceholder
+                CategoryMeshBackground(category: event.category)
             }
 
-            // Gradient overlay
-            LinearGradient.heroOverlay
+            // Category emoji watermark
+            Text(event.category.emoji)
+                .font(.system(size: 80))
+                .opacity(0.15)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(Spacing.lg)
+                .padding(.top, 30)
 
-            // Capacity badge
+            // Dark gradient overlay
+            LinearGradient(
+                colors: [.clear, .clear, .black.opacity(0.5), .black.opacity(0.75)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            // Event title overlay
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Spacer()
+
+                // Date pill
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
+                        .font(.caption2)
+                    Text(heroFormattedDate)
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, Spacing.sm)
+                .padding(.vertical, 4)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
+
+                Text(event.title)
+                    .font(GatherFont.title2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                    .lineLimit(2)
+
+                HStack(spacing: Spacing.md) {
+                    if let location = event.location {
+                        Label(location.shortLocation ?? location.name, systemImage: "mappin")
+                            .lineLimit(1)
+                    }
+
+                    if event.attendingCount > 0 {
+                        Label("\(event.attendingCount) going", systemImage: "person.2.fill")
+                    }
+                }
+                .font(GatherFont.caption)
+                .foregroundStyle(.white.opacity(0.9))
+            }
+            .padding(Spacing.lg)
+            .padding(.bottom, Spacing.lg)
+
+            // Category emoji badge - top left
+            VStack {
+                HStack {
+                    Text(event.category.emoji)
+                        .font(.title2)
+                        .padding(Spacing.xs)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                        .padding(.leading)
+                        .padding(.top, 56)
+                    Spacer()
+                }
+                Spacer()
+            }
+
+            // Capacity badge - top right
             if let capacity = event.capacity {
                 VStack {
                     HStack {
                         Spacer()
                         CapacityBadge(
-                            attending: event.attendingCount,
+                            attending: event.totalAttendingHeadcount,
                             capacity: capacity
                         )
                         .padding()
+                        .padding(.top, 40)
                     }
                     Spacer()
                 }
             }
         }
-        .frame(height: Layout.heroImageHeight)
-    }
-
-    private var heroPlaceholder: some View {
-        LinearGradient(
-            colors: [
-                Color.accentPurpleFallback,
-                Color.accentPinkFallback
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
+        .frame(height: 300)
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: CornerRadius.card,
+                bottomTrailingRadius: CornerRadius.card,
+                topTrailingRadius: 0
+            )
         )
     }
 
-    // MARK: - Title Section
+    private var heroFormattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d 'at' h:mm a"
+        return formatter.string(from: event.startDate)
+    }
 
-    private var titleSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text(event.title)
-                .font(GatherFont.title)
-                .foregroundStyle(Color.gatherPrimaryText)
+    // MARK: - Floating Tab Bar
 
-            if let host = event.host {
-                HStack(spacing: Spacing.sm) {
-                    Circle()
-                        .fill(Color.gatherSecondaryBackground)
-                        .frame(width: AvatarSize.sm, height: AvatarSize.sm)
-                        .overlay {
-                            Text(host.name.prefix(1))
-                                .font(GatherFont.caption)
+    private var visibleTabs: [EventDetailTab] {
+        EventDetailTab.allCases.filter { $0.isVisible(for: event) }
+    }
+
+    private var floatingTabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(visibleTabs, id: \.self) { tab in
+                Button {
+                    let impact = UIImpactFeedbackGenerator(style: .light)
+                    impact.impactOccurred()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    VStack(spacing: 3) {
+                        ZStack {
+                            if selectedTab == tab {
+                                Circle()
+                                    .fill(LinearGradient.gatherAccentGradient)
+                                    .frame(width: 36, height: 36)
+                                    .shadow(color: Color.accentPurpleFallback.opacity(0.4), radius: 8, y: 2)
+                            }
+
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(selectedTab == tab ? .white : Color.gatherSecondaryText)
+                                .scaleEffect(selectedTab == tab ? 1.1 : 1.0)
                         }
 
-                    Text("Hosted by \(host.name)")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(Color.gatherSecondaryText)
+                        Text(tab.rawValue)
+                            .font(.system(size: 9, weight: selectedTab == tab ? .bold : .medium))
+                            .foregroundStyle(selectedTab == tab ? Color.accentPurpleFallback : Color.gatherSecondaryText)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
                 }
             }
         }
-        .padding(.top, Spacing.md)
+        .padding(.horizontal, Spacing.xs)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.glassBorderTop, Color.glassBorderBottom],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 0.5
+                        )
+                )
+                .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
+        )
+        .padding(.horizontal, Spacing.lg)
     }
 
-    // MARK: - Date & Time Section
+    // MARK: - Tab Content
 
-    private var dateTimeSection: some View {
-        HStack(spacing: Spacing.md) {
-            // Calendar icon
-            ZStack {
-                RoundedRectangle(cornerRadius: CornerRadius.md)
-                    .fill(Color.accentPurpleFallback.opacity(0.1))
-                    .frame(width: 48, height: 48)
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .overview:
+            OverviewTab(
+                event: event,
+                showGuestList: $showGuestList,
+                showRSVPSheet: $showRSVPSheet
+            )
+        case .activity:
+            ActivityTab(event: event)
+        case .functions:
+            FunctionsTab(event: event)
+        case .guests:
+            GuestsTab(event: event)
+        case .photos:
+            PhotosTab(event: event)
+        case .budget:
+            BudgetTab(event: event)
+        }
+    }
 
-                VStack(spacing: 0) {
-                    Text(monthAbbreviation)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.accentPurpleFallback)
-                    Text(dayNumber)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.gatherPrimaryText)
-                }
+    // MARK: - RSVP Button Bar
+
+    private var shouldShowRSVPButton: Bool {
+        // Show RSVP bar when:
+        // 1. On overview tab
+        // 2. Not the host
+        // 3. No functions (function-based events handle RSVP per function)
+        // 4. OR event has ticketing enabled
+        selectedTab == .overview && !isHost && (event.functions.isEmpty || event.hasTicketing)
+    }
+
+    private var rsvpButtonBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            if let guest = currentUserGuest {
+                // User has already RSVPed - show status with manage button
+                attendingStatusBar(guest: guest)
+            } else if event.hasTicketing && !event.ticketTiers.isEmpty {
+                // Ticketed event - show ticket purchase
+                ticketPurchaseBar
+            } else {
+                // Standard RSVP
+                standardRSVPBar
             }
+        }
+    }
 
-            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text(formattedFullDate)
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
+    // Attending status bar for users who have already RSVPed
+    private func attendingStatusBar(guest: Guest) -> some View {
+        HStack {
+            // Status indicator
+            HStack(spacing: Spacing.sm) {
+                ZStack {
+                    Circle()
+                        .fill(Color.forRSVPStatus(guest.status).opacity(0.15))
+                        .frame(width: 40, height: 40)
 
-                Text(formattedTime)
-                    .font(GatherFont.callout)
-                    .foregroundStyle(Color.gatherSecondaryText)
+                    Image(systemName: guest.status.icon)
+                        .font(.title3)
+                        .foregroundStyle(Color.forRSVPStatus(guest.status))
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(guest.status.displayName)
+                        .font(GatherFont.headline)
+                        .foregroundStyle(Color.forRSVPStatus(guest.status))
+
+                    if guest.status == .attending || guest.status == .maybe {
+                        Text("\(guest.totalHeadcount) \(guest.totalHeadcount == 1 ? "person" : "people")")
+                            .font(GatherFont.caption)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                    }
+                }
             }
 
             Spacer()
 
-            // Add to calendar button
+            // Manage button
             Button {
-                // Add to calendar
+                showManageRSVPSheet = true
             } label: {
-                Image(systemName: "calendar.badge.plus")
-                    .font(.title2)
-                    .foregroundStyle(Color.accentPurpleFallback)
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "pencil")
+                    Text("Manage")
+                }
+                .font(GatherFont.callout)
+                .fontWeight(.medium)
+                .foregroundStyle(Color.accentPurpleFallback)
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.sm)
+                .background(Color.accentPurpleFallback.opacity(0.1))
+                .clipShape(Capsule())
             }
         }
+        .padding()
+        .background(.ultraThinMaterial)
     }
 
-    // MARK: - Location Section
-
-    private func locationSection(_ location: EventLocation) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            HStack(spacing: Spacing.md) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: CornerRadius.md)
-                        .fill(Color.accentPinkFallback.opacity(0.1))
-                        .frame(width: 48, height: 48)
-
-                    Image(systemName: location.isVirtual ? "video.fill" : "mappin.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(Color.accentPinkFallback)
-                }
-
-                VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text(location.name)
+    // Ticket purchase bar for ticketed events
+    private var ticketPurchaseBar: some View {
+        HStack {
+            // Price info
+            VStack(alignment: .leading, spacing: 2) {
+                if isSoldOut {
+                    Text("Sold Out")
                         .font(GatherFont.headline)
-                        .foregroundStyle(Color.gatherPrimaryText)
-
-                    if let address = location.address {
-                        Text(address)
-                            .font(GatherFont.callout)
-                            .foregroundStyle(Color.gatherSecondaryText)
-                    }
-                }
-
-                Spacer()
-
-                if !location.isVirtual {
-                    Button {
-                        // Open in maps
-                    } label: {
-                        Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(Color.accentPinkFallback)
-                    }
-                }
-            }
-
-            // Map preview
-            if location.hasCoordinates, let lat = location.latitude, let lon = location.longitude {
-                Map(initialPosition: .region(MKCoordinateRegion(
-                    center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                ))) {
-                    Marker(location.name, coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon))
-                }
-                .frame(height: 150)
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                .disabled(true)
-            }
-        }
-    }
-
-    // MARK: - Description Section
-
-    private func descriptionSection(_ description: String) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("About")
-                .font(GatherFont.headline)
-                .foregroundStyle(Color.gatherPrimaryText)
-
-            Text(description)
-                .font(GatherFont.body)
-                .foregroundStyle(Color.gatherSecondaryText)
-        }
-    }
-
-    // MARK: - Guest List Section
-
-    private var guestListSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            HStack {
-                Text("Guests")
-                    .font(GatherFont.headline)
-
-                Spacer()
-
-                Button {
-                    showGuestList = true
-                } label: {
-                    Text("See All")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(Color.accentPurpleFallback)
-                }
-            }
-
-            // Guest summary
-            HStack(spacing: Spacing.md) {
-                GuestCountPill(count: event.attendingCount, label: "Going", status: .attending)
-                GuestCountPill(count: event.maybeCount, label: "Maybe", status: .maybe)
-                if event.pendingCount > 0 {
-                    GuestCountPill(count: event.pendingCount, label: "Pending", status: .pending)
-                }
-            }
-
-            // Guest avatars preview
-            if !event.guests.isEmpty {
-                HStack(spacing: -8) {
-                    ForEach(event.guests.prefix(5)) { guest in
-                        Circle()
-                            .fill(Color.gatherSecondaryBackground)
-                            .frame(width: AvatarSize.sm, height: AvatarSize.sm)
-                            .overlay {
-                                Text(guest.name.prefix(1))
-                                    .font(.caption2)
-                            }
-                            .overlay {
-                                Circle()
-                                    .stroke(Color.gatherBackground, lineWidth: 2)
-                            }
-                    }
-
-                    if event.guests.count > 5 {
-                        Circle()
-                            .fill(Color.gatherTertiaryBackground)
-                            .frame(width: AvatarSize.sm, height: AvatarSize.sm)
-                            .overlay {
-                                Text("+\(event.guests.count - 5)")
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.gatherSecondaryText)
-                            }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Comments Section
-
-    private var commentsSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            HStack {
-                Text("Comments")
-                    .font(GatherFont.headline)
-
-                Spacer()
-
-                Text("\(event.comments.count)")
-                    .font(GatherFont.caption)
-                    .foregroundStyle(Color.gatherSecondaryText)
-            }
-
-            if event.comments.isEmpty {
-                Text("No comments yet. Be the first!")
-                    .font(GatherFont.callout)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .padding(.vertical, Spacing.md)
-            }
-        }
-        .padding(.top, Spacing.md)
-    }
-
-    // MARK: - RSVP Button
-
-    private var rsvpButton: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack {
-                // Current status (if already responded)
-                VStack(alignment: .leading) {
-                    Text("Your RSVP")
+                        .foregroundStyle(.red)
+                    Text("Join waitlist for updates")
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
-                    Text("Not responded")
-                        .font(GatherFont.headline)
-                }
-
-                Spacer()
-
-                Button {
-                    showRSVPSheet = true
-                } label: {
-                    Text("RSVP")
-                        .font(GatherFont.headline)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, Spacing.xl)
-                        .padding(.vertical, Spacing.sm)
-                        .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(Capsule())
+                } else if let minPrice = minTicketPrice {
+                    if minPrice == 0 {
+                        Text("Free")
+                            .font(GatherFont.headline)
+                            .foregroundStyle(.green)
+                    } else {
+                        Text("From \(formatPrice(minPrice))")
+                            .font(GatherFont.headline)
+                    }
+                    Text("\(availableTicketCount) tickets available")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
                 }
             }
-            .padding()
-            .background(.ultraThinMaterial)
+
+            Spacer()
+
+            if isSoldOut {
+                Button {
+                    showWaitlist = true
+                } label: {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "bell.badge")
+                        Text("Join Waitlist")
+                    }
+                    .font(GatherFont.headline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.sm)
+                    .background(Color.orange)
+                    .clipShape(Capsule())
+                }
+            } else {
+                Button {
+                    showTicketPurchase = true
+                } label: {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "ticket.fill")
+                        Text("Get Tickets")
+                    }
+                    .font(GatherFont.headline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.sm)
+                    .background(LinearGradient.gatherAccentGradient)
+                    .clipShape(Capsule())
+                }
+            }
         }
+        .padding()
+        .background(.ultraThinMaterial)
+    }
+
+    private var isSoldOut: Bool {
+        guard event.hasTicketing && !event.ticketTiers.isEmpty else { return false }
+        return event.ticketTiers.allSatisfy { $0.isSoldOut }
+    }
+
+    // Standard RSVP bar for non-ticketed events
+    private var standardRSVPBar: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text("Your RSVP")
+                    .font(GatherFont.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                Text("Not responded")
+                    .font(GatherFont.headline)
+            }
+
+            Spacer()
+
+            Button {
+                showRSVPSheet = true
+            } label: {
+                Text("RSVP")
+                    .font(GatherFont.headline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.xl)
+                    .padding(.vertical, Spacing.sm)
+                    .background(LinearGradient.gatherAccentGradient)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Helpers
 
     private var isHost: Bool {
-        event.host?.id == authManager.currentUser?.id
+        event.hostId == authManager.currentUser?.id
     }
 
-    private var monthAbbreviation: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        return formatter.string(from: event.startDate).uppercased()
+    private var currentUserGuest: Guest? {
+        guard let currentUser = authManager.currentUser else { return nil }
+        return event.guests.first(where: { $0.userId == currentUser.id })
     }
 
-    private var dayNumber: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: event.startDate)
-    }
-
-    private var formattedFullDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d, yyyy"
-        return formatter.string(from: event.startDate)
-    }
-
-    private var formattedTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        var result = formatter.string(from: event.startDate)
-        if let endDate = event.endDate {
-            result += " - \(formatter.string(from: endDate))"
+    private var currentUserTicket: Ticket? {
+        guard let userId = authManager.currentUser?.id else { return nil }
+        return allTickets.first { ticket in
+            ticket.eventId == event.id &&
+            ticket.userId == userId &&
+            ticket.paymentStatus == .completed
         }
-        return result
+    }
+
+    private var currentRSVPStatus: String {
+        if let guest = currentUserGuest {
+            return guest.status.displayName
+        }
+        return "Not responded"
+    }
+
+    private var minTicketPrice: Decimal? {
+        let availableTiers = event.ticketTiers.filter { $0.isAvailable && !$0.isHidden }
+        return availableTiers.map { $0.price }.min()
+    }
+
+    private var availableTicketCount: Int {
+        event.ticketTiers.filter { $0.isAvailable }.reduce(0) { $0 + $1.remainingCount }
+    }
+
+    private func formatPrice(_ price: Decimal) -> String {
+        if price == 0 { return "Free" }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
     }
 }
 
@@ -470,20 +620,19 @@ struct GuestCountPill: View {
 // MARK: - Preview
 
 #Preview {
+    @Previewable @State var previewEvent = Event(
+        title: "Summer Rooftop Party",
+        eventDescription: "Join us for an amazing summer party with great music, food, and drinks. Dress code: summer casual.",
+        startDate: Date().addingTimeInterval(86400 * 7),
+        endDate: Date().addingTimeInterval(86400 * 7 + 14400),
+        location: EventLocation(
+            name: "The Rooftop Lounge",
+            address: "123 Main Street, San Francisco, CA"
+        ),
+        capacity: 50
+    )
     NavigationStack {
-        EventDetailView(
-            event: Event(
-                title: "Summer Rooftop Party",
-                eventDescription: "Join us for an amazing summer party with great music, food, and drinks. Dress code: summer casual.",
-                startDate: Date().addingTimeInterval(86400 * 7),
-                endDate: Date().addingTimeInterval(86400 * 7 + 14400),
-                location: EventLocation(
-                    name: "The Rooftop Lounge",
-                    address: "123 Main Street, San Francisco, CA"
-                ),
-                capacity: 50
-            )
-        )
-        .environmentObject(AuthManager())
+        EventDetailView(event: previewEvent)
+            .environmentObject(AuthManager())
     }
 }

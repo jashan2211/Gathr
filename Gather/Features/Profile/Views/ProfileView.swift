@@ -1,123 +1,64 @@
 import SwiftUI
+import SwiftData
 
 struct ProfileView: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allEvents: [Event]
     @State private var showDeleteConfirmation = false
     @State private var showSignOutConfirmation = false
+    @State private var isLoadingData = false
+    @State private var loadedDataMessage: String?
+
+    private var hostedEvents: Int {
+        guard let userId = authManager.currentUser?.id else { return 0 }
+        return allEvents.filter { $0.hostId == userId }.count
+    }
+
+    private var attendingEvents: Int {
+        guard let userId = authManager.currentUser?.id else { return 0 }
+        return allEvents.filter { event in
+            event.guests.contains { $0.userId == userId && $0.status == .attending }
+        }.count
+    }
 
     var body: some View {
         NavigationStack {
-            List {
-                // Profile Header
-                Section {
-                    HStack(spacing: Spacing.md) {
-                        // Avatar
-                        Circle()
-                            .fill(LinearGradient.gatherAccentGradient)
-                            .frame(width: AvatarSize.lg, height: AvatarSize.lg)
-                            .overlay {
-                                Text(authManager.currentUser?.name.prefix(1).uppercased() ?? "?")
-                                    .font(.title)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.white)
-                            }
+            ScrollView {
+                VStack(spacing: Spacing.lg) {
+                    // Profile Header Card
+                    profileHeader
+                        .bouncyAppear()
 
-                        VStack(alignment: .leading, spacing: Spacing.xxs) {
-                            Text(authManager.currentUser?.name ?? "User")
-                                .font(GatherFont.title3)
+                    // Stats Row
+                    statsRow
+                        .bouncyAppear(delay: 0.03)
 
-                            if let email = authManager.currentUser?.email {
-                                Text(email)
-                                    .font(GatherFont.caption)
-                                    .foregroundStyle(Color.gatherSecondaryText)
-                            }
-                        }
+                    // My Tickets Section
+                    myTicketsSection
+                        .bouncyAppear(delay: 0.06)
 
-                        Spacer()
+                    // Preferences
+                    preferencesSection
+                        .bouncyAppear(delay: 0.09)
 
-                        Button {
-                            // Edit profile
-                        } label: {
-                            Text("Edit")
-                                .font(GatherFont.callout)
-                        }
-                    }
-                    .padding(.vertical, Spacing.xs)
+                    // Support
+                    supportSection
+                        .bouncyAppear(delay: 0.12)
+
+                    // Account Actions
+                    accountSection
+
+                    // Developer Tools
+                    devToolsSection
+
+                    // Version
+                    versionBadge
+
+                    Spacer()
+                        .frame(height: Layout.tabBarHeight + 20)
                 }
-
-                // Preferences
-                Section("Preferences") {
-                    NavigationLink {
-                        NotificationSettingsView()
-                    } label: {
-                        Label("Notifications", systemImage: "bell")
-                    }
-
-                    NavigationLink {
-                        PrivacySettingsView()
-                    } label: {
-                        Label("Privacy", systemImage: "lock")
-                    }
-
-                    NavigationLink {
-                        CalendarSettingsView()
-                    } label: {
-                        Label("Calendar Sync", systemImage: "calendar")
-                    }
-
-                    NavigationLink {
-                        AppearanceSettingsView()
-                    } label: {
-                        Label("Appearance", systemImage: "paintbrush")
-                    }
-                }
-
-                // Support
-                Section("Support") {
-                    NavigationLink {
-                        Text("Help Center")
-                    } label: {
-                        Label("Help", systemImage: "questionmark.circle")
-                    }
-
-                    NavigationLink {
-                        Text("Feedback")
-                    } label: {
-                        Label("Send Feedback", systemImage: "envelope")
-                    }
-
-                    NavigationLink {
-                        Text("About")
-                    } label: {
-                        Label("About Gather", systemImage: "info.circle")
-                    }
-                }
-
-                // Account Actions
-                Section {
-                    Button(role: .destructive) {
-                        showSignOutConfirmation = true
-                    } label: {
-                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-
-                    Button(role: .destructive) {
-                        showDeleteConfirmation = true
-                    } label: {
-                        Label("Delete Account", systemImage: "trash")
-                            .foregroundStyle(.red)
-                    }
-                }
-
-                // Version
-                Section {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundStyle(Color.gatherSecondaryText)
-                    }
-                }
+                .padding()
             }
             .navigationTitle("Profile")
             .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
@@ -131,13 +72,451 @@ struct ProfileView: View {
             .confirmationDialog("Delete Account", isPresented: $showDeleteConfirmation) {
                 Button("Delete Account", role: .destructive) {
                     Task {
-                        await authManager.deleteAccount()
+                        await authManager.deleteAccount(modelContext: modelContext)
                     }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will permanently delete your account and all associated data. This action cannot be undone.")
             }
+        }
+    }
+
+    // MARK: - Profile Header
+
+    private var profileHeader: some View {
+        HStack(spacing: Spacing.md) {
+            // Avatar with gradient ring
+            ZStack {
+                Circle()
+                    .fill(LinearGradient.gatherAccentGradient)
+                    .frame(width: AvatarSize.lg, height: AvatarSize.lg)
+                    .overlay {
+                        Text(authManager.currentUser?.name.prefix(1).uppercased() ?? "?")
+                            .font(.title)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                    }
+                    .modifier(GradientRing(color: Color.accentPurpleFallback, lineWidth: 3))
+            }
+
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                Text(authManager.currentUser?.name ?? "User")
+                    .font(GatherFont.title3)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                if let email = authManager.currentUser?.email {
+                    Text(email)
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+            }
+
+            Spacer()
+
+            Button {
+                // Edit profile
+            } label: {
+                Text("Edit")
+                    .font(GatherFont.callout)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.accentPurpleFallback)
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.vertical, Spacing.xs)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.accentPurpleFallback.opacity(0.3), lineWidth: 1)
+                    )
+            }
+        }
+        .padding(Spacing.md)
+        .glassCard()
+    }
+
+    // MARK: - Stats Row
+
+    private var statsRow: some View {
+        HStack(spacing: Spacing.sm) {
+            ProfileStatCard(
+                value: hostedEvents,
+                label: "Hosted",
+                icon: "calendar.badge.plus",
+                color: Color.accentPurpleFallback
+            )
+            ProfileStatCard(
+                value: attendingEvents,
+                label: "Attending",
+                icon: "ticket.fill",
+                color: Color.accentPinkFallback
+            )
+            ProfileStatCard(
+                value: totalGuests,
+                label: "Total Guests",
+                icon: "person.2.fill",
+                color: Color.mintGreen
+            )
+        }
+    }
+
+    // MARK: - My Tickets Section
+
+    private var myTicketsSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "ticket.fill")
+                    .foregroundStyle(Color.accentPurpleFallback)
+                Text("My Tickets")
+                    .font(GatherFont.headline)
+                    .foregroundStyle(Color.gatherPrimaryText)
+            }
+
+            HStack(spacing: Spacing.md) {
+                Image(systemName: "qrcode")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentPurpleFallback)
+                    .frame(width: 44, height: 44)
+                    .background(Color.accentPurpleFallback.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("View Purchased Tickets")
+                        .font(GatherFont.callout)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Text("Access QR codes and event details")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .padding(Spacing.md)
+            .glassCard()
+        }
+    }
+
+    // MARK: - Preferences Section
+
+    private var preferencesSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("Preferences")
+                .font(GatherFont.headline)
+                .foregroundStyle(Color.gatherPrimaryText)
+
+            VStack(spacing: 1) {
+                ProfileMenuItem(icon: "bell", title: "Notifications", color: Color.accentPurpleFallback) {
+                    NotificationSettingsView()
+                }
+                ProfileMenuItem(icon: "lock", title: "Privacy", color: Color.accentPinkFallback) {
+                    PrivacySettingsView()
+                }
+                ProfileMenuItem(icon: "calendar", title: "Calendar Sync", color: Color.neonBlue) {
+                    CalendarSettingsView()
+                }
+                ProfileMenuItem(icon: "paintbrush", title: "Appearance", color: Color.sunshineYellow) {
+                    AppearanceSettingsView()
+                }
+            }
+            .glassCard(cornerRadius: CornerRadius.md)
+        }
+    }
+
+    // MARK: - Support Section
+
+    private var supportSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("Support")
+                .font(GatherFont.headline)
+                .foregroundStyle(Color.gatherPrimaryText)
+
+            VStack(spacing: 1) {
+                ProfileMenuItem(icon: "questionmark.circle", title: "Help", color: Color.mintGreen) {
+                    Text("Help Center")
+                }
+                ProfileMenuItem(icon: "envelope", title: "Send Feedback", color: Color.accentPurpleFallback) {
+                    Text("Feedback")
+                }
+                ProfileMenuItem(icon: "info.circle", title: "About Gather", color: Color.neonBlue) {
+                    Text("About")
+                }
+            }
+            .glassCard(cornerRadius: CornerRadius.md)
+        }
+    }
+
+    // MARK: - Account Section
+
+    private var accountSection: some View {
+        VStack(spacing: Spacing.sm) {
+            Button {
+                showSignOutConfirmation = true
+            } label: {
+                HStack {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .foregroundStyle(Color.warmCoral)
+                    Text("Sign Out")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.warmCoral)
+                    Spacer()
+                }
+                .padding(Spacing.md)
+                .glassCard()
+            }
+
+            Button {
+                showDeleteConfirmation = true
+            } label: {
+                HStack {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                    Text("Delete Account")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(.red)
+                    Spacer()
+                }
+                .padding(Spacing.md)
+                .glassCard()
+            }
+        }
+    }
+
+    // MARK: - Dev Tools
+
+    private var devToolsSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "wrench.and.screwdriver")
+                    .foregroundStyle(Color.gatherSecondaryText)
+                Text("Developer Tools")
+                    .font(GatherFont.headline)
+                    .foregroundStyle(Color.gatherPrimaryText)
+            }
+
+            // Data stats
+            HStack(spacing: Spacing.md) {
+                DevToolStat(value: allEvents.count, label: "Events", color: Color.accentPurpleFallback)
+                DevToolStat(value: totalGuests, label: "Guests", color: Color.accentPinkFallback)
+                DevToolStat(value: publicEventsCount, label: "Public", color: Color.mintGreen)
+            }
+            .padding(Spacing.sm)
+            .glassCard()
+
+            if isLoadingData {
+                HStack {
+                    ProgressView()
+                        .tint(Color.accentPurpleFallback)
+                    Text("Generating data...")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .padding(Spacing.sm)
+            }
+
+            if let message = loadedDataMessage {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.mintGreen)
+                    Text(message)
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .padding(Spacing.sm)
+            }
+
+            DataLoadButton(
+                title: "Standard",
+                subtitle: "13 events, curated demo data",
+                icon: "square.and.arrow.down",
+                color: Color.accentPurpleFallback,
+                isLoading: isLoadingData
+            ) { loadData(size: .standard) }
+
+            DataLoadButton(
+                title: "Large",
+                subtitle: "50 events across 20 cities",
+                icon: "square.stack.3d.up",
+                color: Color.accentPinkFallback,
+                isLoading: isLoadingData
+            ) { loadData(size: .large) }
+
+            DataLoadButton(
+                title: "Massive",
+                subtitle: "150+ events, stress test mode",
+                icon: "flame",
+                color: Color.sunshineYellow,
+                isLoading: isLoadingData
+            ) { loadData(size: .massive) }
+
+            Button {
+                resetDemoData()
+            } label: {
+                HStack {
+                    Image(systemName: "trash")
+                        .foregroundStyle(Color.warmCoral)
+                    Text("Reset All Data")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.warmCoral)
+                    Spacer()
+                }
+                .padding(Spacing.md)
+                .glassCard()
+            }
+            .disabled(isLoadingData)
+        }
+    }
+
+    // MARK: - Version Badge
+
+    private var versionBadge: some View {
+        HStack {
+            Spacer()
+            Text("Gather v1.0.0")
+                .font(.caption2)
+                .foregroundStyle(Color.gatherSecondaryText)
+            Spacer()
+        }
+        .padding(.top, Spacing.sm)
+    }
+
+    // MARK: - Computed
+
+    private var totalGuests: Int {
+        allEvents.reduce(0) { $0 + $1.guests.count }
+    }
+
+    private var publicEventsCount: Int {
+        allEvents.filter { $0.privacy == .publicEvent }.count
+    }
+
+    // MARK: - Data Sizes
+
+    enum DataSize {
+        case standard, large, massive
+        var eventCount: Int {
+            switch self {
+            case .standard: return 13
+            case .large: return 50
+            case .massive: return 150
+            }
+        }
+        var label: String {
+            switch self {
+            case .standard: return "Standard"
+            case .large: return "Large"
+            case .massive: return "Massive"
+            }
+        }
+    }
+
+    // MARK: - Demo Data Functions
+
+    private func loadData(size: DataSize) {
+        guard let userId = authManager.currentUser?.id else { return }
+        isLoadingData = true
+        loadedDataMessage = nil
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if size == .standard {
+                DemoDataService.shared.loadDemoData(modelContext: modelContext, hostId: userId)
+            } else {
+                DemoDataService.shared.loadMassiveData(modelContext: modelContext, hostId: userId, eventCount: size.eventCount)
+            }
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            isLoadingData = false
+            loadedDataMessage = "\(size.label) data loaded!"
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                withAnimation { loadedDataMessage = nil }
+            }
+        }
+    }
+
+    private func resetDemoData() {
+        DemoDataService.shared.resetAllData(modelContext: modelContext)
+        loadedDataMessage = nil
+
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.warning)
+    }
+}
+
+// MARK: - Profile Stat Card
+
+struct ProfileStatCard: View {
+    let value: Int
+    let label: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(color)
+
+            Text("\(value)")
+                .font(GatherFont.title2)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.gatherPrimaryText)
+                .contentTransition(.numericText())
+
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.md)
+        .glassCard()
+    }
+}
+
+// MARK: - Profile Menu Item
+
+struct ProfileMenuItem: View {
+    let icon: String
+    let title: String
+    let color: Color
+    let destination: () -> AnyView
+
+    init<V: View>(icon: String, title: String, color: Color, @ViewBuilder destination: @escaping () -> V) {
+        self.icon = icon
+        self.title = title
+        self.color = color
+        self.destination = { AnyView(destination()) }
+    }
+
+    var body: some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack(spacing: Spacing.md) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(color)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                Text(title)
+                    .font(GatherFont.callout)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.sm)
         }
     }
 }
@@ -225,9 +604,105 @@ struct AppearanceSettingsView: View {
     }
 }
 
+// MARK: - Profile Stat Item (legacy compat)
+
+struct ProfileStatItem: View {
+    let value: Int
+    let label: String
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: Spacing.xs) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(Color.accentPurpleFallback)
+
+            Text("\(value)")
+                .font(GatherFont.title2)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.gatherPrimaryText)
+
+            Text(label)
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Dev Tool Stat
+
+struct DevToolStat: View {
+    let value: Int
+    let label: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text("\(value)")
+                .font(GatherFont.title2)
+                .fontWeight(.bold)
+                .foregroundStyle(color)
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Data Load Button
+
+struct DataLoadButton: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    let isLoading: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(color)
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(GatherFont.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .padding(Spacing.sm)
+            .glassCard()
+        }
+        .disabled(isLoading)
+        .opacity(isLoading ? 0.5 : 1)
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
     ProfileView()
         .environmentObject(AuthManager())
+        .modelContainer(for: Event.self, inMemory: true)
 }

@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2A34122B307E4333BF68EFD1 /* DemoDataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C42476E4426846E1809CE008 /* DemoDataService.swift */; };
+		616D67BDE15B4304A4FFFAD6 /* EventCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CD7F67C17B4EA095E40F91 /* EventCategory.swift */; };
+		37F502B50CC74D9CAA3669FC /* FunctionRSVPSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA977FDCC66843B487FE7F86 /* FunctionRSVPSheet.swift */; };
 		0A1B2C3D00000001 /* GatherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000001 /* GatherApp.swift */; };
 		0A1B2C3D00000002 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000002 /* MainTabView.swift */; };
 		0A1B2C3D00000003 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000003 /* User.swift */; };
@@ -14,14 +17,11 @@
 		0A1B2C3D00000005 /* Guest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000005 /* Guest.swift */; };
 		0A1B2C3D00000006 /* Comment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000006 /* Comment.swift */; };
 		0A1B2C3D00000007 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000007 /* AuthManager.swift */; };
+		0A1B2C3D00000030 /* EventService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000030 /* EventService.swift */; };
 		0A1B2C3D00000008 /* Colors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000008 /* Colors.swift */; };
 		0A1B2C3D00000009 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000009 /* Typography.swift */; };
 		0A1B2C3D00000010 /* Spacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000010 /* Spacing.swift */; };
-		0A1B2C3D00000011 /* GatherButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000011 /* GatherButton.swift */; };
-		0A1B2C3D00000012 /* GatherTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000012 /* GatherTextField.swift */; };
-		0A1B2C3D00000013 /* EventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000013 /* EventCard.swift */; };
 		0A1B2C3D00000014 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000014 /* AuthView.swift */; };
-		0A1B2C3D00000015 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000015 /* HomeView.swift */; };
 		0A1B2C3D00000016 /* CreateEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000016 /* CreateEventView.swift */; };
 		0A1B2C3D00000017 /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000017 /* EventDetailView.swift */; };
 		0A1B2C3D00000018 /* MyEventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000018 /* MyEventsView.swift */; };
@@ -35,6 +35,46 @@
 		0A1B2C3D00000026 /* GuestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000026 /* GuestTests.swift */; };
 		0A1B2C3D00000027 /* UserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000027 /* UserTests.swift */; };
 		0A1B2C3D00000028 /* GatherUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000028 /* GatherUITests.swift */; };
+		0A1B2C3D00000031 /* EditEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000031 /* EditEventView.swift */; };
+		0A1B2C3D00000032 /* AddGuestSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000032 /* AddGuestSheet.swift */; };
+		0A1B2C3D00000033 /* Budget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000033 /* Budget.swift */; };
+		0A1B2C3D00000034 /* BudgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000034 /* BudgetView.swift */; };
+		0A1B2C3D00000035 /* SeatingChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D00000035 /* SeatingChartView.swift */; };
+		BF0076468FE677064A146CE4 /* EventFunction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0AFBD248FF69FED44676FA6 /* EventFunction.swift */; };
+		088B0AC5EE5EAD4E5574B53D /* FunctionInvite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E82F01AD3201FB52E2B880C /* FunctionInvite.swift */; };
+		ECCF94231909641816E708B6 /* InviteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A4D31F0F818332424F41A6 /* InviteService.swift */; };
+		AB7E76A848EE7F2226A7C8D1 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08160D1795A9736E1809BB74 /* NotificationService.swift */; };
+		C4D414639BFF3CD73C8C001E /* OverviewTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62E2F75963886AE9411C18E4 /* OverviewTab.swift */; };
+		C34868D31078D4EC29086239 /* FunctionsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07123DA9C4302213A3AF044B /* FunctionsTab.swift */; };
+		848C987DEAF7165A62F09F74 /* GuestsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAA5B76F3CB030874B7630D /* GuestsTab.swift */; };
+		748CB89718E97A2F91C17003 /* BudgetTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75517E8EE838A387DFA623A /* BudgetTab.swift */; };
+		3214A4CD5030BF800ABA211A /* FunctionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3FB22904C9A701FDB752CEE /* FunctionCard.swift */; };
+		BC32ECC0B3010A4083081137 /* AddFunctionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7AA7009BB767D4F44228E3 /* AddFunctionSheet.swift */; };
+		BCB92CDF006D5EF08B835824 /* FunctionDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EED526DC7DDD34D280B0ADE0 /* FunctionDetailSheet.swift */; };
+		78E4ECAD615BAB85A3CBD7FC /* GuestRowWithFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 160CF48B84B58794F015398E /* GuestRowWithFunctions.swift */; };
+		1E06ECEE2FCD8A33E566806E /* GuestActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F257EF4DF7A8261BC05959 /* GuestActionBar.swift */; };
+		820535F675ADC87FD5A78D0F /* GuestFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C541EC5E7D536100EA81E0E /* GuestFilterBar.swift */; };
+		1335E9E248F405FEFC1EF7D4 /* SendInvitesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E6C4510DB1663C7FE622814 /* SendInvitesSheet.swift */; };
+		47FF73A725F73544FBE83DDE /* GoingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493689F9F31828D6CFB73317 /* GoingView.swift */; };
+		05300992B3FEBD8F147C7C9C /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E0146FC7135A55AF73A7ED4 /* ExploreView.swift */; };
+		1D5A545CE5E84E46B6682927 /* Ticket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D565057747B44818B138BF1 /* Ticket.swift */; };
+		FC43ADF59E094A2195E2FD71 /* TicketPurchaseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92221A5ED46648DA9119C345 /* TicketPurchaseSheet.swift */; };
+		363ADD5D392C443F85FE10D1 /* TicketConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54CB82C1F53247F8A983B360 /* TicketConfirmationView.swift */; };
+		98481F8BD78F4545B3BA9CF6 /* WaitlistSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 248FAD0F0B8E4FDFBE351BCE /* WaitlistSheet.swift */; };
+		7F4222F0D28B487DA4501B29 /* ManageRSVPSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DCE894C37C3485DAEA02F61 /* ManageRSVPSheet.swift */; };
+		0146F074C1EDB05049F073BA /* CalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBB06C1A8878F8A36AAAB895 /* CalendarService.swift */; };
+		AAAA00000001 /* ActivityTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB00000001 /* ActivityTab.swift */; };
+		AAAA00000002 /* PhotosTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB00000002 /* PhotosTab.swift */; };
+		AAAA00000003 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB00000003 /* OnboardingView.swift */; };
+		AAAA00000004 /* EventTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB00000004 /* EventTemplate.swift */; };
+		CCCC00000001 /* PartyMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDD00000001 /* PartyMember.swift */; };
+		CCCC00000002 /* GuestDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDD00000002 /* GuestDetailSheet.swift */; };
+		EEEE00000001 /* PaymentSplit.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00000001 /* PaymentSplit.swift */; };
+		AA11BB2200000001 /* EventMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11CC2200000001 /* EventMember.swift */; };
+		AA11BB2200000002 /* AppNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11CC2200000002 /* AppNotification.swift */; };
+		AA11BB2200000003 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11CC2200000003 /* NotificationsView.swift */; };
+		AA11BB2200000004 /* EventTeamSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11CC2200000004 /* EventTeamSheet.swift */; };
+		AA11BB2200000005 /* PaymentTransaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11CC2200000005 /* PaymentTransaction.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -55,6 +95,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C42476E4426846E1809CE008 /* DemoDataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Services/DemoDataService.swift"; sourceTree = SOURCE_ROOT; };
+		D9CD7F67C17B4EA095E40F91 /* EventCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventCategory.swift; sourceTree = "<group>"; };
+		EA977FDCC66843B487FE7F86 /* FunctionRSVPSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunctionRSVPSheet.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000001 /* GatherApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherApp.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000002 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000003 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
@@ -62,14 +105,11 @@
 		1A1B2C3D00000005 /* Guest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Guest.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000006 /* Comment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comment.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000007 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		1A1B2C3D00000030 /* EventService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventService.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000008 /* Colors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Colors.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000009 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000010 /* Spacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Spacing.swift; sourceTree = "<group>"; };
-		1A1B2C3D00000011 /* GatherButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherButton.swift; sourceTree = "<group>"; };
-		1A1B2C3D00000012 /* GatherTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherTextField.swift; sourceTree = "<group>"; };
-		1A1B2C3D00000013 /* EventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventCard.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000014 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
-		1A1B2C3D00000015 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000016 /* CreateEventView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEventView.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000017 /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000018 /* MyEventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyEventsView.swift; sourceTree = "<group>"; };
@@ -84,9 +124,49 @@
 		1A1B2C3D00000027 /* UserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserTests.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000028 /* GatherUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherUITests.swift; sourceTree = "<group>"; };
 		1A1B2C3D00000029 /* Gather.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Gather.entitlements; sourceTree = "<group>"; };
+		1A1B2C3D00000031 /* EditEventView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditEventView.swift; sourceTree = "<group>"; };
+		1A1B2C3D00000032 /* AddGuestSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGuestSheet.swift; sourceTree = "<group>"; };
+		1A1B2C3D00000033 /* Budget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Budget.swift; sourceTree = "<group>"; };
+		1A1B2C3D00000034 /* BudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetView.swift; sourceTree = "<group>"; };
+		1A1B2C3D00000035 /* SeatingChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatingChartView.swift; sourceTree = "<group>"; };
 		5A1B2C3D00000001 /* Gather.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Gather.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A1B2C3D00000002 /* GatherTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GatherTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A1B2C3D00000003 /* GatherUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GatherUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0AFBD248FF69FED44676FA6 /* EventFunction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Models/EventFunction.swift"; sourceTree = SOURCE_ROOT; };
+		7E82F01AD3201FB52E2B880C /* FunctionInvite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Models/FunctionInvite.swift"; sourceTree = SOURCE_ROOT; };
+		44A4D31F0F818332424F41A6 /* InviteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Services/InviteService.swift"; sourceTree = SOURCE_ROOT; };
+		08160D1795A9736E1809BB74 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Services/NotificationService.swift"; sourceTree = SOURCE_ROOT; };
+		BBB06C1A8878F8A36AAAB895 /* CalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
+		62E2F75963886AE9411C18E4 /* OverviewTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Tabs/OverviewTab.swift"; sourceTree = SOURCE_ROOT; };
+		07123DA9C4302213A3AF044B /* FunctionsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Tabs/FunctionsTab.swift"; sourceTree = SOURCE_ROOT; };
+		DEAA5B76F3CB030874B7630D /* GuestsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Tabs/GuestsTab.swift"; sourceTree = SOURCE_ROOT; };
+		E75517E8EE838A387DFA623A /* BudgetTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Tabs/BudgetTab.swift"; sourceTree = SOURCE_ROOT; };
+		D3FB22904C9A701FDB752CEE /* FunctionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Functions/FunctionCard.swift"; sourceTree = SOURCE_ROOT; };
+		EC7AA7009BB767D4F44228E3 /* AddFunctionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Functions/AddFunctionSheet.swift"; sourceTree = SOURCE_ROOT; };
+		EED526DC7DDD34D280B0ADE0 /* FunctionDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Functions/FunctionDetailSheet.swift"; sourceTree = SOURCE_ROOT; };
+		160CF48B84B58794F015398E /* GuestRowWithFunctions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Guests/GuestRowWithFunctions.swift"; sourceTree = SOURCE_ROOT; };
+		70F257EF4DF7A8261BC05959 /* GuestActionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Guests/GuestActionBar.swift"; sourceTree = SOURCE_ROOT; };
+		5C541EC5E7D536100EA81E0E /* GuestFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Guests/GuestFilterBar.swift"; sourceTree = SOURCE_ROOT; };
+		1E6C4510DB1663C7FE622814 /* SendInvitesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Invites/SendInvitesSheet.swift"; sourceTree = SOURCE_ROOT; };
+		493689F9F31828D6CFB73317 /* GoingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Going/Views/GoingView.swift"; sourceTree = SOURCE_ROOT; };
+		3E0146FC7135A55AF73A7ED4 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Explore/Views/ExploreView.swift"; sourceTree = SOURCE_ROOT; };
+		0D565057747B44818B138BF1 /* Ticket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Models/Ticket.swift"; sourceTree = SOURCE_ROOT; };
+		92221A5ED46648DA9119C345 /* TicketPurchaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Tickets/Views/TicketPurchaseSheet.swift"; sourceTree = SOURCE_ROOT; };
+		54CB82C1F53247F8A983B360 /* TicketConfirmationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Tickets/Views/TicketConfirmationView.swift"; sourceTree = SOURCE_ROOT; };
+		248FAD0F0B8E4FDFBE351BCE /* WaitlistSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Tickets/Views/WaitlistSheet.swift"; sourceTree = SOURCE_ROOT; };
+		7DCE894C37C3485DAEA02F61 /* ManageRSVPSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/RSVP/Views/ManageRSVPSheet.swift"; sourceTree = SOURCE_ROOT; };
+		BBBB00000001 /* ActivityTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Tabs/ActivityTab.swift"; sourceTree = SOURCE_ROOT; };
+		BBBB00000002 /* PhotosTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/Tabs/PhotosTab.swift"; sourceTree = SOURCE_ROOT; };
+		BBBB00000003 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Onboarding/Views/OnboardingView.swift"; sourceTree = SOURCE_ROOT; };
+		BBBB00000004 /* EventTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTemplate.swift; sourceTree = "<group>"; };
+		DDDD00000001 /* PartyMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartyMember.swift; sourceTree = "<group>"; };
+		DDDD00000002 /* GuestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestDetailSheet.swift; sourceTree = "<group>"; };
+		FFFF00000001 /* PaymentSplit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentSplit.swift; sourceTree = "<group>"; };
+		BB11CC2200000001 /* EventMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Models/EventMember.swift"; sourceTree = SOURCE_ROOT; };
+		BB11CC2200000002 /* AppNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Models/AppNotification.swift"; sourceTree = SOURCE_ROOT; };
+		BB11CC2200000003 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Notifications/Views/NotificationsView.swift"; sourceTree = SOURCE_ROOT; };
+		BB11CC2200000004 /* EventTeamSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Features/Events/Detail/Views/EventTeamSheet.swift"; sourceTree = SOURCE_ROOT; };
+		BB11CC2200000005 /* PaymentTransaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gather/Core/Models/PaymentTransaction.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -189,7 +269,6 @@
 				1A1B2C3D00000008 /* Colors.swift */,
 				1A1B2C3D00000009 /* Typography.swift */,
 				1A1B2C3D00000010 /* Spacing.swift */,
-				7A1B2C3D00000013 /* Components */,
 			);
 			path = DesignSystem;
 			sourceTree = "<group>";
@@ -198,11 +277,11 @@
 			isa = PBXGroup;
 			children = (
 				7A1B2C3D00000014 /* Auth */,
-				7A1B2C3D00000015 /* Home */,
 				7A1B2C3D00000016 /* Events */,
 				7A1B2C3D00000017 /* RSVP */,
 				7A1B2C3D00000018 /* Guests */,
 				7A1B2C3D00000019 /* Profile */,
+				CC11DD2200000001 /* Notifications */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -221,7 +300,15 @@
 				1A1B2C3D00000003 /* User.swift */,
 				1A1B2C3D00000004 /* Event.swift */,
 				1A1B2C3D00000005 /* Guest.swift */,
+				DDDD00000001 /* PartyMember.swift */,
 				1A1B2C3D00000006 /* Comment.swift */,
+				1A1B2C3D00000033 /* Budget.swift */,
+				D9CD7F67C17B4EA095E40F91 /* EventCategory.swift */,
+				BBBB00000004 /* EventTemplate.swift */,
+				FFFF00000001 /* PaymentSplit.swift */,
+				BB11CC2200000001 /* EventMember.swift */,
+				BB11CC2200000002 /* AppNotification.swift */,
+				BB11CC2200000005 /* PaymentTransaction.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -229,19 +316,12 @@
 		7A1B2C3D00000012 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				C42476E4426846E1809CE008 /* DemoDataService.swift */,
 				1A1B2C3D00000007 /* AuthManager.swift */,
+				1A1B2C3D00000030 /* EventService.swift */,
+				BBB06C1A8878F8A36AAAB895 /* CalendarService.swift */,
 			);
 			path = Services;
-			sourceTree = "<group>";
-		};
-		7A1B2C3D00000013 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				1A1B2C3D00000011 /* GatherButton.swift */,
-				1A1B2C3D00000012 /* GatherTextField.swift */,
-				1A1B2C3D00000013 /* EventCard.swift */,
-			);
-			path = Components;
 			sourceTree = "<group>";
 		};
 		7A1B2C3D00000014 /* Auth */ = {
@@ -250,14 +330,6 @@
 				7A1B2C3D00000020 /* Views */,
 			);
 			path = Auth;
-			sourceTree = "<group>";
-		};
-		7A1B2C3D00000015 /* Home */ = {
-			isa = PBXGroup;
-			children = (
-				7A1B2C3D00000021 /* Views */,
-			);
-			path = Home;
 			sourceTree = "<group>";
 		};
 		7A1B2C3D00000016 /* Events */ = {
@@ -302,14 +374,6 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
-		7A1B2C3D00000021 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				1A1B2C3D00000015 /* HomeView.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
 		7A1B2C3D00000022 /* Create */ = {
 			isa = PBXGroup;
 			children = (
@@ -338,6 +402,7 @@
 			isa = PBXGroup;
 			children = (
 				1A1B2C3D00000021 /* RSVPSheet.swift */,
+				EA977FDCC66843B487FE7F86 /* FunctionRSVPSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -346,6 +411,10 @@
 			isa = PBXGroup;
 			children = (
 				1A1B2C3D00000022 /* ContactsView.swift */,
+				1A1B2C3D00000032 /* AddGuestSheet.swift */,
+				DDDD00000002 /* GuestDetailSheet.swift */,
+				1A1B2C3D00000035 /* SeatingChartView.swift */,
+				1A1B2C3D00000034 /* BudgetView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -372,6 +441,8 @@
 				1A1B2C3D00000017 /* EventDetailView.swift */,
 				1A1B2C3D00000019 /* ShareSheet.swift */,
 				1A1B2C3D00000020 /* GuestListSheet.swift */,
+				1A1B2C3D00000031 /* EditEventView.swift */,
+				BB11CC2200000004 /* EventTeamSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -380,6 +451,22 @@
 			isa = PBXGroup;
 			children = (
 				1A1B2C3D00000018 /* MyEventsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		CC11DD2200000001 /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				CC11DD2200000002 /* Views */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+		CC11DD2200000002 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB11CC2200000003 /* NotificationsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -497,6 +584,26 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2A34122B307E4333BF68EFD1 /* DemoDataService.swift in Sources */,
+				616D67BDE15B4304A4FFFAD6 /* EventCategory.swift in Sources */,
+				37F502B50CC74D9CAA3669FC /* FunctionRSVPSheet.swift in Sources */,
+				47FF73A725F73544FBE83DDE /* GoingView.swift in Sources */,
+				05300992B3FEBD8F147C7C9C /* ExploreView.swift in Sources */,
+				BF0076468FE677064A146CE4 /* EventFunction.swift in Sources */,
+				088B0AC5EE5EAD4E5574B53D /* FunctionInvite.swift in Sources */,
+				ECCF94231909641816E708B6 /* InviteService.swift in Sources */,
+				AB7E76A848EE7F2226A7C8D1 /* NotificationService.swift in Sources */,
+				C4D414639BFF3CD73C8C001E /* OverviewTab.swift in Sources */,
+				C34868D31078D4EC29086239 /* FunctionsTab.swift in Sources */,
+				848C987DEAF7165A62F09F74 /* GuestsTab.swift in Sources */,
+				748CB89718E97A2F91C17003 /* BudgetTab.swift in Sources */,
+				3214A4CD5030BF800ABA211A /* FunctionCard.swift in Sources */,
+				BC32ECC0B3010A4083081137 /* AddFunctionSheet.swift in Sources */,
+				BCB92CDF006D5EF08B835824 /* FunctionDetailSheet.swift in Sources */,
+				78E4ECAD615BAB85A3CBD7FC /* GuestRowWithFunctions.swift in Sources */,
+				1E06ECEE2FCD8A33E566806E /* GuestActionBar.swift in Sources */,
+				820535F675ADC87FD5A78D0F /* GuestFilterBar.swift in Sources */,
+				1335E9E248F405FEFC1EF7D4 /* SendInvitesSheet.swift in Sources */,
 				0A1B2C3D00000001 /* GatherApp.swift in Sources */,
 				0A1B2C3D00000002 /* MainTabView.swift in Sources */,
 				0A1B2C3D00000003 /* User.swift in Sources */,
@@ -507,11 +614,7 @@
 				0A1B2C3D00000008 /* Colors.swift in Sources */,
 				0A1B2C3D00000009 /* Typography.swift in Sources */,
 				0A1B2C3D00000010 /* Spacing.swift in Sources */,
-				0A1B2C3D00000011 /* GatherButton.swift in Sources */,
-				0A1B2C3D00000012 /* GatherTextField.swift in Sources */,
-				0A1B2C3D00000013 /* EventCard.swift in Sources */,
 				0A1B2C3D00000014 /* AuthView.swift in Sources */,
-				0A1B2C3D00000015 /* HomeView.swift in Sources */,
 				0A1B2C3D00000016 /* CreateEventView.swift in Sources */,
 				0A1B2C3D00000017 /* EventDetailView.swift in Sources */,
 				0A1B2C3D00000018 /* MyEventsView.swift in Sources */,
@@ -520,6 +623,30 @@
 				0A1B2C3D00000021 /* RSVPSheet.swift in Sources */,
 				0A1B2C3D00000022 /* ContactsView.swift in Sources */,
 				0A1B2C3D00000023 /* ProfileView.swift in Sources */,
+				0A1B2C3D00000030 /* EventService.swift in Sources */,
+				0A1B2C3D00000031 /* EditEventView.swift in Sources */,
+				0A1B2C3D00000032 /* AddGuestSheet.swift in Sources */,
+				0A1B2C3D00000033 /* Budget.swift in Sources */,
+				0A1B2C3D00000034 /* BudgetView.swift in Sources */,
+				0A1B2C3D00000035 /* SeatingChartView.swift in Sources */,
+				1D5A545CE5E84E46B6682927 /* Ticket.swift in Sources */,
+				FC43ADF59E094A2195E2FD71 /* TicketPurchaseSheet.swift in Sources */,
+				363ADD5D392C443F85FE10D1 /* TicketConfirmationView.swift in Sources */,
+				98481F8BD78F4545B3BA9CF6 /* WaitlistSheet.swift in Sources */,
+				7F4222F0D28B487DA4501B29 /* ManageRSVPSheet.swift in Sources */,
+				0146F074C1EDB05049F073BA /* CalendarService.swift in Sources */,
+				AAAA00000001 /* ActivityTab.swift in Sources */,
+				AAAA00000002 /* PhotosTab.swift in Sources */,
+				AAAA00000003 /* OnboardingView.swift in Sources */,
+				AAAA00000004 /* EventTemplate.swift in Sources */,
+				CCCC00000001 /* PartyMember.swift in Sources */,
+				CCCC00000002 /* GuestDetailSheet.swift in Sources */,
+				EEEE00000001 /* PaymentSplit.swift in Sources */,
+				AA11BB2200000001 /* EventMember.swift in Sources */,
+				AA11BB2200000002 /* AppNotification.swift in Sources */,
+				AA11BB2200000003 /* NotificationsView.swift in Sources */,
+				AA11BB2200000004 /* EventTeamSheet.swift in Sources */,
+				AA11BB2200000005 /* PaymentTransaction.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

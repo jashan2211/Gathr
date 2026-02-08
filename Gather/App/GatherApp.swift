@@ -10,12 +10,27 @@ struct GatherApp: App {
             User.self,
             Event.self,
             Guest.self,
-            Comment.self,
-            MediaItem.self
+            PartyMember.self,
+            ActivityPost.self,
+            MediaItem.self,
+            Budget.self,
+            BudgetCategory.self,
+            Expense.self,
+            EventFunction.self,
+            FunctionInvite.self,
+            TicketTier.self,
+            Ticket.self,
+            PromoCode.self,
+            WaitlistEntry.self,
+            PaymentTransaction.self,
+            PaymentSplit.self,
+            EventMember.self,
+            AppNotification.self
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
-            isStoredInMemoryOnly: false
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
         )
 
         do {
@@ -29,16 +44,78 @@ struct GatherApp: App {
 
     @StateObject private var authManager = AuthManager()
     @StateObject private var appState = AppState()
+    @StateObject private var eventService = EventService()
+    @StateObject private var notificationService = NotificationService.shared
 
     // MARK: - Body
+
+    @AppStorage("colorScheme") private var colorSchemeSetting = "system"
+
+    private var preferredColorScheme: ColorScheme? {
+        switch colorSchemeSetting {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(authManager)
                 .environmentObject(appState)
+                .environmentObject(eventService)
+                .environmentObject(notificationService)
+                .preferredColorScheme(preferredColorScheme)
+                .onAppear {
+                    eventService.setModelContext(sharedModelContainer.mainContext)
+                    setupNotifications()
+                }
+                .onOpenURL { url in
+                    handleDeepLink(url)
+                }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    // MARK: - Notifications Setup
+
+    private func setupNotifications() {
+        notificationService.setupNotificationCategories()
+        Task {
+            _ = await notificationService.requestPermission()
+        }
+    }
+
+    // MARK: - Deep Link Handling
+
+    private func handleDeepLink(_ url: URL) {
+        // Handle gather://rsvp/{eventId}/{guestId}
+        // Handle gather://event/{eventId}
+        guard url.scheme == "gather" else { return }
+
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+
+        switch url.host {
+        case "event":
+            if let eventIdString = pathComponents.first,
+               let eventId = UUID(uuidString: eventIdString) {
+                appState.deepLinkEventId = eventId
+            }
+        case "rsvp":
+            if pathComponents.count >= 2,
+               let eventIdString = pathComponents.first,
+               let eventId = UUID(uuidString: eventIdString) {
+                appState.deepLinkEventId = eventId
+                if let guestIdString = pathComponents.dropFirst().first,
+                   let guestId = UUID(uuidString: guestIdString) {
+                    appState.deepLinkGuestId = guestId
+                    appState.showRSVPForDeepLink = true
+                }
+            }
+        default:
+            break
+        }
     }
 }
 
@@ -46,16 +123,20 @@ struct GatherApp: App {
 
 struct RootView: View {
     @EnvironmentObject var authManager: AuthManager
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     var body: some View {
         Group {
-            if authManager.isAuthenticated {
-                MainTabView()
-            } else {
+            if !authManager.isAuthenticated {
                 AuthView()
+            } else if !hasCompletedOnboarding {
+                OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
+            } else {
+                MainTabView()
             }
         }
         .animation(.easeInOut, value: authManager.isAuthenticated)
+        .animation(.easeInOut, value: hasCompletedOnboarding)
     }
 }
 
@@ -63,43 +144,41 @@ struct RootView: View {
 
 @MainActor
 class AppState: ObservableObject {
-    @Published var selectedTab: Tab = .home
+    @Published var selectedTab: Tab = .going
     @Published var isShowingCreateEvent: Bool = false
     @Published var deepLinkEventId: UUID?
+    @Published var deepLinkGuestId: UUID?
+    @Published var showRSVPForDeepLink: Bool = false
 
     enum Tab: Int, CaseIterable {
-        case home
+        case going
         case myEvents
-        case create
-        case contacts
+        case explore
         case profile
 
         var title: String {
             switch self {
-            case .home: return "Home"
+            case .going: return "Going"
             case .myEvents: return "My Events"
-            case .create: return "Create"
-            case .contacts: return "Contacts"
+            case .explore: return "Explore"
             case .profile: return "Profile"
             }
         }
 
         var icon: String {
             switch self {
-            case .home: return "house"
+            case .going: return "ticket"
             case .myEvents: return "calendar"
-            case .create: return "plus.circle.fill"
-            case .contacts: return "person.2"
+            case .explore: return "magnifyingglass"
             case .profile: return "person.circle"
             }
         }
 
         var selectedIcon: String {
             switch self {
-            case .home: return "house.fill"
+            case .going: return "ticket.fill"
             case .myEvents: return "calendar"
-            case .create: return "plus.circle.fill"
-            case .contacts: return "person.2.fill"
+            case .explore: return "magnifyingglass"
             case .profile: return "person.circle.fill"
             }
         }

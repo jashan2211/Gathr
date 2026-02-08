@@ -43,6 +43,9 @@ enum CornerRadius {
     /// 16pt - Cards, containers
     static let lg: CGFloat = 16
 
+    /// 20pt - Glass cards (friendlier, Partiful-style)
+    static let card: CGFloat = 20
+
     /// 24pt - Large cards, sheets
     static let xl: CGFloat = 24
 
@@ -112,11 +115,14 @@ enum Layout {
     /// Card minimum height
     static let cardMinHeight: CGFloat = 80
 
-    /// Hero image height
-    static let heroImageHeight: CGFloat = 280
+    /// Hero image height (expanded)
+    static let heroImageHeight: CGFloat = 340
 
     /// Compact hero height
     static let heroImageHeightCompact: CGFloat = 200
+
+    /// Content overlap above hero (Luma-style card overlap)
+    static let heroContentOverlap: CGFloat = 30
 }
 
 // MARK: - Padding Helpers
@@ -135,5 +141,450 @@ extension View {
     /// Apply section spacing
     func sectionSpacing() -> some View {
         self.padding(.vertical, Spacing.lg)
+    }
+}
+
+// MARK: - GlassCard ViewModifier
+
+struct GlassCardModifier: ViewModifier {
+    var tint: Color = .clear
+    var cornerRadius: CGFloat = CornerRadius.card
+
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.15),
+                        Color.white.opacity(0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .background(tint.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.3),
+                                Color.white.opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.5
+                    )
+            )
+            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+    }
+}
+
+extension View {
+    /// Apply glassmorphic card style
+    func glassCard(tint: Color = .clear, cornerRadius: CGFloat = CornerRadius.card) -> some View {
+        modifier(GlassCardModifier(tint: tint, cornerRadius: cornerRadius))
+    }
+}
+
+// MARK: - Shimmer Loading Modifier
+
+struct ShimmerModifier: ViewModifier {
+    @State private var isAnimating = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isAnimating ? 0.4 : 0.8)
+            .animation(
+                .easeInOut(duration: 1.0)
+                .repeatForever(autoreverses: true),
+                value: isAnimating
+            )
+            .onAppear {
+                isAnimating = true
+            }
+    }
+}
+
+extension View {
+    /// Apply shimmer loading effect (replaces ProgressView spinners)
+    func shimmer() -> some View {
+        modifier(ShimmerModifier())
+    }
+}
+
+// MARK: - Skeleton Loader View
+
+struct SkeletonLoader: View {
+    var width: CGFloat? = nil
+    var height: CGFloat = 16
+    var cornerRadius: CGFloat = CornerRadius.sm
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(Color.gatherSecondaryBackground)
+            .frame(width: width, height: height)
+            .shimmer()
+    }
+}
+
+// MARK: - Press Events
+
+extension View {
+    /// Add press/release event handlers for animations
+    func pressEvents(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) -> some View {
+        self.simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in onPress() }
+                .onEnded { _ in onRelease() }
+        )
+    }
+}
+
+// MARK: - Bouncy Appear Animation
+
+extension View {
+    func bouncyAppear(delay: Double = 0) -> some View {
+        modifier(BouncyAppearModifier(delay: delay))
+    }
+}
+
+struct BouncyAppearModifier: ViewModifier {
+    let delay: Double
+    @State private var isVisible = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isVisible ? 1 : 0.8)
+            .opacity(isVisible ? 1 : 0)
+            .onAppear {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.6).delay(delay)) {
+                    isVisible = true
+                }
+            }
+    }
+}
+
+// MARK: - Card Press Effect (3D feel)
+
+struct CardPressModifier: ViewModifier {
+    @State private var isPressed = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+            .rotation3DEffect(
+                .degrees(isPressed ? 0.5 : 0),
+                axis: (x: 1, y: 0, z: 0)
+            )
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+            .pressEvents(
+                onPress: { isPressed = true },
+                onRelease: { isPressed = false }
+            )
+    }
+}
+
+extension View {
+    /// Add 3D press effect to cards (scale + subtle rotation)
+    func cardPress() -> some View {
+        modifier(CardPressModifier())
+    }
+}
+
+// MARK: - Confetti View
+
+struct ConfettiView: View {
+    @State private var particles: [ConfettiParticle] = []
+    @State private var isAnimating = false
+    let colors: [Color] = [.warmCoral, .sunshineYellow, .mintGreen, .neonBlue, .neonPink, .accentPurpleFallback]
+
+    var body: some View {
+        Canvas { context, size in
+            for particle in particles {
+                let rect = CGRect(
+                    x: particle.x - particle.size / 2,
+                    y: particle.y - particle.size / 2,
+                    width: particle.size,
+                    height: particle.size * 0.6
+                )
+                let path = Path(ellipseIn: rect)
+                context.fill(path, with: .color(particle.color.opacity(particle.opacity)))
+            }
+        }
+        .allowsHitTesting(false)
+        .onAppear {
+            spawnParticles()
+            animateParticles()
+        }
+    }
+
+    private func spawnParticles() {
+        particles = (0..<60).map { _ in
+            ConfettiParticle(
+                x: CGFloat.random(in: 50...350),
+                y: CGFloat.random(in: -100...(-20)),
+                size: CGFloat.random(in: 6...12),
+                color: colors.randomElement()!,
+                velocityX: CGFloat.random(in: -2...2),
+                velocityY: CGFloat.random(in: 2...6),
+                opacity: 1.0,
+                rotation: Double.random(in: 0...360)
+            )
+        }
+    }
+
+    private func animateParticles() {
+        Timer.scheduledTimer(withTimeInterval: 1/60, repeats: true) { timer in
+            var allDone = true
+            for i in particles.indices {
+                particles[i].y += particles[i].velocityY
+                particles[i].x += particles[i].velocityX
+                particles[i].velocityY += 0.15 // gravity
+                particles[i].velocityX *= 0.99 // air resistance
+                particles[i].rotation += Double.random(in: -5...5)
+
+                if particles[i].y > 800 {
+                    particles[i].opacity = max(0, particles[i].opacity - 0.05)
+                }
+
+                if particles[i].opacity > 0 { allDone = false }
+            }
+            if allDone { timer.invalidate() }
+        }
+    }
+}
+
+struct ConfettiParticle {
+    var x: CGFloat
+    var y: CGFloat
+    var size: CGFloat
+    var color: Color
+    var velocityX: CGFloat
+    var velocityY: CGFloat
+    var opacity: Double
+    var rotation: Double
+}
+
+// MARK: - Animated Number Transition
+
+extension View {
+    /// Apply animated numeric text transition for counters
+    func animatedNumber() -> some View {
+        self.contentTransition(.numericText())
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: UUID())
+    }
+}
+
+// MARK: - Overlapping Avatar Stack
+
+struct AvatarStack: View {
+    let names: [String]
+    let maxDisplay: Int
+    let size: CGFloat
+
+    init(names: [String], maxDisplay: Int = 5, size: CGFloat = AvatarSize.sm) {
+        self.names = names
+        self.maxDisplay = maxDisplay
+        self.size = size
+    }
+
+    var body: some View {
+        HStack(spacing: -(size * 0.3)) {
+            ForEach(Array(names.prefix(maxDisplay).enumerated()), id: \.offset) { index, name in
+                Circle()
+                    .fill(avatarColor(for: index))
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Text(String(name.prefix(1)).uppercased())
+                            .font(.system(size: size * 0.4, weight: .semibold))
+                            .foregroundStyle(.white)
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color.gatherBackground, lineWidth: 2)
+                    )
+                    .zIndex(Double(maxDisplay - index))
+            }
+
+            if names.count > maxDisplay {
+                Circle()
+                    .fill(Color.gatherSecondaryBackground)
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Text("+\(names.count - maxDisplay)")
+                            .font(.system(size: size * 0.35, weight: .semibold))
+                            .foregroundStyle(Color.gatherSecondaryText)
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color.gatherBackground, lineWidth: 2)
+                    )
+                    .zIndex(0)
+            }
+        }
+    }
+
+    private func avatarColor(for index: Int) -> Color {
+        let colors: [Color] = [.accentPurpleFallback, .accentPinkFallback, .warmCoral, .mintGreen, .neonBlue]
+        return colors[index % colors.count]
+    }
+}
+
+// MARK: - "Name and X others" Text
+
+struct AttendeePreviewText: View {
+    let names: [String]
+    let totalCount: Int
+
+    var body: some View {
+        if names.isEmpty {
+            Text("Be the first to attend!")
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
+        } else {
+            let firstName = names.first?.components(separatedBy: " ").first ?? names.first ?? ""
+            let remaining = totalCount - 1
+
+            if remaining > 0 {
+                Text("\(firstName) and \(remaining) other\(remaining == 1 ? "" : "s")")
+                    .font(GatherFont.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            } else {
+                Text("\(firstName) is going")
+                    .font(GatherFont.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+        }
+    }
+}
+
+// MARK: - Gradient Ring (Avatar border based on status)
+
+struct GradientRing: ViewModifier {
+    let color: Color
+    let lineWidth: CGFloat
+
+    init(color: Color, lineWidth: CGFloat = 2.5) {
+        self.color = color
+        self.lineWidth = lineWidth
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                Circle()
+                    .stroke(
+                        AngularGradient(
+                            colors: [color, color.opacity(0.5), color],
+                            center: .center
+                        ),
+                        lineWidth: lineWidth
+                    )
+            )
+    }
+}
+
+extension View {
+    /// Add gradient ring around avatars (color matches RSVP status)
+    func gradientRing(color: Color, lineWidth: CGFloat = 2.5) -> some View {
+        modifier(GradientRing(color: color, lineWidth: lineWidth))
+    }
+}
+
+// MARK: - MeshGradient Background (iOS 18+)
+
+struct CategoryMeshBackground: View {
+    let category: EventCategory
+    @State private var animationPhase: CGFloat = 0
+
+    var body: some View {
+        if #available(iOS 18.0, *) {
+            meshGradientView
+        } else {
+            fallbackGradient
+        }
+    }
+
+    @available(iOS 18.0, *)
+    private var meshGradientView: some View {
+        let colors = meshColors(for: category)
+        return MeshGradient(
+            width: 3, height: 3,
+            points: [
+                [0, 0], [0.5, 0], [1, 0],
+                [0, 0.5], [Float(0.5 + sin(animationPhase) * 0.1), 0.5], [1, 0.5],
+                [0, 1], [0.5, 1], [1, 1]
+            ],
+            colors: colors
+        )
+        .onAppear {
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) {
+                animationPhase = .pi * 2
+            }
+        }
+    }
+
+    private var fallbackGradient: some View {
+        LinearGradient(
+            colors: [
+                Color.forCategory(category),
+                Color.forCategory(category).opacity(0.6),
+                Color.accentPurpleFallback.opacity(0.4)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    @available(iOS 18.0, *)
+    private func meshColors(for category: EventCategory) -> [Color] {
+        switch category {
+        case .wedding:
+            return [
+                .accentPinkFallback, .softLavender, .white.opacity(0.9),
+                .softLavender.opacity(0.8), .accentPinkFallback.opacity(0.6), .softLavender,
+                .white.opacity(0.9), .accentPinkFallback.opacity(0.4), .softLavender.opacity(0.7)
+            ]
+        case .party:
+            return [
+                .accentPurpleFallback, .accentPinkFallback, .neonPink.opacity(0.7),
+                .accentPinkFallback.opacity(0.8), .accentPurpleFallback.opacity(0.6), .neonPink,
+                .neonPink.opacity(0.5), .accentPurpleFallback.opacity(0.4), .accentPinkFallback
+            ]
+        case .concert:
+            return [
+                .warmCoral, .neonPink, .deepIndigo,
+                .neonPink.opacity(0.8), .warmCoral.opacity(0.6), .deepIndigo.opacity(0.8),
+                .deepIndigo, .neonPink.opacity(0.5), .warmCoral.opacity(0.7)
+            ]
+        case .conference:
+            return [
+                Color(red: 0.35, green: 0.55, blue: 1.0), .sunshineYellow.opacity(0.6), .white.opacity(0.8),
+                .sunshineYellow.opacity(0.4), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.5), .sunshineYellow,
+                .white.opacity(0.7), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.3), .sunshineYellow.opacity(0.5)
+            ]
+        case .meetup:
+            return [
+                .mintGreen, .neonBlue.opacity(0.4), .white.opacity(0.9),
+                .neonBlue.opacity(0.3), .mintGreen.opacity(0.6), .white.opacity(0.8),
+                .white.opacity(0.9), .mintGreen.opacity(0.4), .neonBlue.opacity(0.3)
+            ]
+        case .office:
+            return [
+                Color(red: 0.35, green: 0.55, blue: 1.0), .softLavender.opacity(0.5), .white.opacity(0.9),
+                .softLavender.opacity(0.4), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.3), .white.opacity(0.8),
+                .white.opacity(0.9), .softLavender.opacity(0.3), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.2)
+            ]
+        case .custom:
+            return [
+                .accentPurpleFallback.opacity(0.5), .gatherSecondaryBackground, .white.opacity(0.8),
+                .gatherSecondaryBackground, .accentPurpleFallback.opacity(0.3), .gatherSecondaryBackground,
+                .white.opacity(0.7), .gatherSecondaryBackground, .accentPurpleFallback.opacity(0.2)
+            ]
+        }
     }
 }

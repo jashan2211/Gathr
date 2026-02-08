@@ -52,6 +52,48 @@ extension Color {
     static let rsvpYesFallback = Color(red: 16/255, green: 185/255, blue: 129/255)      // #10B981
     static let rsvpMaybeFallback = Color(red: 245/255, green: 158/255, blue: 11/255)    // #F59E0B
     static let rsvpNoFallback = Color(red: 239/255, green: 68/255, blue: 68/255)        // #EF4444
+
+    // MARK: - Warm Palette (Glassmorphism Overhaul)
+
+    /// Warm coral - vibrant action color
+    static let warmCoral = Color(red: 255/255, green: 107/255, blue: 107/255)       // #FF6B6B
+
+    /// Sunshine yellow - highlights, badges
+    static let sunshineYellow = Color(red: 251/255, green: 191/255, blue: 36/255)   // #FBBF24
+
+    /// Mint green - success states, free tickets
+    static let mintGreen = Color(red: 52/255, green: 211/255, blue: 153/255)        // #34D399
+
+    /// Neon blue - dark mode event cards, discovery
+    static let neonBlue = Color(red: 0/255, green: 212/255, blue: 255/255)          // #00D4FF
+
+    /// Neon pink - dark mode accents, social features
+    static let neonPink = Color(red: 255/255, green: 45/255, blue: 85/255)          // #FF2D55
+
+    /// Deep indigo - premium feel backgrounds
+    static let deepIndigo = Color(red: 49/255, green: 10/255, blue: 101/255)        // #310A65
+
+    /// Soft lavender - light glass tint
+    static let softLavender = Color(red: 196/255, green: 181/255, blue: 253/255)    // #C4B5FD
+
+    // MARK: - Glassmorphic Surface Colors
+
+    /// Glass card light overlay (top-left)
+    static let glassHighlight = Color.white.opacity(0.15)
+
+    /// Glass card dark overlay (bottom-right)
+    static let glassShadow = Color.white.opacity(0.05)
+
+    /// Glass border highlight
+    static let glassBorderTop = Color.white.opacity(0.3)
+
+    /// Glass border shadow
+    static let glassBorderBottom = Color.white.opacity(0.1)
+
+    // MARK: - Semantic Fallbacks
+
+    /// Error/Destructive color
+    static let gatherError = Color(red: 239/255, green: 68/255, blue: 68/255)           // #EF4444
 }
 
 // MARK: - Color Scheme Helpers
@@ -84,6 +126,19 @@ extension Color {
             return .gatherAccentSecondary
         }
     }
+
+    /// Category-specific accent color for glass tints and badges
+    static func forCategory(_ category: EventCategory) -> Color {
+        switch category {
+        case .wedding: return .accentPinkFallback
+        case .party: return .accentPurpleFallback
+        case .office: return Color(red: 0.35, green: 0.55, blue: 1.0)
+        case .conference: return .sunshineYellow
+        case .concert: return .warmCoral
+        case .meetup: return .mintGreen
+        case .custom: return .gatherSecondaryText
+        }
+    }
 }
 
 // MARK: - Gradient Definitions
@@ -113,4 +168,88 @@ extension LinearGradient {
         startPoint: .leading,
         endPoint: .trailing
     )
+
+    /// Glassmorphic card fill gradient
+    static let glassCardFill = LinearGradient(
+        colors: [Color.glassHighlight, Color.glassShadow],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Glassmorphic border gradient
+    static let glassBorder = LinearGradient(
+        colors: [Color.glassBorderTop, Color.glassBorderBottom],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Neon discovery gradient (dark mode explore)
+    static let neonDiscovery = LinearGradient(
+        colors: [.neonBlue, .accentPurpleFallback, .neonPink],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Warm sunset gradient (featured events)
+    static let warmSunset = LinearGradient(
+        colors: [.warmCoral, .sunshineYellow],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Soft blue card gradient
+    static let cardGradientBlue = LinearGradient(
+        colors: [Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.15), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.05)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Soft green card gradient
+    static let cardGradientGreen = LinearGradient(
+        colors: [Color(red: 0.2, green: 0.8, blue: 0.5).opacity(0.15), Color(red: 0.2, green: 0.8, blue: 0.5).opacity(0.05)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Soft warm/orange card gradient
+    static let cardGradientOrange = LinearGradient(
+        colors: [Color(red: 1.0, green: 0.6, blue: 0.2).opacity(0.15), Color(red: 1.0, green: 0.6, blue: 0.2).opacity(0.05)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Soft pink card gradient
+    static let cardGradientPink = LinearGradient(
+        colors: [Color(red: 0.93, green: 0.28, blue: 0.6).opacity(0.15), Color(red: 0.93, green: 0.28, blue: 0.6).opacity(0.05)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Soft purple card gradient
+    static let cardGradientPurple = LinearGradient(
+        colors: [Color(red: 0.49, green: 0.23, blue: 0.93).opacity(0.15), Color(red: 0.49, green: 0.23, blue: 0.93).opacity(0.05)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Get gradient for an event category
+    static func cardGradient(for category: EventCategory) -> LinearGradient {
+        switch category {
+        case .wedding: return cardGradientPink
+        case .party: return cardGradientPurple
+        case .office: return cardGradientBlue
+        case .conference: return cardGradientOrange
+        case .concert: return LinearGradient(
+            colors: [Color.warmCoral.opacity(0.15), Color.warmCoral.opacity(0.05)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        case .meetup: return cardGradientGreen
+        case .custom: return LinearGradient(
+            colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.03)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        }
+    }
 }

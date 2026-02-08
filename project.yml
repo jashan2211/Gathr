@@ -35,6 +35,14 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: "Gather"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
+    info:
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: "com.gather.app"
+            CFBundleURLSchemes:
+              - gather
+        NSCalendarsFullAccessUsageDescription: "Gather needs calendar access to add events to your calendar."
+        NSContactsUsageDescription: "Gather needs access to your contacts to help you invite guests."
     entitlements:
       path: Gather/Gather.entitlements
       properties:

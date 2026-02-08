@@ -3,16 +3,25 @@ import SwiftUI
 struct RSVPSheet: View {
     let event: Event
     @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var authManager: AuthManager
     @State private var selectedStatus: RSVPStatus = .attending
     @State private var plusOnes: Int = 0
     @State private var comment: String = ""
     @State private var step: Step = .status
     @State private var isSubmitting = false
+    @State private var isEditingExisting = false
 
     enum Step {
         case status
         case details
         case confirmation
+    }
+
+    // Check for existing guest entry
+    private var existingGuest: Guest? {
+        guard let currentUser = authManager.currentUser else { return nil }
+        return event.guests.first(where: { $0.userId == currentUser.id })
     }
 
     var body: some View {
@@ -40,7 +49,7 @@ struct RSVPSheet: View {
                 // Action buttons
                 actionButtons
             }
-            .navigationTitle("RSVP")
+            .navigationTitle(isEditingExisting ? "Update RSVP" : "RSVP")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -49,6 +58,18 @@ struct RSVPSheet: View {
                     }
                 }
             }
+            .onAppear {
+                loadExistingGuest()
+            }
+        }
+    }
+
+    private func loadExistingGuest() {
+        if let guest = existingGuest {
+            selectedStatus = guest.status
+            plusOnes = guest.plusOneCount
+            comment = guest.metadata?.notes ?? ""
+            isEditingExisting = true
         }
     }
 
@@ -269,6 +290,9 @@ struct RSVPSheet: View {
     // MARK: - Helpers
 
     private var confirmationTitle: String {
+        if isEditingExisting {
+            return "Response Updated"
+        }
         switch selectedStatus {
         case .attending:
             return "You're going!"
@@ -282,6 +306,18 @@ struct RSVPSheet: View {
     }
 
     private var confirmationSubtitle: String {
+        if isEditingExisting {
+            switch selectedStatus {
+            case .attending:
+                return "Your RSVP has been updated to Attending"
+            case .maybe:
+                return "Your RSVP has been updated to Maybe"
+            case .declined:
+                return "Your RSVP has been updated to Not Attending"
+            default:
+                return "Your response has been updated"
+            }
+        }
         switch selectedStatus {
         case .attending:
             return "We'll remind you before the event"
@@ -297,9 +333,52 @@ struct RSVPSheet: View {
     private func submitRSVP() {
         isSubmitting = true
 
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            // Haptic success feedback
+        guard let currentUser = authManager.currentUser else {
+            isSubmitting = false
+            return
+        }
+
+        // Find or create guest entry
+        if let existingGuest = existingGuest {
+            // Update existing
+            existingGuest.status = selectedStatus
+            existingGuest.plusOneCount = plusOnes
+            existingGuest.respondedAt = Date()
+            if !comment.isEmpty {
+                if existingGuest.metadata != nil {
+                    existingGuest.metadata?.notes = comment
+                } else {
+                    existingGuest.metadata = GuestMetadata(notes: comment)
+                }
+            }
+        } else {
+            // Create new guest
+            let newGuest = Guest(
+                name: currentUser.name,
+                email: currentUser.email,
+                status: selectedStatus,
+                plusOneCount: plusOnes,
+                metadata: comment.isEmpty ? nil : GuestMetadata(notes: comment),
+                userId: currentUser.id
+            )
+            newGuest.respondedAt = Date()
+            event.guests.append(newGuest)
+        }
+
+        try? modelContext.save()
+
+        // Send notification to host
+        Task {
+            await NotificationService.shared.scheduleRSVPNotification(
+                guestName: currentUser.name,
+                eventTitle: event.title,
+                functionName: nil,
+                response: rsvpResponseFromStatus(selectedStatus)
+            )
+        }
+
+        // Haptic success feedback
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
 
@@ -307,6 +386,15 @@ struct RSVPSheet: View {
                 step = .confirmation
                 isSubmitting = false
             }
+        }
+    }
+
+    private func rsvpResponseFromStatus(_ status: RSVPStatus) -> RSVPResponse {
+        switch status {
+        case .attending: return .yes
+        case .maybe: return .maybe
+        case .declined: return .no
+        default: return .no
         }
     }
 

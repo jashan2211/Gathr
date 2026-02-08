@@ -1,5 +1,6 @@
 import Foundation
 import AuthenticationServices
+import SwiftData
 
 // MARK: - Auth Manager
 
@@ -11,11 +12,14 @@ class AuthManager: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var isLoading: Bool = false
     @Published var authError: AuthError?
+    @Published var pendingGoogleSignIn: Bool = false
 
     // MARK: - Private Properties
 
     private let userDefaults = UserDefaults.standard
     private let userIdKey = "currentUserId"
+    private let userNameKey = "currentUserName"
+    private let userEmailKey = "currentUserEmail"
 
     // MARK: - Initialization
 
@@ -26,12 +30,28 @@ class AuthManager: ObservableObject {
     // MARK: - Auth State
 
     private func checkExistingAuth() {
-        // Check if user is already signed in
-        if userDefaults.string(forKey: userIdKey) != nil {
-            // In production, fetch user from CloudKit/local storage
-            // For now, mark as authenticated if we have a stored ID
+        if let storedUserId = userDefaults.string(forKey: userIdKey),
+           let uuid = UUID(uuidString: storedUserId) {
+            let name = userDefaults.string(forKey: userNameKey) ?? "User"
+            let email = userDefaults.string(forKey: userEmailKey) ?? ""
+            currentUser = User(id: uuid, name: name, email: email)
             isAuthenticated = true
         }
+    }
+
+    private func persistUser(_ user: User) {
+        userDefaults.set(user.id.uuidString, forKey: userIdKey)
+        userDefaults.set(user.name, forKey: userNameKey)
+        userDefaults.set(user.email ?? "", forKey: userEmailKey)
+    }
+
+    // MARK: - Demo Sign In (for testing)
+
+    func signInAsDemo() {
+        let user = User(name: "Demo User", email: "demo@gather.app")
+        persistUser(user)
+        currentUser = user
+        isAuthenticated = true
     }
 
     // MARK: - Apple Sign In
@@ -40,7 +60,6 @@ class AuthManager: ObservableObject {
         isLoading = true
         authError = nil
 
-        // Extract user info from Apple credential
         let userId = credential.user
         let email = credential.email
         let fullName = [
@@ -48,17 +67,16 @@ class AuthManager: ObservableObject {
             credential.fullName?.familyName
         ].compactMap { $0 }.joined(separator: " ")
 
-        // Create or fetch user
         let user = User(
             name: fullName.isEmpty ? "User" : fullName,
             email: email,
             authProviders: [.apple]
         )
 
-        // Store user ID
         userDefaults.set(userId, forKey: userIdKey)
+        userDefaults.set(user.name, forKey: userNameKey)
+        userDefaults.set(user.email ?? "", forKey: userEmailKey)
 
-        // Update state
         currentUser = user
         isAuthenticated = true
         isLoading = false
@@ -67,30 +85,30 @@ class AuthManager: ObservableObject {
     // MARK: - Google Sign In
 
     func signInWithGoogle() async {
+        // Show the Google sign-in sheet (simulated OAuth)
+        pendingGoogleSignIn = true
+    }
+
+    func completeGoogleSignIn(name: String, email: String) {
         isLoading = true
         authError = nil
 
-        // TODO: Implement Firebase Auth Google Sign-In
-        // For now, simulate success
+        let user = User(
+            name: name.isEmpty ? "Google User" : name,
+            email: email,
+            authProviders: [.google]
+        )
 
-        do {
-            // Simulate network delay
-            try await Task.sleep(nanoseconds: 1_000_000_000)
+        persistUser(user)
+        currentUser = user
+        isAuthenticated = true
+        isLoading = false
+        pendingGoogleSignIn = false
+    }
 
-            let user = User(
-                name: "Google User",
-                email: "user@gmail.com",
-                authProviders: [.google]
-            )
-
-            currentUser = user
-            isAuthenticated = true
-            isLoading = false
-
-        } catch {
-            authError = .signInFailed(error.localizedDescription)
-            isLoading = false
-        }
+    func cancelGoogleSignIn() {
+        pendingGoogleSignIn = false
+        isLoading = false
     }
 
     // MARK: - Email Magic Link
@@ -98,9 +116,6 @@ class AuthManager: ObservableObject {
     func sendMagicLink(email: String) async -> Bool {
         isLoading = true
         authError = nil
-
-        // TODO: Implement Firebase Auth email link
-        // For now, simulate success
 
         do {
             try await Task.sleep(nanoseconds: 500_000_000)
@@ -117,8 +132,6 @@ class AuthManager: ObservableObject {
         isLoading = true
         authError = nil
 
-        // TODO: Implement Firebase Auth email link verification
-
         do {
             try await Task.sleep(nanoseconds: 500_000_000)
 
@@ -128,6 +141,7 @@ class AuthManager: ObservableObject {
                 authProviders: [.email]
             )
 
+            persistUser(user)
             currentUser = user
             isAuthenticated = true
             isLoading = false
@@ -142,20 +156,66 @@ class AuthManager: ObservableObject {
 
     func signOut() {
         userDefaults.removeObject(forKey: userIdKey)
+        userDefaults.removeObject(forKey: userNameKey)
+        userDefaults.removeObject(forKey: userEmailKey)
         currentUser = nil
         isAuthenticated = false
     }
 
     // MARK: - Delete Account
 
-    func deleteAccount() async -> Bool {
+    func deleteAccount(modelContext: ModelContext) async -> Bool {
         isLoading = true
 
-        do {
-            // TODO: Delete user data from CloudKit
-            // TODO: Revoke Apple/Google credentials
+        guard let userId = currentUser?.id else {
+            isLoading = false
+            return false
+        }
 
+        do {
             try await Task.sleep(nanoseconds: 500_000_000)
+
+            // Delete user's hosted events
+            let eventDescriptor = FetchDescriptor<Event>(
+                predicate: #Predicate { $0.hostId == userId }
+            )
+            if let events = try? modelContext.fetch(eventDescriptor) {
+                for event in events {
+                    modelContext.delete(event)
+                }
+            }
+
+            // Delete user's guest records
+            let guestDescriptor = FetchDescriptor<Guest>(
+                predicate: #Predicate { $0.userId == userId }
+            )
+            if let guests = try? modelContext.fetch(guestDescriptor) {
+                for guest in guests {
+                    modelContext.delete(guest)
+                }
+            }
+
+            // Delete user's tickets
+            let ticketDescriptor = FetchDescriptor<Ticket>(
+                predicate: #Predicate { $0.userId == userId }
+            )
+            if let tickets = try? modelContext.fetch(ticketDescriptor) {
+                for ticket in tickets {
+                    modelContext.delete(ticket)
+                }
+            }
+
+            // Delete user's waitlist entries
+            let waitlistDescriptor = FetchDescriptor<WaitlistEntry>(
+                predicate: #Predicate { $0.userId == userId }
+            )
+            if let entries = try? modelContext.fetch(waitlistDescriptor) {
+                for entry in entries {
+                    modelContext.delete(entry)
+                }
+            }
+
+            try? modelContext.save()
 
             signOut()
             isLoading = false

@@ -5,7 +5,7 @@ import SwiftData
 
 @Model
 final class Guest {
-    @Attribute(.unique) var id: UUID
+    var id: UUID
     var name: String
     var email: String?
     var phone: String?
@@ -18,6 +18,9 @@ final class Guest {
 
     // Store user ID for reference
     var userId: UUID?
+
+    @Relationship(deleteRule: .cascade)
+    var partyMembers: [PartyMember] = []
 
     init(
         id: UUID = UUID(),
@@ -125,7 +128,10 @@ struct GuestMetadata: Codable, Equatable, Hashable {
 
 extension Guest {
     var totalHeadcount: Int {
-        1 + plusOneCount
+        if !partyMembers.isEmpty {
+            return 1 + partyMembers.count
+        }
+        return 1 + plusOneCount
     }
 
     var hasResponded: Bool {

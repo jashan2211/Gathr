@@ -5,7 +5,7 @@ import SwiftData
 
 @Model
 final class Event {
-    @Attribute(.unique) var id: UUID
+    var id: UUID
     var title: String
     var eventDescription: String?
     var startDate: Date
@@ -22,11 +22,47 @@ final class Event {
     var createdAt: Date
     var updatedAt: Date
 
+    // Event type and features
+    var category: EventCategory
+    var enabledFeaturesRaw: [String]  // Store as strings for SwiftData compatibility
+
+    // Draft status
+    var isDraft: Bool = false
+
     // Store host ID for reference
     var hostId: UUID?
 
     @Relationship(deleteRule: .cascade)
     var guests: [Guest] = []
+
+    @Relationship(deleteRule: .cascade)
+    var functions: [EventFunction] = []
+
+    @Relationship(deleteRule: .cascade)
+    var ticketTiers: [TicketTier] = []
+
+    @Relationship(deleteRule: .cascade)
+    var promoCodes: [PromoCode] = []
+
+    // Computed property to get/set features as Set<EventFeature>
+    var enabledFeatures: Set<EventFeature> {
+        get {
+            Set(enabledFeaturesRaw.compactMap { EventFeature(rawValue: $0) })
+        }
+        set {
+            enabledFeaturesRaw = newValue.map { $0.rawValue }
+        }
+    }
+
+    // Feature convenience checks
+    var hasFunctions: Bool { enabledFeatures.contains(.functions) }
+    var hasGuestManagement: Bool { enabledFeatures.contains(.guestManagement) }
+    var hasTicketing: Bool { enabledFeatures.contains(.ticketing) }
+    var hasBudget: Bool { enabledFeatures.contains(.budget) }
+    var hasSeating: Bool { enabledFeatures.contains(.seating) }
+    var hasSchedule: Bool { enabledFeatures.contains(.schedule) }
+    var hasActivity: Bool { enabledFeatures.contains(.activity) }
+    var hasPhotos: Bool { enabledFeatures.contains(.photos) }
 
     init(
         id: UUID = UUID(),
@@ -43,7 +79,10 @@ final class Event {
         heroMediaURL: URL? = nil,
         password: String? = nil,
         requiresApproval: Bool = false,
-        hostId: UUID? = nil
+        category: EventCategory = .custom,
+        enabledFeatures: Set<EventFeature>? = nil,
+        hostId: UUID? = nil,
+        isDraft: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -59,7 +98,11 @@ final class Event {
         self.heroMediaURL = heroMediaURL
         self.password = password
         self.requiresApproval = requiresApproval
+        self.category = category
+        // Use provided features or default to category's default features
+        self.enabledFeaturesRaw = (enabledFeatures ?? category.defaultFeatures).map { $0.rawValue }
         self.hostId = hostId
+        self.isDraft = isDraft
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -93,14 +136,25 @@ enum EventPrivacy: String, Codable, CaseIterable {
 
 enum GuestListVisibility: String, Codable, CaseIterable {
     case visible
+    case firstNamesOnly
     case countOnly
     case hidden
 
     var displayName: String {
         switch self {
         case .visible: return "Show guest list"
+        case .firstNamesOnly: return "First names only"
         case .countOnly: return "Show count only"
         case .hidden: return "Hide completely"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .visible: return "Full names, status, and contact info (host only)"
+        case .firstNamesOnly: return "First names and avatars visible to attendees"
+        case .countOnly: return "Only total count visible"
+        case .hidden: return "Guest list not visible"
         }
     }
 }
@@ -150,6 +204,9 @@ enum RecurrenceFrequency: String, Codable, CaseIterable {
 struct EventLocation: Codable, Equatable, Hashable {
     var name: String
     var address: String?
+    var city: String?
+    var state: String?
+    var country: String?
     var latitude: Double?
     var longitude: Double?
     var virtualURL: URL?
@@ -162,15 +219,33 @@ struct EventLocation: Codable, Equatable, Hashable {
         latitude != nil && longitude != nil
     }
 
+    /// Short display like "Los Angeles, CA"
+    var shortLocation: String? {
+        if let city = city, let state = state {
+            return "\(city), \(state)"
+        } else if let city = city {
+            return city
+        } else if let state = state {
+            return state
+        }
+        return nil
+    }
+
     init(
         name: String,
         address: String? = nil,
+        city: String? = nil,
+        state: String? = nil,
+        country: String? = nil,
         latitude: Double? = nil,
         longitude: Double? = nil,
         virtualURL: URL? = nil
     ) {
         self.name = name
         self.address = address
+        self.city = city
+        self.state = state
+        self.country = country
         self.latitude = latitude
         self.longitude = longitude
         self.virtualURL = virtualURL
@@ -197,6 +272,11 @@ extension Event {
         guests.filter { $0.status == RSVPStatus.attending }.count
     }
 
+    var totalAttendingHeadcount: Int {
+        guests.filter { $0.status == RSVPStatus.attending }
+            .reduce(0) { $0 + $1.totalHeadcount }
+    }
+
     var maybeCount: Int {
         guests.filter { $0.status == RSVPStatus.maybe }.count
     }
@@ -219,13 +299,6 @@ extension Event {
         return remaining == 0
     }
 
-    // Placeholder for comments - will be fetched separately
-    var comments: [Comment] {
-        return []
-    }
-
-    // Placeholder for host - will be fetched separately
-    var host: User? {
-        return nil
-    }
+    // Note: Activity posts and host are fetched via @Query in views
+    // e.g. @Query var allPosts: [ActivityPost] filtered by eventId
 }

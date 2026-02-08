@@ -4,7 +4,7 @@ struct ShareSheet: View {
     let event: Event
     @Environment(\.dismiss) var dismiss
     @State private var linkCopied = false
-    @State private var shareURL = "https://gather.app/e/abc123" // Placeholder
+    @State private var shareURL: String = ""
 
     var body: some View {
         NavigationStack {
@@ -94,6 +94,9 @@ struct ShareSheet: View {
             }
         }
         .presentationDetents([.medium])
+        .onAppear {
+            shareURL = "gather://event/\(event.id.uuidString)"
+        }
     }
 
     // MARK: - Event Preview
@@ -214,6 +217,18 @@ struct ShareOptionButton: View {
             }
         }
     }
+}
+
+// MARK: - Share Activity Sheet (UIKit wrapper)
+
+struct ShareActivitySheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Preview

@@ -22,7 +22,7 @@ final class UserTests: XCTestCase {
             email: "jane@example.com",
             phone: "+1234567890",
             avatarURL: URL(string: "https://example.com/avatar.jpg"),
-            authProviders: [.apple, .google]
+            authProviders: [.apple, .email]
         )
 
         XCTAssertEqual(user.name, "Jane Doe")
@@ -31,7 +31,7 @@ final class UserTests: XCTestCase {
         XCTAssertNotNil(user.avatarURL)
         XCTAssertEqual(user.authProviders.count, 2)
         XCTAssertTrue(user.authProviders.contains(.apple))
-        XCTAssertTrue(user.authProviders.contains(.google))
+        XCTAssertTrue(user.authProviders.contains(.email))
     }
 
     // MARK: - User Settings
@@ -39,7 +39,7 @@ final class UserTests: XCTestCase {
     func testDefaultUserSettings() {
         let settings = UserSettings()
 
-        XCTAssertEqual(settings.defaultEventPrivacy, .inviteOnly)
+        XCTAssertEqual(settings.defaultEventPrivacy, "inviteOnly")
         XCTAssertTrue(settings.showMeAsAttending)
         XCTAssertTrue(settings.notificationsEnabled)
         XCTAssertTrue(settings.calendarSyncEnabled)
@@ -47,13 +47,13 @@ final class UserTests: XCTestCase {
 
     func testCustomUserSettings() {
         let settings = UserSettings(
-            defaultEventPrivacy: .publicEvent,
+            defaultEventPrivacy: "public",
             showMeAsAttending: false,
             notificationsEnabled: false,
             calendarSyncEnabled: false
         )
 
-        XCTAssertEqual(settings.defaultEventPrivacy, .publicEvent)
+        XCTAssertEqual(settings.defaultEventPrivacy, "public")
         XCTAssertFalse(settings.showMeAsAttending)
         XCTAssertFalse(settings.notificationsEnabled)
         XCTAssertFalse(settings.calendarSyncEnabled)

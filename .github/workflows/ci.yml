@@ -7,18 +7,18 @@ on:
     branches: [main]
 
 env:
-  DEVELOPER_DIR: /Applications/Xcode_15.2.app/Contents/Developer
+  DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
 
 jobs:
   build:
     name: Build
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.2.app
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -27,27 +27,27 @@ jobs:
         run: |
           xcodebuild build-for-testing \
             -scheme Gather \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=17.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.2' \
             -derivedDataPath build/DerivedData \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO
 
   test:
     name: Test
-    runs-on: macos-14
+    runs-on: macos-15
     needs: build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.2.app
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Run Unit Tests
         run: |
           xcodebuild test \
             -scheme Gather \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=17.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.2' \
             -only-testing:GatherTests \
             -resultBundlePath TestResults/UnitTests \
             CODE_SIGN_IDENTITY="" \
@@ -57,7 +57,7 @@ jobs:
         run: |
           xcodebuild test \
             -scheme Gather \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=17.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.2' \
             -only-testing:GatherUITests \
             -resultBundlePath TestResults/UITests \
             CODE_SIGN_IDENTITY="" \
@@ -74,7 +74,7 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,24 +84,24 @@ jobs:
 
       - name: Run SwiftLint
         run: swiftlint lint --strict
-        continue-on-error: true  # Don't fail build on lint warnings initially
+        continue-on-error: true
 
   analyze:
     name: Static Analysis
-    runs-on: macos-14
+    runs-on: macos-15
     needs: build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.2.app
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Analyze
         run: |
           xcodebuild analyze \
             -scheme Gather \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=17.2' \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.2' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO

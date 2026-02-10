@@ -54,13 +54,17 @@ struct OverviewTab: View {
             }
             .horizontalPadding()
             .padding(.top, Spacing.md)
-            .padding(.bottom, 100)
+            .padding(.bottom, Layout.scrollBottomInset)
         }
         .sheet(isPresented: $showSendInvites) {
             SendInvitesSheet(event: event, preselectedGuests: event.guests.map { $0.id })
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showAddGuest) {
             AddGuestSheet(event: event)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .alert("Calendar", isPresented: $showCalendarAlert) {
             Button("OK", role: .cancel) {}
@@ -72,6 +76,8 @@ struct OverviewTab: View {
             let shareText = "\(event.title)\n\(event.startDate.formatted(date: .abbreviated, time: .shortened))"
             let shareItems: [String] = [shareText, deepLink]
             ShareActivitySheet(items: shareItems)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -88,7 +94,7 @@ struct OverviewTab: View {
             QuickActionCard(
                 icon: "person.badge.plus",
                 title: "Add Guest",
-                color: .purple
+                color: .accentPurpleFallback
             ) {
                 showAddGuest = true
             }
@@ -97,7 +103,7 @@ struct OverviewTab: View {
             QuickActionCard(
                 icon: "paperplane.fill",
                 title: "Send Invites",
-                color: .blue
+                color: .neonBlue
             ) {
                 showSendInvites = true
             }
@@ -106,7 +112,7 @@ struct OverviewTab: View {
             QuickActionCard(
                 icon: "square.and.arrow.up",
                 title: "Share",
-                color: .green
+                color: .mintGreen
             ) {
                 showShareSheet = true
             }
@@ -137,7 +143,7 @@ struct OverviewTab: View {
                     label: "Confirmed",
                     count: event.attendingCount,
                     total: event.guests.count,
-                    color: .green,
+                    color: .rsvpYesFallback,
                     icon: "checkmark.circle.fill"
                 )
 
@@ -145,7 +151,7 @@ struct OverviewTab: View {
                     label: "Maybe",
                     count: maybeCount,
                     total: event.guests.count,
-                    color: .orange,
+                    color: .rsvpMaybeFallback,
                     icon: "questionmark.circle.fill"
                 )
 
@@ -153,7 +159,7 @@ struct OverviewTab: View {
                     label: "Declined",
                     count: declinedCount,
                     total: event.guests.count,
-                    color: .red,
+                    color: .rsvpNoFallback,
                     icon: "xmark.circle.fill"
                 )
 
@@ -161,7 +167,7 @@ struct OverviewTab: View {
                     label: "Pending",
                     count: pendingCount,
                     total: event.guests.count,
-                    color: .gray,
+                    color: .gatherSecondaryText,
                     icon: "clock.fill"
                 )
             }
@@ -203,7 +209,7 @@ struct OverviewTab: View {
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, Spacing.xxs)
                     .background(Color.accentPurpleFallback)
 
                 Text(dayNumber)
@@ -236,8 +242,8 @@ struct OverviewTab: View {
             Spacer()
 
             Button {
-                CalendarService.shared.addEventToCalendar(event: event) { message in
-                    calendarAlertMessage = message
+                Task {
+                    calendarAlertMessage = await CalendarService.shared.addEventToCalendar(event: event)
                     showCalendarAlert = true
                 }
             } label: {
@@ -441,36 +447,28 @@ struct OverviewTab: View {
     }
 
     private var monthAbbreviation: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        return formatter.string(from: event.startDate).uppercased()
+        GatherDateFormatter.monthAbbrev.string(from: event.startDate).uppercased()
     }
 
     private var dayNumber: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.dayNumber.string(from: event.startDate)
     }
 
     private var formattedFullDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.fullWeekdayDate.string(from: event.startDate)
     }
 
     private var formattedTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        var result = formatter.string(from: event.startDate)
+        var result = GatherDateFormatter.timeOnly.string(from: event.startDate)
         if let endDate = event.endDate {
-            result += " - \(formatter.string(from: endDate))"
+            result += " - \(GatherDateFormatter.timeOnly.string(from: endDate))"
         }
         return result
     }
 
     private func openInMaps(_ location: EventLocation) {
         guard let lat = location.latitude, let lon = location.longitude else { return }
-        let url = URL(string: "maps://?daddr=\(lat),\(lon)")!
+        guard let url = URL(string: "maps://?daddr=\(lat),\(lon)") else { return }
         if UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         }
@@ -506,9 +504,10 @@ struct QuickActionCard: View {
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .pressEvents(
-            onPress: { withAnimation(.easeInOut(duration: 0.15)) { isPressed = true } },
-            onRelease: { withAnimation(.easeInOut(duration: 0.15)) { isPressed = false } }
+            onPress: { withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) { isPressed = true } },
+            onRelease: { withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) { isPressed = false } }
         )
+        .accessibilityLabel(title)
     }
 }
 
@@ -558,6 +557,9 @@ struct RSVPProgressRow: View {
                 .foregroundStyle(Color.gatherPrimaryText)
                 .frame(width: 30, alignment: .trailing)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label): \(count) of \(total)")
+        .accessibilityValue("\(Int(percentage * 100)) percent")
         .onAppear {
             withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
                 animatedProgress = percentage
@@ -576,7 +578,7 @@ struct FunctionTimelineCard: View {
             // Timeline dot and line
             VStack(spacing: 0) {
                 Circle()
-                    .fill(function.date > Date() ? Color.accentPurpleFallback : Color.green)
+                    .fill(function.date > Date() ? Color.accentPurpleFallback : Color.rsvpYesFallback)
                     .frame(width: 12, height: 12)
             }
 
@@ -608,7 +610,7 @@ struct FunctionTimelineCard: View {
                     Text("\(confirmedCount)")
                 }
                 .font(GatherFont.caption)
-                .foregroundStyle(Color.green)
+                .foregroundStyle(Color.rsvpYesFallback)
             }
         }
         .padding(Spacing.sm)
@@ -641,7 +643,7 @@ struct RecentRSVPRow: View {
 
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.rsvpYesFallback)
                 Text("Attending")
                     .foregroundStyle(Color.gatherSecondaryText)
                 if guest.plusOneCount > 0 {
@@ -656,7 +658,7 @@ struct RecentRSVPRow: View {
     }
 
     private var avatarColor: Color {
-        let colors: [Color] = [.purple, .blue, .green, .orange, .pink, .teal]
+        let colors: [Color] = [.accentPurpleFallback, .neonBlue, .mintGreen, .warmCoral, .accentPinkFallback, .softLavender]
         let index = abs(guest.name.hashValue) % colors.count
         return colors[index]
     }
@@ -666,8 +668,6 @@ struct RecentRSVPRow: View {
 
 extension EventFunction {
     var formattedDateShort: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, h:mm a"
-        return formatter.string(from: date)
+        GatherDateFormatter.monthDayTime.string(from: date)
     }
 }

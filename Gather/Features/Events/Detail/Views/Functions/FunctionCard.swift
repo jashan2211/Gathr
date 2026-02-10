@@ -69,21 +69,21 @@ struct FunctionCard: View {
                     icon: "checkmark.circle.fill",
                     count: function.attendingCount,
                     label: "Attending",
-                    color: .green
+                    color: .rsvpYesFallback
                 )
 
                 StatPill(
                     icon: "questionmark.circle.fill",
                     count: function.maybeCount,
                     label: "Maybe",
-                    color: .orange
+                    color: .rsvpMaybeFallback
                 )
 
                 StatPill(
                     icon: "paperplane.fill",
                     count: function.sentCount,
                     label: "Invited",
-                    color: .blue
+                    color: .neonBlue
                 )
 
                 Spacer()
@@ -92,6 +92,8 @@ struct FunctionCard: View {
         .padding()
         .background(Color.gatherSecondaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(function.name), \(formattedTime)\(function.location.map { ", \($0.name)" } ?? "")")
     }
 
     // MARK: - Status Badge
@@ -112,7 +114,7 @@ struct FunctionCard: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, Spacing.xxs)
-                    .background(Color.green)
+                    .background(Color.rsvpYesFallback)
                     .clipShape(Capsule())
             }
         }
@@ -121,23 +123,17 @@ struct FunctionCard: View {
     // MARK: - Helpers
 
     private var monthAbbreviation: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        return formatter.string(from: function.date).uppercased()
+        GatherDateFormatter.monthAbbrev.string(from: function.date).uppercased()
     }
 
     private var dayNumber: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: function.date)
+        GatherDateFormatter.dayNumber.string(from: function.date)
     }
 
     private var formattedTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        var result = formatter.string(from: function.date)
+        var result = GatherDateFormatter.timeOnly.string(from: function.date)
         if let endTime = function.endTime {
-            result += " - \(formatter.string(from: endTime))"
+            result += " - \(GatherDateFormatter.timeOnly.string(from: endTime))"
         }
         return result
     }
@@ -161,6 +157,8 @@ struct StatPill: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(Color.gatherPrimaryText)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(count) \(label)")
     }
 }
 

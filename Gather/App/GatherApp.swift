@@ -6,27 +6,7 @@ struct GatherApp: App {
     // MARK: - SwiftData Container
 
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            User.self,
-            Event.self,
-            Guest.self,
-            PartyMember.self,
-            ActivityPost.self,
-            MediaItem.self,
-            Budget.self,
-            BudgetCategory.self,
-            Expense.self,
-            EventFunction.self,
-            FunctionInvite.self,
-            TicketTier.self,
-            Ticket.self,
-            PromoCode.self,
-            WaitlistEntry.self,
-            PaymentTransaction.self,
-            PaymentSplit.self,
-            EventMember.self,
-            AppNotification.self
-        ])
+        let schema = Schema(versionedSchema: GatherSchemaV1.self)
         let modelConfiguration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
@@ -34,9 +14,26 @@ struct GatherApp: App {
         )
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            return try ModelContainer(
+                for: schema,
+                migrationPlan: GatherMigrationPlan.self,
+                configurations: [modelConfiguration]
+            )
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            // If persistent store fails (e.g. schema migration), fall back to in-memory
+            let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            do {
+                return try ModelContainer(
+                    for: schema,
+                    migrationPlan: GatherMigrationPlan.self,
+                    configurations: [fallbackConfig]
+                )
+            } catch {
+                // Both persistent and in-memory stores failed — the data layer is
+                // completely non-functional and no meaningful UI can be shown.
+                // This mirrors Apple's recommended pattern for ModelContainer init.
+                fatalError("Could not create ModelContainer (persistent + in-memory both failed): \(error)")
+            }
         }
     }()
 
@@ -69,22 +66,13 @@ struct GatherApp: App {
                 .preferredColorScheme(preferredColorScheme)
                 .onAppear {
                     eventService.setModelContext(sharedModelContainer.mainContext)
-                    setupNotifications()
+                    notificationService.setupNotificationCategories()
                 }
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
         }
         .modelContainer(sharedModelContainer)
-    }
-
-    // MARK: - Notifications Setup
-
-    private func setupNotifications() {
-        notificationService.setupNotificationCategories()
-        Task {
-            _ = await notificationService.requestPermission()
-        }
     }
 
     // MARK: - Deep Link Handling

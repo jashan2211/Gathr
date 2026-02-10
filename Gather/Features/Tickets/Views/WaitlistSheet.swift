@@ -7,7 +7,7 @@ struct WaitlistSheet: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
-    @Query private var allWaitlistEntries: [WaitlistEntry]
+    @Query private var eventWaitlistEntries: [WaitlistEntry]
 
     @State private var name: String = ""
     @State private var email: String = ""
@@ -15,6 +15,15 @@ struct WaitlistSheet: View {
     @State private var showSuccess = false
     @State private var waitlistPosition: Int = 0
     @State private var existingEntry: WaitlistEntry?
+
+    init(event: Event, tier: TicketTier?) {
+        self.event = event
+        self.tier = tier
+        let eventId = event.id
+        _eventWaitlistEntries = Query(
+            filter: #Predicate<WaitlistEntry> { $0.eventId == eventId }
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -63,9 +72,8 @@ struct WaitlistSheet: View {
                 Text("Join the Waitlist")
                     .font(GatherFont.title2)
 
-                Text(tier != nil
-                     ? "Get notified when \(tier!.name) tickets become available."
-                     : "Get notified when tickets become available for \(event.title).")
+                Text(tier.map { "Get notified when \($0.name) tickets become available." }
+                     ?? "Get notified when tickets become available for \(event.title).")
                     .font(GatherFont.body)
                     .foregroundStyle(Color.gatherSecondaryText)
                     .multilineTextAlignment(.center)
@@ -80,6 +88,7 @@ struct WaitlistSheet: View {
 
                     TextField("Your name", text: $name)
                         .textContentType(.name)
+                        .submitLabel(.done)
                         .padding()
                         .background(Color.gatherSecondaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
@@ -94,6 +103,7 @@ struct WaitlistSheet: View {
                         .textContentType(.emailAddress)
                         .keyboardType(.emailAddress)
                         .autocapitalization(.none)
+                        .submitLabel(.done)
                         .padding()
                         .background(Color.gatherSecondaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
@@ -124,6 +134,8 @@ struct WaitlistSheet: View {
                 }
             }
             .disabled(name.isEmpty || email.isEmpty || isSubmitting)
+            .accessibilityLabel(isSubmitting ? "Joining waitlist" : "Join Waitlist")
+            .accessibilityHint("Adds you to the waitlist for ticket availability notifications")
         }
     }
 
@@ -134,12 +146,12 @@ struct WaitlistSheet: View {
             // Success icon
             ZStack {
                 Circle()
-                    .fill(Color.green.opacity(0.1))
+                    .fill(Color.rsvpYesFallback.opacity(0.1))
                     .frame(width: 100, height: 100)
 
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 48))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.rsvpYesFallback)
             }
 
             VStack(spacing: Spacing.md) {
@@ -170,6 +182,8 @@ struct WaitlistSheet: View {
             .frame(maxWidth: .infinity)
             .background(Color.gatherSecondaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Your waitlist position is number \(waitlistPosition)")
 
             Spacer()
 
@@ -207,7 +221,7 @@ struct WaitlistSheet: View {
                 Text("Already on Waitlist")
                     .font(GatherFont.title2)
 
-                Text("You joined on \(formatDate(existingEntry!.createdAt))")
+                Text("You joined on \(formatDate(existingEntry?.createdAt ?? Date()))")
                     .font(GatherFont.body)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
@@ -218,7 +232,7 @@ struct WaitlistSheet: View {
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
 
-                Text("#\(existingEntry!.position)")
+                Text("#\(existingEntry?.position ?? 0)")
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.accentPurpleFallback)
 
@@ -230,6 +244,8 @@ struct WaitlistSheet: View {
             .frame(maxWidth: .infinity)
             .background(Color.gatherSecondaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Your waitlist position is number \(existingEntry?.position ?? 0)")
 
             // Info text
             HStack {
@@ -242,6 +258,7 @@ struct WaitlistSheet: View {
             .padding()
             .background(Color.accentPurpleFallback.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            .accessibilityElement(children: .combine)
 
             Spacer()
 
@@ -251,12 +268,14 @@ struct WaitlistSheet: View {
             } label: {
                 Text("Leave Waitlist")
                     .font(GatherFont.headline)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.rsvpNoFallback)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.red.opacity(0.1))
+                    .background(Color.rsvpNoFallback.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             }
+            .accessibilityLabel("Leave Waitlist")
+            .accessibilityHint("Removes you from the waitlist for this event")
 
             Button {
                 dismiss()
@@ -279,13 +298,13 @@ struct WaitlistSheet: View {
 
     private func checkExistingEntry() {
         guard let userId = authManager.currentUser?.id else { return }
-        existingEntry = allWaitlistEntries.first { entry in
-            entry.eventId == event.id && entry.userId == userId
+        existingEntry = eventWaitlistEntries.first { entry in
+            entry.userId == userId
         }
     }
 
     private var eventWaitlistCount: Int {
-        allWaitlistEntries.filter { $0.eventId == event.id }.count
+        eventWaitlistEntries.count
     }
 
     private func joinWaitlist() {
@@ -303,11 +322,12 @@ struct WaitlistSheet: View {
         entry.userId = authManager.currentUser?.id
 
         modelContext.insert(entry)
-        try? modelContext.save()
+        modelContext.safeSave()
 
         waitlistPosition = position
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        Task {
+            try? await Task.sleep(for: .seconds(0.5))
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
 
@@ -321,15 +341,13 @@ struct WaitlistSheet: View {
     private func leaveWaitlist() {
         if let entry = existingEntry {
             modelContext.delete(entry)
-            try? modelContext.save()
+            modelContext.safeSave()
         }
         dismiss()
     }
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: date)
+        GatherDateFormatter.monthDayYear.string(from: date)
     }
 }
 

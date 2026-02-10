@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct GoingView: View {
-    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var selectedEvent: Event?
@@ -49,7 +48,7 @@ struct GoingView: View {
                                 } label: {
                                     GoingEventCard(event: event)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(CardPressStyle())
                                 .bouncyAppear(delay: Double(index) * 0.04)
                             }
                         }
@@ -57,6 +56,9 @@ struct GoingView: View {
                 }
                 .padding()
                 .padding(.bottom, 20)
+            }
+            .refreshable {
+                try? await Task.sleep(for: .milliseconds(500))
             }
             .navigationTitle("Going")
             .toolbar {
@@ -78,6 +80,7 @@ struct GoingView: View {
                 ForEach(TimeFilter.allCases, id: \.self) { timeFilter in
                     let count = countForFilter(timeFilter)
                     Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             filter = timeFilter
                         }
@@ -135,6 +138,8 @@ struct GoingView: View {
                     }
                     .scaleEffect(filter == timeFilter ? 1.03 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: filter == timeFilter)
+                    .accessibilityLabel("\(timeFilter.rawValue), \(count) events")
+                    .accessibilityAddTraits(filter == timeFilter ? [.isSelected] : [])
                 }
             }
         }
@@ -149,7 +154,7 @@ struct GoingView: View {
             ZStack(alignment: .bottomLeading) {
                 // Mesh gradient background
                 CategoryMeshBackground(category: event.category)
-                    .frame(height: 200)
+                    .frame(height: Layout.heroHeight)
 
                 // Dark overlay
                 LinearGradient(
@@ -185,7 +190,7 @@ struct GoingView: View {
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, Spacing.sm)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, Spacing.xxs)
                     .background(.ultraThinMaterial)
                     .clipShape(Capsule())
 
@@ -320,23 +325,7 @@ struct GoingView: View {
     }
 
     private func heroFormattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d 'at' h:mm a"
-        return formatter.string(from: date)
-    }
-}
-
-// MARK: - Card Press Button Style
-
-struct CardPressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .rotation3DEffect(
-                .degrees(configuration.isPressed ? 0.5 : 0),
-                axis: (x: 1, y: 0, z: 0)
-            )
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+        GatherDateFormatter.fullEventDate.string(from: date)
     }
 }
 
@@ -415,24 +404,20 @@ struct GoingEventCard: View {
             .padding(.vertical, Spacing.sm)
         }
         .glassCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(event.title). \(event.location?.name ?? ""). \(formattedTime). \(daysUntilCount <= 0 ? "Happening now" : daysUntilCount == 1 ? "Tomorrow" : "In \(daysUntilCount) days")")
     }
 
     private var monthAbbrev: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        return formatter.string(from: event.startDate).uppercased()
+        GatherDateFormatter.monthAbbrev.string(from: event.startDate).uppercased()
     }
 
     private var dayNumber: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.dayNumber.string(from: event.startDate)
     }
 
     private var formattedTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, h:mm a"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.shortEventTime.string(from: event.startDate)
     }
 
     private var daysUntilCount: Int {

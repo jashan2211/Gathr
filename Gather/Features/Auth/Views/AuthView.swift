@@ -97,29 +97,7 @@ struct AuthView: View {
                     .offset(y: buttonsVisible ? 0 : 30)
                     .opacity(buttonsVisible ? 1 : 0)
 
-                    // Sign in with Google
-                    Button {
-                        Task {
-                            await authManager.signInWithGoogle()
-                        }
-                    } label: {
-                        HStack(spacing: Spacing.sm) {
-                            Image(systemName: "g.circle.fill")
-                                .font(.title3)
-                            Text("Continue with Google")
-                                .font(GatherFont.callout)
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(Color.gatherSecondaryBackground)
-                        .foregroundStyle(Color.gatherPrimaryText)
-                        .clipShape(Capsule())
-                    }
-                    .offset(y: buttonsVisible ? 0 : 30)
-                    .opacity(buttonsVisible ? 1 : 0)
-
-                    // Email magic link
+                    // Email sign in
                     Button {
                         showEmailSheet = true
                     } label: {
@@ -139,52 +117,66 @@ struct AuthView: View {
                     .offset(y: buttonsVisible ? 0 : 30)
                     .opacity(buttonsVisible ? 1 : 0)
 
-                    // Divider
-                    HStack {
-                        Rectangle()
-                            .fill(Color.gatherSecondaryText.opacity(0.2))
-                            .frame(height: 1)
-                        Text("or")
-                            .font(.caption2)
-                            .foregroundStyle(Color.gatherSecondaryText)
-                        Rectangle()
-                            .fill(Color.gatherSecondaryText.opacity(0.2))
-                            .frame(height: 1)
-                    }
-                    .padding(.vertical, 4)
-                    .opacity(buttonsVisible ? 1 : 0)
-
-                    // Demo Sign In
-                    Button {
-                        authManager.signInAsDemo()
-                    } label: {
-                        HStack(spacing: Spacing.sm) {
-                            Image(systemName: "person.fill.viewfinder")
-                                .font(.title3)
-                            Text("Demo Sign In")
-                                .font(GatherFont.callout)
-                                .fontWeight(.bold)
+                    // Demo Sign In (DEBUG only)
+                    if AppConfig.isDemoMode {
+                        // Divider
+                        HStack {
+                            Rectangle()
+                                .fill(Color.gatherSecondaryText.opacity(0.2))
+                                .frame(height: 1)
+                            Text("or")
+                                .font(.caption2)
+                                .foregroundStyle(Color.gatherSecondaryText)
+                            Rectangle()
+                                .fill(Color.gatherSecondaryText.opacity(0.2))
+                                .frame(height: 1)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(LinearGradient.gatherAccentGradient)
-                        .foregroundStyle(.white)
-                        .clipShape(Capsule())
-                        .shadow(color: Color.accentPurpleFallback.opacity(0.3), radius: 12, y: 6)
+                        .padding(.vertical, Spacing.xxs)
+                        .opacity(buttonsVisible ? 1 : 0)
+
+                        // Demo Sign In
+                        Button {
+                            authManager.signInAsDemo()
+                        } label: {
+                            HStack(spacing: Spacing.sm) {
+                                Image(systemName: "person.fill.viewfinder")
+                                    .font(.title3)
+                                Text("Demo Sign In")
+                                    .font(GatherFont.callout)
+                                    .fontWeight(.bold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(LinearGradient.gatherAccentGradient)
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                            .shadow(color: Color.accentPurpleFallback.opacity(0.3), radius: 12, y: 6)
+                        }
+                        .scaleEffect(buttonsVisible ? 1 : 0.9)
+                        .opacity(buttonsVisible ? 1 : 0)
                     }
-                    .scaleEffect(buttonsVisible ? 1 : 0.9)
-                    .opacity(buttonsVisible ? 1 : 0)
                 }
                 .padding(.horizontal, Spacing.lg)
 
-                // Terms
-                Text("By continuing, you agree to our Terms of Service and Privacy Policy")
-                    .font(.caption2)
-                    .foregroundStyle(Color.gatherTertiaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.xl)
-                    .padding(.bottom, Spacing.xl)
-                    .opacity(buttonsVisible ? 0.8 : 0)
+                // Terms & Privacy (clickable links)
+                HStack(spacing: 0) {
+                    Text("By continuing, you agree to our ")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherTertiaryText)
+                    Link("Terms", destination: AppConfig.termsOfServiceURL)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(Color.accentPurpleFallback)
+                    Text(" and ")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherTertiaryText)
+                    Link("Privacy Policy", destination: AppConfig.privacyPolicyURL)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(Color.accentPurpleFallback)
+                }
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.xl)
+                .padding(.bottom, Spacing.xl)
+                .opacity(buttonsVisible ? 0.8 : 0)
             }
 
             // Loading overlay
@@ -220,9 +212,6 @@ struct AuthView: View {
         .sheet(isPresented: $showEmailSheet) {
             EmailSignInSheet(email: $email)
         }
-        .sheet(isPresented: $authManager.pendingGoogleSignIn) {
-            GoogleSignInSheet()
-        }
         .alert("Error", isPresented: .constant(authManager.authError != nil)) {
             Button("OK") {
                 authManager.authError = nil
@@ -250,293 +239,108 @@ struct AuthView: View {
     }
 }
 
-// MARK: - Google Sign In Sheet (Simulated OAuth)
-
-struct GoogleSignInSheet: View {
-    @EnvironmentObject var authManager: AuthManager
-    @Environment(\.dismiss) var dismiss
-    @State private var name = ""
-    @State private var email = ""
-    @FocusState private var isNameFocused: Bool
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: Spacing.lg) {
-                // Google logo area
-                VStack(spacing: Spacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.08))
-                            .frame(width: 90, height: 90)
-
-                        Circle()
-                            .fill(Color.blue.opacity(0.05))
-                            .frame(width: 70, height: 70)
-
-                        Image(systemName: "g.circle.fill")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.blue)
-                    }
-
-                    Text("Sign in with Google")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.gatherPrimaryText)
-
-                    Text("Enter your details to simulate Google OAuth")
-                        .font(GatherFont.caption)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                }
-                .padding(.top, Spacing.lg)
-
-                // Name field
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("NAME")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                        .tracking(0.5)
-
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "person")
-                            .font(.caption)
-                            .foregroundStyle(Color.accentPurpleFallback.opacity(0.7))
-                            .frame(width: 20)
-                        TextField("Your name", text: $name)
-                            .font(GatherFont.body)
-                            .textContentType(.name)
-                            .focused($isNameFocused)
-                    }
-                    .padding(Spacing.sm)
-                    .background(Color.gatherSecondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                }
-
-                // Email field
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("EMAIL")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                        .tracking(0.5)
-
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "envelope")
-                            .font(.caption)
-                            .foregroundStyle(Color.accentPurpleFallback.opacity(0.7))
-                            .frame(width: 20)
-                        TextField("email@gmail.com", text: $email)
-                            .font(GatherFont.body)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    }
-                    .padding(Spacing.sm)
-                    .background(Color.gatherSecondaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                }
-
-                // Sign in button
-                Button {
-                    authManager.completeGoogleSignIn(name: name, email: email)
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.callout)
-                        Text("Sign In")
-                            .font(GatherFont.callout)
-                            .fontWeight(.bold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(
-                        email.isEmpty
-                            ? AnyShapeStyle(Color.gatherSecondaryBackground)
-                            : AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                    )
-                    .foregroundStyle(email.isEmpty ? Color.gatherSecondaryText : .white)
-                    .clipShape(Capsule())
-                }
-                .disabled(email.isEmpty)
-
-                Spacer()
-            }
-            .padding(.horizontal, Spacing.md)
-            .navigationTitle("Google Sign In")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        authManager.cancelGoogleSignIn()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(Color.gatherSecondaryText)
-                    }
-                }
-            }
-            .onAppear {
-                isNameFocused = true
-            }
-        }
-        .presentationDetents([.medium])
-    }
-}
-
 // MARK: - Email Sign In Sheet
 
 struct EmailSignInSheet: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) var dismiss
     @Binding var email: String
-    @State private var linkSent = false
+    @State private var emailError: String?
     @FocusState private var isEmailFocused: Bool
+
+    private var isValidEmail: Bool {
+        let emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+        return email.wholeMatch(of: emailRegex) != nil
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: Spacing.lg) {
-                if linkSent {
-                    // Success state
+                // Email input
+                VStack(spacing: Spacing.lg) {
                     VStack(spacing: Spacing.md) {
                         ZStack {
                             Circle()
-                                .fill(Color.rsvpYesFallback.opacity(0.1))
-                                .frame(width: 110, height: 110)
-                                .bouncyAppear()
-
-                            Circle()
-                                .fill(Color.rsvpYesFallback.opacity(0.15))
+                                .fill(Color.accentPurpleFallback.opacity(0.08))
                                 .frame(width: 80, height: 80)
-                                .bouncyAppear(delay: 0.05)
-
-                            Image(systemName: "envelope.badge.fill")
-                                .font(.system(size: 48))
-                                .foregroundStyle(Color.rsvpYesFallback)
-                                .bouncyAppear(delay: 0.1)
+                            Image(systemName: "envelope.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(LinearGradient.gatherAccentGradient)
                         }
 
-                        Text("Check your inbox")
+                        Text("Sign in with Email")
                             .font(.system(size: 22, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.gatherPrimaryText)
-                            .bouncyAppear(delay: 0.15)
 
-                        Text("We sent a sign-in link to **\(email)**")
-                            .font(GatherFont.body)
+                        Text("Enter your email to create or access your account")
+                            .font(GatherFont.caption)
                             .foregroundStyle(Color.gatherSecondaryText)
                             .multilineTextAlignment(.center)
-                            .bouncyAppear(delay: 0.2)
-
-                        // Auto-verify button for demo purposes
-                        Button {
-                            Task {
-                                await authManager.verifyMagicLink(email: email, link: "demo-link")
-                                dismiss()
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "link")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                Text("Open Magic Link (Demo)")
-                                    .font(GatherFont.callout)
-                                    .fontWeight(.semibold)
-                            }
-                            .foregroundStyle(Color.accentPurpleFallback)
-                            .padding(.horizontal, Spacing.lg)
-                            .padding(.vertical, Spacing.sm)
-                            .background(Color.accentPurpleFallback.opacity(0.1))
-                            .clipShape(Capsule())
-                        }
-                        .padding(.top, Spacing.sm)
-                        .bouncyAppear(delay: 0.25)
                     }
-                    .padding(.top, Spacing.xxl)
-                } else {
-                    // Email input
-                    VStack(spacing: Spacing.lg) {
-                        VStack(spacing: Spacing.md) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.accentPurpleFallback.opacity(0.08))
-                                    .frame(width: 80, height: 80)
-                                Image(systemName: "envelope.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(LinearGradient.gatherAccentGradient)
-                            }
+                    .padding(.top, Spacing.sm)
 
-                            Text("Enter your email")
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.gatherPrimaryText)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("EMAIL")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .tracking(0.5)
 
-                            Text("We'll send you a magic link to sign in")
-                                .font(GatherFont.caption)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-                        .padding(.top, Spacing.sm)
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("EMAIL")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                                .tracking(0.5)
-
-                            HStack(spacing: Spacing.xs) {
-                                Image(systemName: "envelope")
-                                    .font(.caption)
-                                    .foregroundStyle(Color.accentPurpleFallback.opacity(0.7))
-                                    .frame(width: 20)
-                                TextField("email@example.com", text: $email)
-                                    .font(GatherFont.body)
-                                    .keyboardType(.emailAddress)
-                                    .textContentType(.emailAddress)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .focused($isEmailFocused)
-                            }
-                            .padding(Spacing.sm)
-                            .background(Color.gatherSecondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                        }
-
-                        Button {
-                            Task {
-                                let success = await authManager.sendMagicLink(email: email)
-                                if success {
-                                    withAnimation(.spring(response: 0.4)) {
-                                        linkSent = true
-                                    }
+                        HStack(spacing: Spacing.xs) {
+                            Image(systemName: "envelope")
+                                .font(.caption)
+                                .foregroundStyle(Color.accentPurpleFallback.opacity(0.7))
+                                .frame(width: 20)
+                            TextField("email@example.com", text: $email)
+                                .font(GatherFont.body)
+                                .keyboardType(.emailAddress)
+                                .textContentType(.emailAddress)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .submitLabel(.done)
+                                .focused($isEmailFocused)
+                                .onSubmit {
+                                    signIn()
                                 }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "paperplane.fill")
-                                    .font(.callout)
-                                Text("Send Magic Link")
-                                    .font(GatherFont.callout)
-                                    .fontWeight(.bold)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                email.isEmpty
-                                    ? AnyShapeStyle(Color.gatherSecondaryBackground)
-                                    : AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                            )
-                            .foregroundStyle(email.isEmpty ? Color.gatherSecondaryText : .white)
-                            .clipShape(Capsule())
                         }
-                        .disabled(email.isEmpty)
+                        .padding(Spacing.sm)
+                        .background(Color.gatherSecondaryBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+
+                        if let error = emailError {
+                            Text(error)
+                                .font(GatherFont.caption)
+                                .foregroundStyle(Color.rsvpNoFallback)
+                        }
                     }
+
+                    Button {
+                        signIn()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.callout)
+                            Text("Continue")
+                                .font(GatherFont.callout)
+                                .fontWeight(.bold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(
+                            email.isEmpty
+                                ? AnyShapeStyle(Color.gatherSecondaryBackground)
+                                : AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                        )
+                        .foregroundStyle(email.isEmpty ? Color.gatherSecondaryText : .white)
+                        .clipShape(Capsule())
+                    }
+                    .disabled(email.isEmpty)
                 }
 
                 Spacer()
             }
             .padding(.horizontal, Spacing.md)
-            .navigationTitle(linkSent ? "" : "Sign in with Email")
+            .navigationTitle("Sign in with Email")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -555,6 +359,17 @@ struct EmailSignInSheet: View {
             }
         }
         .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func signIn() {
+        emailError = nil
+        guard isValidEmail else {
+            emailError = "Please enter a valid email address"
+            return
+        }
+        authManager.signInWithEmail(email: email)
+        dismiss()
     }
 }
 

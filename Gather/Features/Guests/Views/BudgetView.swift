@@ -4,15 +4,23 @@ import SwiftData
 struct BudgetView: View {
     @Bindable var event: Event
     @Environment(\.modelContext) private var modelContext
-    @Query private var budgets: [Budget]
+    @Query private var eventBudgets: [Budget]
 
     @State private var showAddCategory = false
     @State private var showAddExpense = false
     @State private var selectedCategory: BudgetCategory?
     @State private var showEditBudget = false
 
+    init(event: Event) {
+        self.event = event
+        let eventId = event.id
+        _eventBudgets = Query(
+            filter: #Predicate<Budget> { $0.eventId == eventId }
+        )
+    }
+
     private var budget: Budget? {
-        budgets.first { $0.eventId == event.id }
+        eventBudgets.first
     }
 
     var body: some View {
@@ -60,16 +68,22 @@ struct BudgetView: View {
             .sheet(isPresented: $showAddCategory) {
                 if let budget = budget {
                     AddCategorySheet(budget: budget, functions: event.functions)
+                        .presentationDetents([.medium])
+                        .presentationDragIndicator(.visible)
                 }
             }
             .sheet(isPresented: $showAddExpense) {
                 if let category = selectedCategory {
                     AddExpenseSheet(category: category, functions: event.functions)
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
                 }
             }
             .sheet(isPresented: $showEditBudget) {
                 if let budget = budget {
                     EditBudgetSheet(budget: budget)
+                        .presentationDetents([.medium])
+                        .presentationDragIndicator(.visible)
                 }
             }
         }

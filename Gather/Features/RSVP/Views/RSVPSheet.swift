@@ -139,6 +139,8 @@ struct RSVPSheet: View {
                                 .foregroundStyle(Color.accentPurpleFallback)
                         }
                     }
+                    .accessibilityLabel("Plus ones")
+                    .accessibilityValue("\(plusOnes)")
                     .padding()
                     .background(Color.gatherSecondaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
@@ -175,6 +177,7 @@ struct RSVPSheet: View {
                     .foregroundStyle(Color.forRSVPStatus(selectedStatus))
             }
             .padding(.top, Spacing.xl)
+            .accessibilityHidden(true)
 
             VStack(spacing: Spacing.sm) {
                 Text(confirmationTitle)
@@ -185,6 +188,7 @@ struct RSVPSheet: View {
                     .foregroundStyle(Color.gatherSecondaryText)
                     .multilineTextAlignment(.center)
             }
+            .accessibilityElement(children: .combine)
 
             // Add to calendar prompt
             if selectedStatus == .attending {
@@ -202,6 +206,8 @@ struct RSVPSheet: View {
                     .background(Color.accentPurpleFallback.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
+                .accessibilityLabel("Add to Calendar")
+                .accessibilityHint("Adds this event to your device calendar")
             }
         }
     }
@@ -365,7 +371,7 @@ struct RSVPSheet: View {
             event.guests.append(newGuest)
         }
 
-        try? modelContext.save()
+        modelContext.safeSave()
 
         // Send notification to host
         Task {
@@ -378,7 +384,8 @@ struct RSVPSheet: View {
         }
 
         // Haptic success feedback
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        Task {
+            try? await Task.sleep(for: .seconds(0.5))
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
 
@@ -418,6 +425,8 @@ struct ProgressIndicator: View {
             }
         }
         .padding(.horizontal, Spacing.xl)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(stepIndex + 1) of 3")
     }
 
     private var stepIndex: Int {
@@ -481,6 +490,10 @@ struct RSVPOptionCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(status.displayName), \(statusDescription)")
+        .accessibilityHint(isSelected ? "Currently selected" : "Double tap to select \(status.displayName)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var statusDescription: String {

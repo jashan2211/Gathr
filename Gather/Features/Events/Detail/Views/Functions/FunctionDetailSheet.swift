@@ -307,7 +307,7 @@ struct FunctionDetailSheet: View {
                         ))) {
                             Marker(location.name, coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon))
                         }
-                        .frame(height: 150)
+                        .frame(height: Layout.photoHeight)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                         .disabled(true)
                     }
@@ -354,11 +354,11 @@ struct FunctionDetailSheet: View {
 
             // Add to Calendar
             Button {
-                CalendarService.shared.addFunctionToCalendar(
-                    function: function,
-                    eventTitle: event.title
-                ) { message in
-                    calendarAlertMessage = message
+                Task {
+                    calendarAlertMessage = await CalendarService.shared.addFunctionToCalendar(
+                        function: function,
+                        eventTitle: event.title
+                    )
                     showCalendarAlert = true
                 }
             } label: {
@@ -515,29 +515,21 @@ struct FunctionDetailSheet: View {
     // MARK: - Helpers
 
     private var monthAbbreviation: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        return formatter.string(from: function.date).uppercased()
+        GatherDateFormatter.monthAbbrev.string(from: function.date).uppercased()
     }
 
     private var dayNumber: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: function.date)
+        GatherDateFormatter.dayNumber.string(from: function.date)
     }
 
     private var formattedFullDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d, yyyy"
-        return formatter.string(from: function.date)
+        GatherDateFormatter.fullWeekdayDateYear.string(from: function.date)
     }
 
     private var formattedTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        var result = formatter.string(from: function.date)
+        var result = GatherDateFormatter.timeOnly.string(from: function.date)
         if let endTime = function.endTime {
-            result += " - \(formatter.string(from: endTime))"
+            result += " - \(GatherDateFormatter.timeOnly.string(from: endTime))"
         }
         return result
     }
@@ -566,7 +558,7 @@ struct FunctionDetailSheet: View {
         function.customDressCode = editDressCode == .custom ? editCustomDressCode : nil
         function.updatedAt = Date()
 
-        try? modelContext.save()
+        modelContext.safeSave()
         isEditing = false
     }
 
@@ -574,7 +566,7 @@ struct FunctionDetailSheet: View {
         if let index = event.functions.firstIndex(where: { $0.id == function.id }) {
             event.functions.remove(at: index)
             modelContext.delete(function)
-            try? modelContext.save()
+            modelContext.safeSave()
         }
         dismiss()
     }

@@ -141,6 +141,8 @@ struct FunctionRSVPSheet: View {
                                 .foregroundStyle(Color.accentPurpleFallback)
                         }
                     }
+                    .accessibilityLabel("Party size")
+                    .accessibilityValue("\(partySize)")
                     .padding()
                     .background(Color.gatherSecondaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
@@ -177,6 +179,7 @@ struct FunctionRSVPSheet: View {
                     .foregroundStyle(responseColor)
             }
             .padding(.top, Spacing.xl)
+            .accessibilityHidden(true)
 
             VStack(spacing: Spacing.sm) {
                 Text(confirmationTitle)
@@ -187,6 +190,7 @@ struct FunctionRSVPSheet: View {
                     .foregroundStyle(Color.gatherSecondaryText)
                     .multilineTextAlignment(.center)
             }
+            .accessibilityElement(children: .combine)
 
             // Add to calendar prompt
             if selectedResponse == .yes {
@@ -204,6 +208,8 @@ struct FunctionRSVPSheet: View {
                     .background(Color.accentPurpleFallback.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
+                .accessibilityLabel("Add to Calendar")
+                .accessibilityHint("Adds this function to your device calendar")
             }
         }
     }
@@ -289,9 +295,9 @@ struct FunctionRSVPSheet: View {
 
     private var responseColor: Color {
         switch selectedResponse {
-        case .yes: return .green
-        case .no: return .red
-        case .maybe: return .orange
+        case .yes: return .rsvpYesFallback
+        case .no: return .rsvpNoFallback
+        case .maybe: return .rsvpMaybeFallback
         }
     }
 
@@ -365,7 +371,7 @@ struct FunctionRSVPSheet: View {
             function.invites.append(newInvite)
         }
 
-        try? modelContext.save()
+        modelContext.safeSave()
 
         // Send notification to host
         Task {
@@ -378,7 +384,8 @@ struct FunctionRSVPSheet: View {
         }
 
         // Haptic success feedback
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        Task {
+            try? await Task.sleep(for: .seconds(0.5))
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
 
@@ -409,6 +416,8 @@ struct FunctionRSVPProgressIndicator: View {
             }
         }
         .padding(.horizontal, Spacing.xl)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(stepIndex + 1) of 3")
     }
 
     private var stepIndex: Int {
@@ -472,13 +481,17 @@ struct FunctionRSVPOptionCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(responseTitle), \(responseDescription)")
+        .accessibilityHint(isSelected ? "Currently selected" : "Double tap to select \(responseTitle)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var responseColor: Color {
         switch response {
-        case .yes: return .green
-        case .no: return .red
-        case .maybe: return .orange
+        case .yes: return .rsvpYesFallback
+        case .no: return .rsvpNoFallback
+        case .maybe: return .rsvpMaybeFallback
         }
     }
 

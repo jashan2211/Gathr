@@ -4,7 +4,6 @@ struct FunctionsTab: View {
     @Bindable var event: Event
     @State private var showAddFunction = false
     @State private var selectedFunction: EventFunction?
-    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         ScrollView {
@@ -17,7 +16,7 @@ struct FunctionsTab: View {
             }
             .padding(.horizontal)
             .padding(.top, Spacing.md)
-            .padding(.bottom, 100)
+            .padding(.bottom, Layout.scrollBottomInset)
         }
         .sheet(isPresented: $showAddFunction) {
             AddFunctionSheet(event: event)

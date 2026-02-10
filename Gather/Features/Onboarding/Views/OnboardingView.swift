@@ -33,7 +33,7 @@ struct OnboardingView: View {
                     readyPage.tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut(duration: 0.3), value: currentPage)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
 
                 // Bottom section
                 VStack(spacing: Spacing.md) {
@@ -360,7 +360,7 @@ struct OnboardingView: View {
         UserDefaults.standard.set(selectedRole.rawValue, forKey: "userRole")
         UserDefaults.standard.set(selectedCategories.map { $0.rawValue }, forKey: "preferredCategories")
 
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             hasCompletedOnboarding = true
         }
 

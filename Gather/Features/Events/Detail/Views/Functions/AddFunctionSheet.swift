@@ -177,7 +177,7 @@ struct AddFunctionSheet: View {
         )
 
         event.functions.append(newFunction)
-        try? modelContext.save()
+        modelContext.safeSave()
         dismiss()
     }
 }

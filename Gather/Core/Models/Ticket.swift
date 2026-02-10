@@ -32,7 +32,7 @@ final class TicketTier {
         if isFree { return "Free" }
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
+        formatter.currencyCode = Locale.current.currency?.identifier ?? "USD"
         return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
     }
 
@@ -152,10 +152,10 @@ final class Ticket {
     }
 
     static func generateTicketNumber() -> String {
-        let letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-        let numbers = "0123456789"
-        let randomLetters = String((0..<3).map { _ in letters.randomElement()! })
-        let randomNumbers = String((0..<4).map { _ in numbers.randomElement()! })
+        let letters = Array("ABCDEFGHJKLMNPQRSTUVWXYZ")
+        let numbers = Array("0123456789")
+        let randomLetters = String((0..<3).compactMap { _ in letters.randomElement() })
+        let randomNumbers = String((0..<4).compactMap { _ in numbers.randomElement() })
         return "TKT-\(randomLetters)\(randomNumbers)"
     }
 }

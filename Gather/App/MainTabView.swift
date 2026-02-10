@@ -109,8 +109,12 @@ struct MainTabView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
+                .accessibilityLabel(tab.title)
+                .accessibilityAddTraits(appState.selectedTab == tab ? [.isSelected] : [])
+                .accessibilityHint(appState.selectedTab == tab ? "Currently selected" : "Double tap to switch")
             }
         }
+        .accessibilityElement(children: .contain)
         .padding(.top, Spacing.sm)
         .padding(.bottom, Spacing.xs)
         .background(

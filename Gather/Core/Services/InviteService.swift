@@ -21,8 +21,8 @@ class InviteService: ObservableObject {
     }
 
     func generateShareableLink(event: Event) -> URL? {
-        // Format: https://gather.app/event/{eventId}
-        let urlString = "https://gather.app/event/\(event.id.uuidString)"
+        // Custom URL scheme — will be replaced with Universal Links when domain is configured
+        let urlString = "gather://event/\(event.id.uuidString)"
         return URL(string: urlString)
     }
 
@@ -38,11 +38,9 @@ class InviteService: ObservableObject {
 
         if !functions.isEmpty {
             message += "Functions:\n"
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "EEEE, MMM d 'at' h:mm a"
 
             for function in functions.sorted(by: { $0.date < $1.date }) {
-                message += "- \(function.name): \(dateFormatter.string(from: function.date))"
+                message += "- \(function.name): \(GatherDateFormatter.fullWeekdayDateTime.string(from: function.date))"
                 if let location = function.location {
                     message += " at \(location.name)"
                 }
@@ -50,9 +48,7 @@ class InviteService: ObservableObject {
             }
             message += "\n"
         } else {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "EEEE, MMM d, yyyy 'at' h:mm a"
-            message += "Date: \(dateFormatter.string(from: event.startDate))\n"
+            message += "Date: \(GatherDateFormatter.fullWeekdayDateTimeYear.string(from: event.startDate))\n"
 
             if let location = event.location {
                 message += "Location: \(location.name)\n"
@@ -66,7 +62,7 @@ class InviteService: ObservableObject {
             message += "RSVP here: \(inviteLink.absoluteString)\n\n"
         }
 
-        message += "Download Gather: https://gather.app/download"
+        message += "Download Gather: \(AppConfig.appStoreURL.absoluteString)"
 
         return message
     }

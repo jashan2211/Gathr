@@ -144,15 +144,9 @@ extension EventFunction {
     }
 
     var formattedDateRange: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-
         if let endTime = endTime {
-            let endFormatter = DateFormatter()
-            endFormatter.timeStyle = .short
-            return "\(formatter.string(from: date)) - \(endFormatter.string(from: endTime))"
+            return "\(GatherDateFormatter.mediumDateTime.string(from: date)) - \(GatherDateFormatter.timeOnly.string(from: endTime))"
         }
-        return formatter.string(from: date)
+        return GatherDateFormatter.mediumDateTime.string(from: date)
     }
 }

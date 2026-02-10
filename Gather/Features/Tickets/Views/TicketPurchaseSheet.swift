@@ -109,6 +109,7 @@ struct TicketPurchaseSheet: View {
                     }
                     .padding()
                 }
+                .scrollDismissesKeyboard(.interactively)
 
                 // Sticky bottom checkout bar
                 VStack {
@@ -188,7 +189,7 @@ struct TicketPurchaseSheet: View {
                 // Applied promo badge
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.rsvpYesFallback)
                     Text("\(promo.code) applied!")
                         .font(GatherFont.callout)
                         .fontWeight(.medium)
@@ -207,6 +208,7 @@ struct TicketPurchaseSheet: View {
                     TextField("Enter code", text: $promoCode)
                         .textFieldStyle(.plain)
                         .textInputAutocapitalization(.characters)
+                        .submitLabel(.done)
                         .padding(Spacing.sm)
                         .background(Color.gatherSecondaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
@@ -220,7 +222,7 @@ struct TicketPurchaseSheet: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, Spacing.md)
                             .padding(.vertical, Spacing.sm)
-                            .background(promoCode.isEmpty ? Color.gray : Color.accentPurpleFallback)
+                            .background(promoCode.isEmpty ? Color.gatherSecondaryText : Color.accentPurpleFallback)
                             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                     }
                     .disabled(promoCode.isEmpty)
@@ -229,7 +231,7 @@ struct TicketPurchaseSheet: View {
                 if let error = promoError {
                     Text(error)
                         .font(GatherFont.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.rsvpNoFallback)
                 }
             } else {
                 Button {
@@ -270,10 +272,10 @@ struct TicketPurchaseSheet: View {
             if groupDiscount > 0 {
                 HStack(spacing: Spacing.xs) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.mintGreen)
                     Text("Group discount: -\(formatPrice(groupDiscount))")
                         .font(GatherFont.callout)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.mintGreen)
                 }
             }
         }
@@ -306,6 +308,7 @@ struct TicketPurchaseSheet: View {
                 TextField("Full name", text: $guestName)
                     .textFieldStyle(.plain)
                     .textContentType(.name)
+                    .submitLabel(.done)
                     .padding(Spacing.sm)
                     .background(Color.gatherSecondaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
@@ -315,6 +318,7 @@ struct TicketPurchaseSheet: View {
                     .keyboardType(.emailAddress)
                     .textContentType(.emailAddress)
                     .autocapitalization(.none)
+                    .submitLabel(.done)
                     .padding(Spacing.sm)
                     .background(Color.gatherSecondaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
@@ -360,10 +364,10 @@ struct TicketPurchaseSheet: View {
             if groupDiscount > 0 {
                 HStack {
                     Text("Group Discount")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.mintGreen)
                     Spacer()
                     Text("-\(formatPrice(groupDiscount))")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.mintGreen)
                 }
                 .font(GatherFont.callout)
             }
@@ -372,10 +376,10 @@ struct TicketPurchaseSheet: View {
             if promoDiscount > 0 {
                 HStack {
                     Text("Promo: \(appliedPromo?.code ?? "")")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.mintGreen)
                     Spacer()
                     Text("-\(formatPrice(promoDiscount))")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.mintGreen)
                 }
                 .font(GatherFont.callout)
             }
@@ -405,6 +409,8 @@ struct TicketPurchaseSheet: View {
                     .font(GatherFont.title2)
                     .fontWeight(.bold)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Total: \(formatPrice(totalPrice))")
         }
         .padding(Spacing.md)
         .glassCard()
@@ -417,15 +423,6 @@ struct TicketPurchaseSheet: View {
             Divider()
 
             VStack(spacing: Spacing.sm) {
-                // Security note
-                HStack(spacing: Spacing.xxs) {
-                    Image(systemName: "lock.fill")
-                        .font(.caption2)
-                    Text("Secure checkout")
-                        .font(GatherFont.caption)
-                }
-                .foregroundStyle(Color.gatherSecondaryText)
-
                 if isFreeOrder {
                     // Free order - single confirm button
                     Button {
@@ -439,38 +436,24 @@ struct TicketPurchaseSheet: View {
                             .background(LinearGradient.gatherAccentGradient)
                             .clipShape(Capsule())
                     }
+                    .accessibilityLabel("Confirm free order, \(totalQuantity) ticket\(totalQuantity == 1 ? "" : "s")")
                 } else {
-                    // Apple Pay (primary)
-                    Button {
-                        processPayment(method: .applePay)
-                    } label: {
+                    // Paid tickets - coming soon
+                    VStack(spacing: Spacing.xs) {
                         HStack(spacing: Spacing.xs) {
-                            Image(systemName: "apple.logo")
+                            Image(systemName: "creditcard.trianglebadge.exclamationmark")
                                 .font(.title3)
-                            Text("Pay - \(formatPrice(totalPrice))")
-                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(Color.gatherSecondaryText)
+                            Text("Paid tickets coming soon")
+                                .font(GatherFont.headline)
+                                .foregroundStyle(Color.gatherPrimaryText)
                         }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Spacing.sm)
-                        .background(Color.black)
-                        .clipShape(Capsule())
+                        Text("Online payments are not yet available. Contact the event host to arrange payment.")
+                            .font(GatherFont.caption)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .multilineTextAlignment(.center)
                     }
-
-                    // Card (secondary)
-                    Button {
-                        processPayment(method: .card)
-                    } label: {
-                        HStack(spacing: Spacing.xs) {
-                            Image(systemName: "creditcard.fill")
-                            Text("Pay with Card")
-                        }
-                        .font(GatherFont.callout)
-                        .fontWeight(.medium)
-                        .foregroundStyle(Color.accentPurpleFallback)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Spacing.xs)
-                    }
+                    .padding(.vertical, Spacing.sm)
                 }
             }
             .padding(.horizontal)
@@ -519,6 +502,9 @@ struct TicketPurchaseSheet: View {
             }
             .padding(Spacing.xl)
             .glassCard()
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Processing payment, please wait")
+            .accessibilityAddTraits(.updatesFrequently)
         }
     }
 
@@ -535,7 +521,7 @@ struct TicketPurchaseSheet: View {
         if price == 0 { return "Free" }
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
+        formatter.currencyCode = Locale.current.currency?.identifier ?? "USD"
         return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
     }
 
@@ -551,16 +537,6 @@ struct TicketPurchaseSheet: View {
             }
         } else {
             promoError = "Invalid promo code"
-        }
-    }
-
-    private func processPayment(method: PaymentMethod) {
-        isProcessing = true
-
-        // Simulate 2-second payment processing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            isProcessing = false
-            completePurchase(paymentMethod: method)
         }
     }
 
@@ -625,7 +601,7 @@ struct TicketPurchaseSheet: View {
             event.guests.append(guest)
         }
 
-        try? modelContext.save()
+        modelContext.safeSave()
 
         purchasedTicket = lastTicket
         showConfirmation = true
@@ -714,11 +690,13 @@ struct TierCard: View {
                                 .foregroundStyle(quantity > 0 ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.3))
                         }
                         .disabled(quantity == 0)
+                        .accessibilityLabel("Decrease quantity for \(tier.name)")
 
                         Text("\(quantity)")
                             .font(GatherFont.headline)
                             .frame(width: 30)
                             .contentTransition(.numericText())
+                            .accessibilityHidden(true)
 
                         Button {
                             if quantity < tier.maxPerOrder && quantity < tier.remainingCount {
@@ -730,7 +708,11 @@ struct TierCard: View {
                                 .foregroundStyle(Color.accentPurpleFallback)
                         }
                         .disabled(quantity >= tier.maxPerOrder || quantity >= tier.remainingCount)
+                        .accessibilityLabel("Increase quantity for \(tier.name)")
                     }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Ticket quantity for \(tier.name)")
+                    .accessibilityValue("\(quantity)")
                 }
             }
 
@@ -771,6 +753,10 @@ struct TierCard: View {
                     lineWidth: 1.5
                 )
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(tier.name), \(tier.formattedPrice), \(tier.isSoldOut ? "Sold out" : "\(tier.remainingCount) available")")
+        .accessibilityValue(quantity > 0 ? "\(quantity) selected" : "None selected")
+        .accessibilityAddTraits(quantity > 0 ? .isSelected : [])
     }
 }
 

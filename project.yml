@@ -1,9 +1,8 @@
 name: Gather
 options:
-  bundleIdPrefix: com.gather
+  bundleIdPrefix: ca.thebighead
   deploymentTarget:
     iOS: "17.0"
-  xcodeVersion: "15.2"
   generateEmptyDirectories: true
   groupSortPosition: top
 
@@ -31,28 +30,26 @@ targets:
           - "**/.DS_Store"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.gather.app
-        INFOPLIST_KEY_CFBundleDisplayName: "Gather"
+        PRODUCT_BUNDLE_IDENTIFIER: ca.thebighead.gathr
+        INFOPLIST_KEY_CFBundleDisplayName: "Gathr"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: 7HTTY6JAP6
+        CODE_SIGN_ENTITLEMENTS: Gather/Gather.entitlements
     info:
+      path: Gather/Info.plist
       properties:
         CFBundleURLTypes:
-          - CFBundleURLName: "com.gather.app"
+          - CFBundleURLName: "ca.thebighead.gathr"
             CFBundleURLSchemes:
               - gather
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         NSCalendarsFullAccessUsageDescription: "Gather needs calendar access to add events to your calendar."
         NSContactsUsageDescription: "Gather needs access to your contacts to help you invite guests."
-    entitlements:
-      path: Gather/Gather.entitlements
-      properties:
-        com.apple.developer.icloud-container-identifiers:
-          - iCloud.com.gather.app
-        com.apple.developer.icloud-services:
-          - CloudKit
-        aps-environment: development
-        com.apple.developer.applesignin:
-          - Default
+        NSPhotoLibraryUsageDescription: "Gather needs access to your photo library to add event photos."
     dependencies: []
     preBuildScripts:
       - name: SwiftLint
@@ -71,7 +68,7 @@ targets:
       - path: GatherTests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.gather.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: ca.thebighead.gathr.tests
     dependencies:
       - target: Gather
 
@@ -82,7 +79,7 @@ targets:
       - path: GatherUITests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.gather.app.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: ca.thebighead.gathr.uitests
     dependencies:
       - target: Gather
 

@@ -1,5 +1,11 @@
 import Foundation
 import SwiftData
+import os
+
+private let logger = Logger(subsystem: "ca.thebighead.gathr", category: "EventService")
+
+// Hardcoded scheme URL — guaranteed valid, safe to force-unwrap at definition site
+private let _fallbackShareURL = URL(string: "gather://event")!
 
 // MARK: - Event Service
 
@@ -58,7 +64,7 @@ class EventService: ObservableObject {
         do {
             return try context.fetch(descriptor)
         } catch {
-            print("Failed to fetch events: \(error)")
+            logger.error("Failed to fetch events: \(error.localizedDescription)")
             return []
         }
     }
@@ -79,7 +85,7 @@ class EventService: ObservableObject {
         do {
             return try context.fetch(descriptor)
         } catch {
-            print("Failed to fetch events: \(error)")
+            logger.error("Failed to fetch events: \(error.localizedDescription)")
             return []
         }
     }
@@ -96,7 +102,7 @@ class EventService: ObservableObject {
         do {
             return try context.fetch(descriptor).first
         } catch {
-            print("Failed to fetch event: \(error)")
+            logger.error("Failed to fetch event: \(error.localizedDescription)")
             return nil
         }
     }
@@ -105,14 +111,14 @@ class EventService: ObservableObject {
 
     func updateEvent(_ event: Event) {
         event.updatedAt = Date()
-        try? modelContext?.save()
+        modelContext?.safeSave()
     }
 
     // MARK: - Delete Event
 
     func deleteEvent(_ event: Event) {
         modelContext?.delete(event)
-        try? modelContext?.save()
+        modelContext?.safeSave()
     }
 
     // MARK: - RSVP
@@ -135,7 +141,7 @@ class EventService: ObservableObject {
         guest.respondedAt = Date()
 
         event.guests.append(guest)
-        try? modelContext?.save()
+        modelContext?.safeSave()
 
         return guest
     }
@@ -144,21 +150,18 @@ class EventService: ObservableObject {
         guest.status = status
         guest.plusOneCount = plusOnes
         guest.respondedAt = Date()
-        try? modelContext?.save()
+        modelContext?.safeSave()
     }
 
     // MARK: - Share Link Generation
 
     func generateShareLink(for event: Event) -> URL {
-        let baseURL = "gather://event/"
-        // Safe: UUID string + fixed scheme always produces a valid URL
-        return URL(string: "\(baseURL)\(event.id.uuidString)") ?? URL(string: "gather://")!
+        // UUID.uuidString only contains hex chars and hyphens — always URL-safe
+        URL(string: "gather://event/\(event.id.uuidString)") ?? _fallbackShareURL
     }
 
     func generateShareText(for event: Event) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d 'at' h:mm a"
-        let dateString = formatter.string(from: event.startDate)
+        let dateString = GatherDateFormatter.fullEventDate.string(from: event.startDate)
 
         var text = "You're invited to \(event.title)!\n"
         text += "📅 \(dateString)\n"

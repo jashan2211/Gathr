@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct ExploreView: View {
-    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var searchText = ""
     @State private var selectedCategory: EventCategory?
@@ -73,6 +72,9 @@ struct ExploreView: View {
                         .bouncyAppear(delay: 0.1)
                 }
                 .padding(.bottom, Layout.tabBarHeight + 20)
+            }
+            .refreshable {
+                try? await Task.sleep(for: .milliseconds(500))
             }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("")
@@ -163,7 +165,7 @@ struct ExploreView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(isSearchFocused ? Color.accentPurpleFallback : Color.gatherSecondaryText)
                     .fontWeight(.medium)
-                    .animation(.easeInOut(duration: 0.2), value: isSearchFocused)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSearchFocused)
 
                 TextField("Search events, venues...", text: $searchText)
                     .font(GatherFont.body)
@@ -179,6 +181,7 @@ struct ExploreView: View {
                             .foregroundStyle(Color.gatherSecondaryText)
                             .font(.body)
                     }
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, Spacing.md)
@@ -198,10 +201,11 @@ struct ExploreView: View {
                         lineWidth: isSearchFocused ? 1.5 : 1
                     )
             )
-            .animation(.easeInOut(duration: 0.2), value: isSearchFocused)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSearchFocused)
 
             // Filter button
             Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showFilterSheet = true
             } label: {
                 ZStack(alignment: .topTrailing) {
@@ -238,6 +242,7 @@ struct ExploreView: View {
                     }
                 }
             }
+            .accessibilityLabel("Filter events")
         }
     }
 
@@ -306,6 +311,7 @@ struct ExploreView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .bold))
             }
+            .accessibilityLabel("Remove \(label) filter")
         }
         .foregroundStyle(.white)
         .padding(.horizontal, Spacing.sm)
@@ -327,6 +333,7 @@ struct ExploreView: View {
                     gradient: LinearGradient.gatherAccentGradient,
                     isSelected: selectedCategory == nil
                 ) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         selectedCategory = nil
                     }
@@ -341,6 +348,7 @@ struct ExploreView: View {
                         gradient: LinearGradient.categoryGradient(for: category),
                         isSelected: selectedCategory == category
                     ) {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             selectedCategory = category
                         }
@@ -360,7 +368,7 @@ struct ExploreView: View {
             ZStack(alignment: .bottom) {
                 // Mesh gradient background
                 CategoryMeshBackground(category: event.category)
-                    .frame(height: 240)
+                    .frame(height: Layout.heroHeightFeatured)
                     .overlay(alignment: .topLeading) {
                         Text(event.category.emoji)
                             .font(.system(size: 80))
@@ -738,9 +746,7 @@ struct ExploreView: View {
     }
 
     private func featuredFormattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
+        GatherDateFormatter.monthDay.string(from: date)
     }
 
     private func relativeDate(_ date: Date) -> String {
@@ -752,9 +758,7 @@ struct ExploreView: View {
         if days == 1 { return "Tomorrow" }
         if days <= 7 { return "In \(days) days" }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
+        return GatherDateFormatter.monthDay.string(from: date)
     }
 }
 
@@ -781,6 +785,7 @@ struct ExploreCategoryChip: View {
                     Text("\(count)")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(isSelected ? .white.opacity(0.8) : Color.gatherSecondaryText)
+                        .contentTransition(.numericText())
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(
@@ -816,492 +821,8 @@ struct ExploreCategoryChip: View {
             .scaleEffect(isSelected ? 1.05 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
         }
-    }
-}
-
-// MARK: - Happening Soon Card
-
-struct HappeningSoonCard: View {
-    let event: Event
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Gradient hero with date overlay
-            ZStack(alignment: .topLeading) {
-                CategoryMeshBackground(category: event.category)
-                    .frame(width: 200, height: 110)
-                    .overlay(alignment: .bottomTrailing) {
-                        Text(event.category.emoji)
-                            .font(.system(size: 36))
-                            .opacity(0.3)
-                            .offset(x: -8, y: -8)
-                    }
-
-                // Date chip
-                VStack(spacing: 0) {
-                    Text(dayOfMonth)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                    Text(monthAbbrev)
-                        .font(.system(size: 10, weight: .semibold))
-                        .textCase(.uppercase)
-                }
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial.opacity(0.7))
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                .padding(Spacing.xs)
-            }
-            .clipped()
-
-            // Info
-            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text(event.title)
-                    .font(GatherFont.callout)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.gatherPrimaryText)
-                    .lineLimit(1)
-
-                if let location = event.location {
-                    HStack(spacing: 3) {
-                        Image(systemName: "mappin")
-                            .font(.system(size: 8))
-                        Text(location.shortLocation ?? location.name)
-                            .lineLimit(1)
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                }
-
-                HStack(spacing: 4) {
-                    Text(relativeDay)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(urgencyColor)
-
-                    Spacer()
-
-                    // Mini attendee avatars
-                    let attendingNames = event.guests
-                        .filter { $0.status == .attending }
-                        .prefix(2)
-                        .map { $0.name }
-                    if !attendingNames.isEmpty {
-                        AvatarStack(names: Array(attendingNames), maxDisplay: 2, size: 16)
-                    } else {
-                        HStack(spacing: 2) {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 8))
-                            Text("\(event.totalAttendingHeadcount)")
-                                .fontWeight(.semibold)
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                    }
-                }
-            }
-            .padding(Spacing.sm)
-        }
-        .frame(width: 200)
-        .glassCard()
-    }
-
-    private var dayOfMonth: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: event.startDate)
-    }
-
-    private var monthAbbrev: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        return formatter.string(from: event.startDate)
-    }
-
-    private var relativeDay: String {
-        let calendar = Calendar.current
-        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: event.startDate)).day ?? 0
-        if days == 0 { return "Today" }
-        if days == 1 { return "Tomorrow" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE"
-        return formatter.string(from: event.startDate)
-    }
-
-    private var urgencyColor: Color {
-        let calendar = Calendar.current
-        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: event.startDate)).day ?? 0
-        if days <= 1 { return Color.warmCoral }
-        if days <= 3 { return Color.sunshineYellow }
-        return Color.accentPurpleFallback
-    }
-}
-
-// MARK: - Explore Grid Card
-
-struct ExploreGridCard: View {
-    let event: Event
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Hero with accent line
-            ZStack(alignment: .topTrailing) {
-                CategoryMeshBackground(category: event.category)
-                    .frame(height: 100)
-                    .overlay(alignment: .bottomLeading) {
-                        Text(event.category.emoji)
-                            .font(.system(size: 28))
-                            .padding(Spacing.xs)
-                    }
-
-                // Price tag
-                Text(priceLabel)
-                    .font(.caption2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.xs)
-                    .padding(.vertical, 3)
-                    .background(priceColor)
-                    .clipShape(Capsule())
-                    .padding(Spacing.xs)
-            }
-            .clipped()
-
-            // Content
-            VStack(alignment: .leading, spacing: 4) {
-                Text(event.title)
-                    .font(GatherFont.callout)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.gatherPrimaryText)
-                    .lineLimit(2)
-                    .frame(minHeight: 36, alignment: .topLeading)
-
-                if let location = event.location {
-                    HStack(spacing: 3) {
-                        Image(systemName: "mappin")
-                            .font(.system(size: 8))
-                        Text(location.shortLocation ?? location.name)
-                            .lineLimit(1)
-                    }
-                    .font(.caption2)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                }
-
-                // Relative date
-                HStack(spacing: 3) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 8))
-                    Text(smartDate)
-                        .lineLimit(1)
-                }
-                .font(.caption2)
-                .foregroundStyle(Color.accentPurpleFallback)
-
-                // Attendee preview + capacity
-                HStack(spacing: 4) {
-                    let attendingNames = event.guests
-                        .filter { $0.status == .attending }
-                        .prefix(3)
-                        .map { $0.name }
-
-                    if !attendingNames.isEmpty {
-                        AvatarStack(
-                            names: Array(attendingNames),
-                            maxDisplay: 3,
-                            size: 20
-                        )
-                        if event.totalAttendingHeadcount > 3 {
-                            Text("+\(event.totalAttendingHeadcount - 3)")
-                                .font(.caption2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-                    } else {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 8))
-                            .foregroundStyle(Color.gatherSecondaryText)
-                        Text("\(event.totalAttendingHeadcount)")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.gatherPrimaryText)
-                    }
-
-                    Spacer()
-
-                    if let capacity = event.capacity, capacity > 0 {
-                        let remaining = capacity - event.totalAttendingHeadcount
-                        if remaining <= 10 && remaining > 0 {
-                            Text("\(remaining) left!")
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(Color.warmCoral)
-                        }
-                    }
-                }
-            }
-            .padding(Spacing.sm)
-        }
-        .glassCard()
-    }
-
-    private var priceLabel: String {
-        let tiers = event.ticketTiers
-        if let cheapest = tiers.min(by: { $0.price < $1.price }) {
-            return cheapest.price == 0 ? "FREE" : "$\(NSDecimalNumber(decimal: cheapest.price).intValue)"
-        }
-        return "FREE"
-    }
-
-    private var priceColor: Color {
-        let tiers = event.ticketTiers
-        if let cheapest = tiers.min(by: { $0.price < $1.price }),
-           cheapest.price > 0 {
-            return Color.accentPurpleFallback
-        }
-        return Color.mintGreen
-    }
-
-    /// Smart date: shows "Tomorrow", "This Sat", or "Feb 12"
-    private var smartDate: String {
-        let calendar = Calendar.current
-        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: event.startDate)).day ?? 0
-
-        if days == 0 { return "Today" }
-        if days == 1 { return "Tomorrow" }
-        if days <= 6 {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEEE"
-            return "This \(formatter.string(from: event.startDate))"
-        }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d"
-        return formatter.string(from: event.startDate)
-    }
-}
-
-// MARK: - Location Filter Sheet
-
-struct LocationFilterSheet: View {
-    let availableCities: [String]
-    let availableStates: [String]
-    let availableCountries: [String]
-
-    @Binding var selectedCity: String?
-    @Binding var selectedState: String?
-    @Binding var selectedCountry: String?
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.lg) {
-                    // City
-                    if !availableCities.isEmpty {
-                        filterSection(
-                            title: "City",
-                            icon: "building.2.fill",
-                            items: availableCities,
-                            selected: selectedCity,
-                            gradient: LinearGradient(
-                                colors: [Color.accentPurpleFallback, Color.accentPurpleFallback.opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        ) { city in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                selectedCity = selectedCity == city ? nil : city
-                            }
-                        }
-                    }
-
-                    // State
-                    if !availableStates.isEmpty {
-                        filterSection(
-                            title: "State",
-                            icon: "map.fill",
-                            items: availableStates,
-                            selected: selectedState,
-                            gradient: LinearGradient(
-                                colors: [Color.accentPinkFallback, Color.accentPinkFallback.opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        ) { state in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                selectedState = selectedState == state ? nil : state
-                            }
-                        }
-                    }
-
-                    // Country
-                    if !availableCountries.isEmpty {
-                        filterSection(
-                            title: "Country",
-                            icon: "globe",
-                            items: availableCountries,
-                            selected: selectedCountry,
-                            gradient: LinearGradient(
-                                colors: [Color.rsvpYesFallback, Color.rsvpYesFallback.opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        ) { country in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                selectedCountry = selectedCountry == country ? nil : country
-                            }
-                        }
-                    }
-
-                    if availableCities.isEmpty && availableStates.isEmpty && availableCountries.isEmpty {
-                        VStack(spacing: Spacing.md) {
-                            Image(systemName: "map")
-                                .font(.system(size: 40))
-                                .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-                            Text("No location data available")
-                                .font(GatherFont.body)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Filter by Location")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if selectedCity != nil || selectedState != nil || selectedCountry != nil {
-                        Button("Reset") {
-                            withAnimation {
-                                selectedCity = nil
-                                selectedState = nil
-                                selectedCountry = nil
-                            }
-                        }
-                        .foregroundStyle(Color.accentPurpleFallback)
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.accentPurpleFallback)
-                }
-            }
-        }
-    }
-
-    private func filterSection(
-        title: String,
-        icon: String,
-        items: [String],
-        selected: String?,
-        gradient: LinearGradient,
-        onSelect: @escaping (String) -> Void
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            // Section header
-            HStack(spacing: Spacing.xs) {
-                Image(systemName: icon)
-                    .font(.callout)
-                    .foregroundStyle(Color.accentPurpleFallback)
-                Text(title)
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
-            }
-
-            // Chips
-            GatherFlowLayout(spacing: Spacing.xs) {
-                ForEach(items, id: \.self) { item in
-                    Button {
-                        onSelect(item)
-                    } label: {
-                        Text(item)
-                            .font(GatherFont.callout)
-                            .fontWeight(selected == item ? .semibold : .regular)
-                            .foregroundStyle(selected == item ? .white : Color.gatherPrimaryText)
-                            .padding(.horizontal, Spacing.md)
-                            .padding(.vertical, Spacing.xs)
-                            .background(
-                                selected == item
-                                    ? AnyShapeStyle(gradient)
-                                    : AnyShapeStyle(Color.gatherSecondaryBackground)
-                            )
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(
-                                        selected == item ? Color.clear : Color.gatherSecondaryText.opacity(0.2),
-                                        lineWidth: 1
-                                    )
-                            )
-                    }
-                    .scaleEffect(selected == item ? 1.05 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: selected == item)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Flow Layout
-
-struct GatherFlowLayout: SwiftUI.Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(
-                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                proposal: ProposedViewSize(result.sizes[index])
-            )
-        }
-    }
-
-    private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> ArrangementResult {
-        let maxWidth = proposal.width ?? .infinity
-        var positions: [CGPoint] = []
-        var sizes: [CGSize] = []
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            sizes.append(size)
-
-            if currentX + size.width > maxWidth && currentX > 0 {
-                currentX = 0
-                currentY += rowHeight + spacing
-                rowHeight = 0
-            }
-
-            positions.append(CGPoint(x: currentX, y: currentY))
-            rowHeight = max(rowHeight, size.height)
-            currentX += size.width + spacing
-        }
-
-        let totalHeight = currentY + rowHeight
-        return ArrangementResult(
-            positions: positions,
-            sizes: sizes,
-            size: CGSize(width: maxWidth, height: totalHeight)
-        )
-    }
-
-    struct ArrangementResult {
-        var positions: [CGPoint]
-        var sizes: [CGSize]
-        var size: CGSize
+        .accessibilityLabel("\(title)\(count > 0 ? ", \(count) events" : "")")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 
@@ -1327,49 +848,39 @@ extension LinearGradient {
     static func categoryGradient(for category: EventCategory) -> LinearGradient {
         switch category {
         case .wedding:
-            return LinearGradient(colors: [Color(red: 0.95, green: 0.4, blue: 0.6), Color(red: 0.98, green: 0.6, blue: 0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.weddingRose, .weddingRoseLight], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .party:
-            return LinearGradient(colors: [Color.accentPurpleFallback, Color.accentPinkFallback], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.accentPurpleFallback, .accentPinkFallback], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .office:
-            return LinearGradient(colors: [Color(red: 0.2, green: 0.5, blue: 0.9), Color(red: 0.4, green: 0.7, blue: 1.0)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.officeBlue, .officeBlueLight], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .conference:
-            return LinearGradient(colors: [Color(red: 0.95, green: 0.6, blue: 0.2), Color(red: 1.0, green: 0.8, blue: 0.3)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.conferenceAmber, .conferenceGold], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .concert:
-            return LinearGradient(colors: [Color(red: 0.9, green: 0.2, blue: 0.3), Color(red: 1.0, green: 0.4, blue: 0.5)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.concertRed, .concertSalmon], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .meetup:
-            return LinearGradient(colors: [Color(red: 0.1, green: 0.7, blue: 0.5), Color(red: 0.3, green: 0.9, blue: 0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.meetupTeal, .meetupGreenLight], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .custom:
-            return LinearGradient(colors: [Color(red: 0.5, green: 0.5, blue: 0.6), Color(red: 0.7, green: 0.7, blue: 0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.customSlate, .customSlateLight], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
     }
 
     static func categoryGradientVibrant(for category: EventCategory) -> LinearGradient {
         switch category {
         case .wedding:
-            return LinearGradient(colors: [Color(red: 0.9, green: 0.3, blue: 0.5), Color(red: 0.95, green: 0.5, blue: 0.7), Color(red: 1.0, green: 0.7, blue: 0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.weddingRoseDeep, .weddingRoseMid, .weddingBlush], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .party:
-            return LinearGradient(colors: [Color(red: 0.49, green: 0.23, blue: 0.93), Color.accentPinkFallback, Color(red: 1.0, green: 0.5, blue: 0.3)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.partyPurple, .accentPinkFallback, .warmOrange], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .office:
-            return LinearGradient(colors: [Color(red: 0.1, green: 0.4, blue: 0.85), Color(red: 0.3, green: 0.6, blue: 1.0), Color(red: 0.5, green: 0.8, blue: 1.0)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.officeBlueDeep, .officeBlueBright, .officeBlueSky], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .conference:
-            return LinearGradient(colors: [Color(red: 0.9, green: 0.5, blue: 0.1), Color(red: 1.0, green: 0.7, blue: 0.2), Color(red: 1.0, green: 0.85, blue: 0.4)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.conferenceAmberDeep, .conferenceOrangeGold, .conferenceGoldLight], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .concert:
-            return LinearGradient(colors: [Color(red: 0.85, green: 0.1, blue: 0.2), Color(red: 0.95, green: 0.3, blue: 0.4), Color(red: 1.0, green: 0.5, blue: 0.3)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.concertRedDeep, .concertCrimson, .warmOrange], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .meetup:
-            return LinearGradient(colors: [Color(red: 0.0, green: 0.6, blue: 0.45), Color(red: 0.2, green: 0.8, blue: 0.55), Color(red: 0.4, green: 0.95, blue: 0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.meetupTealDeep, .meetupEmerald, .meetupEmeraldLight], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .custom:
-            return LinearGradient(colors: [Color(red: 0.4, green: 0.4, blue: 0.55), Color(red: 0.6, green: 0.6, blue: 0.75), Color(red: 0.75, green: 0.75, blue: 0.85)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [.customSlateDark, .customSlateMid, .customSlatePale], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
-    }
-}
-
-// MARK: - Scale Button Style
-
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 

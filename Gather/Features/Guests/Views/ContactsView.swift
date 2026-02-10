@@ -128,7 +128,7 @@ struct ContactsView: View {
                 modelContext.insert(guest)
             }
         }
-        try? modelContext.save()
+        modelContext.safeSave()
     }
 }
 
@@ -190,29 +190,65 @@ struct ImportContactsSheet: View {
     var onImport: ([CNContact]) -> Void
     @State private var showPicker = false
     @State private var selectedContacts: [CNContact] = []
+    @State private var contactsAccessDenied = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: Spacing.lg) {
-                VStack(spacing: Spacing.md) {
-                    Image(systemName: "person.crop.circle.badge.plus")
-                        .font(.system(size: 48))
-                        .foregroundStyle(Color.accentPurpleFallback)
+                if contactsAccessDenied {
+                    // Permission denied state
+                    VStack(spacing: Spacing.md) {
+                        Image(systemName: "person.crop.circle.badge.xmark")
+                            .font(.system(size: 48))
+                            .foregroundStyle(Color.rsvpNoFallback)
 
-                    Text("Import Contacts")
-                        .font(GatherFont.title3)
-                        .foregroundStyle(Color.gatherPrimaryText)
+                        Text("Contacts Access Denied")
+                            .font(GatherFont.title3)
+                            .foregroundStyle(Color.gatherPrimaryText)
 
-                    Text("Select contacts from your phone to add to your Gather contact list.")
-                        .font(GatherFont.body)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, Spacing.xl)
+                        Text("Gather needs access to your contacts to import them. Please enable Contacts access in Settings.")
+                            .font(GatherFont.body)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .multilineTextAlignment(.center)
 
-                Button {
-                    showPicker = true
-                } label: {
+                        Button {
+                            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(settingsURL)
+                            }
+                        } label: {
+                            HStack(spacing: Spacing.xs) {
+                                Image(systemName: "gear")
+                                Text("Open Settings")
+                            }
+                            .font(GatherFont.headline)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, Spacing.lg)
+                            .padding(.vertical, Spacing.sm)
+                            .background(LinearGradient.gatherAccentGradient)
+                            .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.top, Spacing.xl)
+                } else {
+                    VStack(spacing: Spacing.md) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 48))
+                            .foregroundStyle(Color.accentPurpleFallback)
+
+                        Text("Import Contacts")
+                            .font(GatherFont.title3)
+                            .foregroundStyle(Color.gatherPrimaryText)
+
+                        Text("Select contacts from your phone to add to your Gather contact list.")
+                            .font(GatherFont.body)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, Spacing.xl)
+
+                    Button {
+                        checkContactsAccessAndShowPicker()
+                    } label: {
                     HStack(spacing: Spacing.sm) {
                         Image(systemName: "person.2.fill")
                         Text("Choose Contacts")
@@ -225,36 +261,37 @@ struct ImportContactsSheet: View {
                     .cornerRadius(CornerRadius.md)
                 }
 
-                if !selectedContacts.isEmpty {
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        Text("\(selectedContacts.count) contacts selected")
-                            .font(GatherFont.callout)
-                            .foregroundStyle(Color.gatherSecondaryText)
+                    if !selectedContacts.isEmpty {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Text("\(selectedContacts.count) contacts selected")
+                                .font(GatherFont.callout)
+                                .foregroundStyle(Color.gatherSecondaryText)
 
-                        ScrollView {
-                            LazyVStack(spacing: Spacing.xs) {
-                                ForEach(selectedContacts, id: \.identifier) { contact in
-                                    let name = [contact.givenName, contact.familyName]
-                                        .filter { !$0.isEmpty }
-                                        .joined(separator: " ")
-                                    HStack {
-                                        Text(name)
-                                            .font(GatherFont.body)
-                                        Spacer()
-                                        if let email = contact.emailAddresses.first?.value as String? {
-                                            Text(email)
-                                                .font(GatherFont.caption)
-                                                .foregroundStyle(Color.gatherSecondaryText)
+                            ScrollView {
+                                LazyVStack(spacing: Spacing.xs) {
+                                    ForEach(selectedContacts, id: \.identifier) { contact in
+                                        let name = [contact.givenName, contact.familyName]
+                                            .filter { !$0.isEmpty }
+                                            .joined(separator: " ")
+                                        HStack {
+                                            Text(name)
+                                                .font(GatherFont.body)
+                                            Spacer()
+                                            if let email = contact.emailAddresses.first?.value as String? {
+                                                Text(email)
+                                                    .font(GatherFont.caption)
+                                                    .foregroundStyle(Color.gatherSecondaryText)
+                                            }
                                         }
+                                        .padding(Spacing.sm)
+                                        .background(Color.gatherSecondaryBackground)
+                                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                                     }
-                                    .padding(Spacing.sm)
-                                    .background(Color.gatherSecondaryBackground)
-                                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                                 }
                             }
                         }
                     }
-                }
+                } // end else (contacts access not denied)
 
                 Spacer()
             }
@@ -278,6 +315,16 @@ struct ImportContactsSheet: View {
             .sheet(isPresented: $showPicker) {
                 ContactsPickerView(selectedContacts: $selectedContacts)
             }
+        }
+    }
+
+    private func checkContactsAccessAndShowPicker() {
+        let status = CNContactStore.authorizationStatus(for: .contacts)
+        switch status {
+        case .denied, .restricted:
+            contactsAccessDenied = true
+        default:
+            showPicker = true
         }
     }
 }

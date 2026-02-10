@@ -62,6 +62,7 @@ struct ManageRSVPSheet: View {
                 }
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Your RSVP")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -84,12 +85,14 @@ struct ManageRSVPSheet: View {
                 Text("You can always RSVP again if your plans change.")
             }
             .sheet(isPresented: $showRequestCancellation) {
-                RequestCancellationSheet(
-                    ticket: ticket!,
-                    event: event,
-                    reason: $cancellationReason
-                ) {
-                    dismiss()
+                if let ticket = ticket {
+                    RequestCancellationSheet(
+                        ticket: ticket,
+                        event: event,
+                        reason: $cancellationReason
+                    ) {
+                        dismiss()
+                    }
                 }
             }
         }
@@ -149,6 +152,8 @@ struct ManageRSVPSheet: View {
         .frame(maxWidth: .infinity)
         .background(Color.gatherSecondaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("RSVP status: \(statusTitle). \(statusSubtitle)")
     }
 
     // MARK: - Ticket Info Card
@@ -184,7 +189,7 @@ struct ManageRSVPSheet: View {
                 } else {
                     Text("Free")
                         .font(GatherFont.headline)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.rsvpYesFallback)
                 }
             }
 
@@ -202,6 +207,8 @@ struct ManageRSVPSheet: View {
         .padding()
         .background(Color.gatherSecondaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Ticket \(ticket.ticketNumber), \(ticket.quantity) ticket\(ticket.quantity > 1 ? "s" : ""), \(ticket.totalPrice > 0 ? formatPrice(ticket.totalPrice) : "Free")")
     }
 
     // MARK: - Edit Section
@@ -240,6 +247,8 @@ struct ManageRSVPSheet: View {
                                 .foregroundStyle(Color.accentPurpleFallback)
                         }
                     }
+                    .accessibilityLabel("Additional guests")
+                    .accessibilityValue("\(plusOnes)")
                     .padding()
                     .background(Color.gatherTertiaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
@@ -332,6 +341,8 @@ struct ManageRSVPSheet: View {
                         .background(LinearGradient.gatherAccentGradient)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
+                    .accessibilityLabel("Modify Response")
+                    .accessibilityHint("Opens editor to change your RSVP status")
 
                     if guest.status == .attending || guest.status == .maybe {
                         Button {
@@ -339,12 +350,14 @@ struct ManageRSVPSheet: View {
                         } label: {
                             Text("Cancel RSVP")
                                 .font(GatherFont.headline)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Color.rsvpNoFallback)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.red.opacity(0.1))
+                                .background(Color.rsvpNoFallback.opacity(0.1))
                                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                         }
+                        .accessibilityLabel("Cancel RSVP")
+                        .accessibilityHint("Cancels your attendance for this event")
                     }
                 } else if isPaidTicket {
                     // Paid ticket - can only request cancellation
@@ -356,12 +369,14 @@ struct ManageRSVPSheet: View {
                             Text("Request Cancellation")
                         }
                         .font(GatherFont.headline)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.orange.opacity(0.1))
+                        .background(Color.rsvpMaybeFallback.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
+                    .accessibilityLabel("Request Cancellation")
+                    .accessibilityHint("Sends a cancellation request to the event host for your paid ticket")
                 }
 
                 // Add to calendar (if attending)
@@ -380,6 +395,7 @@ struct ManageRSVPSheet: View {
                         .background(Color.accentPurpleFallback.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
+                    .accessibilityLabel("Add to Calendar")
                 }
             }
         }
@@ -419,9 +435,7 @@ struct ManageRSVPSheet: View {
     }
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
+        GatherDateFormatter.monthDay.string(from: date)
     }
 
     private func formatPrice(_ price: Decimal) -> String {
@@ -447,13 +461,14 @@ struct ManageRSVPSheet: View {
             }
         }
 
-        try? modelContext.save()
+        modelContext.safeSave()
 
         // Haptic feedback
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        Task {
+            try? await Task.sleep(for: .seconds(0.5))
             isSubmitting = false
             isEditing = false
         }
@@ -462,7 +477,7 @@ struct ManageRSVPSheet: View {
     private func cancelRSVP() {
         guest.status = .declined
         guest.respondedAt = Date()
-        try? modelContext.save()
+        modelContext.safeSave()
 
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
@@ -509,6 +524,9 @@ private struct EditStatusOption: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(status.displayName)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -530,12 +548,12 @@ struct RequestCancellationSheet: View {
                 // Icon
                 ZStack {
                     Circle()
-                        .fill(Color.orange.opacity(0.1))
+                        .fill(Color.rsvpMaybeFallback.opacity(0.1))
                         .frame(width: 80, height: 80)
 
                     Image(systemName: "envelope.badge.shield.half.filled")
                         .font(.system(size: 36))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
                 }
                 .padding(.top, Spacing.lg)
 
@@ -643,7 +661,8 @@ struct RequestCancellationSheet: View {
         isSending = true
 
         // Simulate sending request
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        Task {
+            try? await Task.sleep(for: .seconds(1))
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
 

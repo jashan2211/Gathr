@@ -188,15 +188,15 @@ struct NotificationsView: View {
 
     private func iconColor(_ colorName: String) -> Color {
         switch colorName {
-        case "purple": return .purple
-        case "blue": return .blue
-        case "green": return .green
-        case "orange": return .orange
-        case "red": return .red
-        case "pink": return .pink
-        case "teal": return .teal
-        case "indigo": return .indigo
-        default: return .purple
+        case "purple": return .accentPurpleFallback
+        case "blue": return .neonBlue
+        case "green": return .rsvpYesFallback
+        case "orange": return .rsvpMaybeFallback
+        case "red": return .rsvpNoFallback
+        case "pink": return .accentPinkFallback
+        case "teal": return .mintGreen
+        case "indigo": return .deepIndigo
+        default: return .accentPurpleFallback
         }
     }
 
@@ -232,7 +232,7 @@ struct NotificationBellButton: View {
                     Text("\(min(unreadNotifications.count, 99))")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, Spacing.xxs)
                         .padding(.vertical, 1)
                         .background(Color.rsvpNoFallback)
                         .clipShape(Capsule())

@@ -57,9 +57,17 @@ struct EventDetailView: View {
     @State private var showSeatingChart = false
     @State private var showTicketPurchase = false
     @State private var showWaitlist = false
+    @Namespace private var tabNamespace
     @EnvironmentObject var authManager: AuthManager
-    @Environment(\.modelContext) private var modelContext
-    @Query private var allTickets: [Ticket]
+    @Query private var eventTickets: [Ticket]
+
+    init(event: Event) {
+        self.event = event
+        let eventId = event.id
+        _eventTickets = Query(
+            filter: #Predicate<Ticket> { $0.eventId == eventId }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -73,6 +81,8 @@ struct EventDetailView: View {
 
             // Tab Content
             tabContent
+                .id(selectedTab)
+                .transition(.opacity)
                 .padding(.top, 24)
         }
         .ignoresSafeArea(edges: .top)
@@ -113,6 +123,7 @@ struct EventDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("More options")
             }
         }
         .sheet(isPresented: $showRSVPSheet) {
@@ -127,28 +138,44 @@ struct EventDetailView: View {
                     guest: guest,
                     ticket: currentUserTicket
                 )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $showTicketPurchase) {
             TicketPurchaseSheet(event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showWaitlist) {
             WaitlistSheet(event: event, tier: nil)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(event: event)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showGuestList) {
             GuestListSheet(event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showEditSheet) {
             EditEventView(event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showAddGuest) {
             AddGuestSheet(event: event)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showSeatingChart) {
             SeatingChartView(event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -165,6 +192,7 @@ struct EventDetailView: View {
                 } placeholder: {
                     CategoryMeshBackground(category: event.category)
                 }
+                .accessibilityLabel("Event cover image for \(event.title)")
             } else {
                 CategoryMeshBackground(category: event.category)
             }
@@ -198,7 +226,7 @@ struct EventDetailView: View {
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, Spacing.sm)
-                .padding(.vertical, 4)
+                .padding(.vertical, Spacing.xxs)
                 .background(.ultraThinMaterial)
                 .clipShape(Capsule())
 
@@ -256,7 +284,7 @@ struct EventDetailView: View {
                 }
             }
         }
-        .frame(height: 300)
+        .frame(height: Layout.heroHeightDetail)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
@@ -268,9 +296,7 @@ struct EventDetailView: View {
     }
 
     private var heroFormattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d 'at' h:mm a"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.fullEventDate.string(from: event.startDate)
     }
 
     // MARK: - Floating Tab Bar
@@ -294,6 +320,7 @@ struct EventDetailView: View {
                             if selectedTab == tab {
                                 Circle()
                                     .fill(LinearGradient.gatherAccentGradient)
+                                    .matchedGeometryEffect(id: "activeTab", in: tabNamespace)
                                     .frame(width: 36, height: 36)
                                     .shadow(color: Color.accentPurpleFallback.opacity(0.4), radius: 8, y: 2)
                             }
@@ -311,8 +338,12 @@ struct EventDetailView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
                 }
+                .accessibilityLabel(tab.rawValue)
+                .accessibilityAddTraits(selectedTab == tab ? [.isSelected] : [])
+                .accessibilityHint(selectedTab == tab ? "Currently selected" : "Double tap to view \(tab.rawValue)")
             }
         }
+        .accessibilityElement(children: .contain)
         .padding(.horizontal, Spacing.xs)
         .background(
             Capsule()
@@ -444,7 +475,7 @@ struct EventDetailView: View {
                 if isSoldOut {
                     Text("Sold Out")
                         .font(GatherFont.headline)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.rsvpNoFallback)
                     Text("Join waitlist for updates")
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
@@ -452,7 +483,7 @@ struct EventDetailView: View {
                     if minPrice == 0 {
                         Text("Free")
                             .font(GatherFont.headline)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Color.rsvpYesFallback)
                     } else {
                         Text("From \(formatPrice(minPrice))")
                             .font(GatherFont.headline)
@@ -477,7 +508,7 @@ struct EventDetailView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, Spacing.lg)
                     .padding(.vertical, Spacing.sm)
-                    .background(Color.orange)
+                    .background(Color.rsvpMaybeFallback)
                     .clipShape(Capsule())
                 }
             } else {
@@ -548,8 +579,7 @@ struct EventDetailView: View {
 
     private var currentUserTicket: Ticket? {
         guard let userId = authManager.currentUser?.id else { return nil }
-        return allTickets.first { ticket in
-            ticket.eventId == event.id &&
+        return eventTickets.first { ticket in
             ticket.userId == userId &&
             ticket.paymentStatus == .completed
         }

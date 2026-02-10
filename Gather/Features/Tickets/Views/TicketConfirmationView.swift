@@ -33,6 +33,7 @@ struct TicketConfirmationView: View {
             if showConfetti {
                 ConfettiView()
                     .ignoresSafeArea()
+                    .accessibilityHidden(true)
             }
         }
         .alert("Calendar", isPresented: $showingCalendarAlert) {
@@ -47,7 +48,8 @@ struct TicketConfirmationView: View {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2)) {
                 cardAppeared = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            Task {
+                try? await Task.sleep(for: .seconds(0.3))
                 showConfetti = true
             }
         }
@@ -87,6 +89,8 @@ struct TicketConfirmationView: View {
                 .foregroundStyle(Color.gatherSecondaryText)
         }
         .padding(.top, Spacing.lg)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Confirmed. You're going! Confirmation number \(ticket.ticketNumber)")
     }
 
     // MARK: - Ticket Card (Apple Wallet Style)
@@ -175,6 +179,8 @@ struct TicketConfirmationView: View {
                         .padding(Spacing.sm)
                         .background(Color.white)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                        .accessibilityLabel("QR code for ticket \(ticket.ticketNumber)")
+                        .accessibilityHint("Show this QR code at the event entrance")
                 }
 
                 Text("Scan at entry")
@@ -189,6 +195,8 @@ struct TicketConfirmationView: View {
             .frame(maxWidth: .infinity)
         }
         .glassCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Ticket for \(event.title), \(formattedDate) at \(formattedTime), \(ticket.quantity) ticket\(ticket.quantity > 1 ? "s" : ""), \(ticket.guestName)")
     }
 
     // MARK: - Action Buttons
@@ -231,6 +239,8 @@ struct TicketConfirmationView: View {
                     }
                     Spacer()
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Location: \(location.name)\(location.address.map { ", \($0)" } ?? "")")
             }
 
             VStack(alignment: .leading, spacing: Spacing.xs) {
@@ -242,6 +252,8 @@ struct TicketConfirmationView: View {
                         .fontWeight(.semibold)
                 }
                 .font(GatherFont.callout)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Order total: \(formatPrice(ticket.totalPrice))")
 
                 if ticket.serviceFee > 0 {
                     HStack {
@@ -279,12 +291,13 @@ struct TicketConfirmationView: View {
             .glassCard(cornerRadius: CornerRadius.md)
 
             HStack {
-                Image(systemName: "envelope.fill")
+                Image(systemName: "ticket.fill")
                     .foregroundStyle(Color.accentPurpleFallback)
-                Text("A confirmation email has been sent to \(ticket.guestEmail)")
+                Text("Your ticket has been saved to your account")
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
+            .accessibilityElement(children: .combine)
         }
     }
 
@@ -308,15 +321,11 @@ struct TicketConfirmationView: View {
     // MARK: - Helpers
 
     private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.monthDayYear.string(from: event.startDate)
     }
 
     private var formattedTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.timeOnly.string(from: event.startDate)
     }
 
     private var ticketShareText: String {
@@ -335,7 +344,7 @@ struct TicketConfirmationView: View {
         if price == 0 { return "Free" }
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
+        formatter.currencyCode = Locale.current.currency?.identifier ?? "USD"
         return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
     }
 
@@ -357,14 +366,8 @@ struct TicketConfirmationView: View {
 
     private func addToCalendar() {
         let eventStore = EKEventStore()
-        if #available(iOS 17.0, *) {
-            eventStore.requestFullAccessToEvents { granted, error in
-                handleCalendarAccess(granted: granted, error: error, eventStore: eventStore)
-            }
-        } else {
-            eventStore.requestAccess(to: .event) { granted, error in
-                handleCalendarAccess(granted: granted, error: error, eventStore: eventStore)
-            }
+        eventStore.requestFullAccessToEvents { granted, error in
+            handleCalendarAccess(granted: granted, error: error, eventStore: eventStore)
         }
     }
 

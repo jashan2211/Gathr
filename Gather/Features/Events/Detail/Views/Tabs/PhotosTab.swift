@@ -8,16 +8,21 @@ struct PhotosTab: View {
     let event: Event
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.modelContext) private var modelContext
-    @Query private var allMediaItems: [MediaItem]
+    @Query private var photos: [MediaItem]
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedItem: MediaItem?
     @State private var showPhotoViewer = false
 
-    private var photos: [MediaItem] {
-        allMediaItems
-            .filter { $0.eventId == event.id && $0.type == .image }
-            .sorted { $0.createdAt > $1.createdAt }
+    init(event: Event) {
+        self.event = event
+        let eventId = event.id
+        let imageRawValue = MediaType.image.rawValue
+        _photos = Query(
+            filter: #Predicate<MediaItem> { $0.eventId == eventId && $0.type.rawValue == imageRawValue },
+            sort: \MediaItem.createdAt,
+            order: .reverse
+        )
     }
 
     private var isHost: Bool {
@@ -175,7 +180,7 @@ struct PhotosTab: View {
             uploaderName: authManager.currentUser?.name ?? "Guest"
         )
         modelContext.insert(item)
-        try? modelContext.save()
+        modelContext.safeSave()
 
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
@@ -183,7 +188,7 @@ struct PhotosTab: View {
 
     private func deletePhoto(_ item: MediaItem) {
         modelContext.delete(item)
-        try? modelContext.save()
+        modelContext.safeSave()
         showPhotoViewer = false
         selectedItem = nil
     }

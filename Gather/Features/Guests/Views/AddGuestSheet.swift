@@ -16,6 +16,14 @@ struct AddGuestSheet: View {
     @State private var isImporting = false
     @State private var showSuccess = false
 
+    private var isEmailValid: Bool {
+        email.isEmpty || (email.contains("@") && email.split(separator: "@").last?.contains(".") == true)
+    }
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && isEmailValid
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -54,10 +62,13 @@ struct AddGuestSheet: View {
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
+                    .accessibilityLabel("Close")
                 }
             }
             .sheet(isPresented: $showContactsPicker) {
                 ContactsPickerView(selectedContacts: $selectedContacts)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
             }
         }
     }
@@ -67,6 +78,7 @@ struct AddGuestSheet: View {
     private var manualEntryView: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
+
                 // Success banner
                 if showSuccess {
                     HStack(spacing: Spacing.xs) {
@@ -114,6 +126,7 @@ struct AddGuestSheet: View {
                             TextField("Guest name", text: $name)
                                 .font(GatherFont.body)
                                 .textContentType(.name)
+                                .submitLabel(.done)
                         }
                         .padding(Spacing.sm)
                         .background(Color.gatherSecondaryBackground)
@@ -137,10 +150,22 @@ struct AddGuestSheet: View {
                                 .keyboardType(.emailAddress)
                                 .textContentType(.emailAddress)
                                 .textInputAutocapitalization(.never)
+                                .submitLabel(.done)
                         }
                         .padding(Spacing.sm)
                         .background(Color.gatherSecondaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: CornerRadius.md)
+                                .stroke(!isEmailValid ? Color.warmCoral : Color.clear, lineWidth: 1)
+                        )
+
+                        if !isEmailValid {
+                            Text("Enter a valid email address")
+                                .font(.caption2)
+                                .foregroundStyle(Color.warmCoral)
+                                .transition(.opacity)
+                        }
                     }
 
                     // Phone
@@ -159,6 +184,7 @@ struct AddGuestSheet: View {
                                 .font(GatherFont.body)
                                 .keyboardType(.phonePad)
                                 .textContentType(.telephoneNumber)
+                                .submitLabel(.done)
                         }
                         .padding(Spacing.sm)
                         .background(Color.gatherSecondaryBackground)
@@ -222,18 +248,19 @@ struct AddGuestSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.sm)
                     .background(
-                        name.isEmpty
-                            ? AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
-                            : AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                        canSave
+                            ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                            : AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
                     )
                     .clipShape(Capsule())
                 }
-                .disabled(name.isEmpty)
-                .scaleEffect(name.isEmpty ? 0.97 : 1.0)
-                .animation(.spring(response: 0.3), value: name.isEmpty)
+                .disabled(!canSave)
+                .scaleEffect(canSave ? 1.0 : 0.97)
+                .animation(.spring(response: 0.3), value: canSave)
             }
             .padding(Spacing.md)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     // MARK: - Contacts Import View
@@ -308,7 +335,7 @@ struct AddGuestSheet: View {
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color.accentPurpleFallback)
                                 .padding(.horizontal, Spacing.sm)
-                                .padding(.vertical, 4)
+                                .padding(.vertical, Spacing.xxs)
                                 .background(Color.accentPurpleFallback.opacity(0.1))
                                 .clipShape(Capsule())
                         }
@@ -406,7 +433,8 @@ struct AddGuestSheet: View {
 
         // Show success briefly
         withAnimation(.spring(response: 0.3)) { showSuccess = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        Task {
+            try? await Task.sleep(for: .seconds(2))
             withAnimation { showSuccess = false }
         }
 

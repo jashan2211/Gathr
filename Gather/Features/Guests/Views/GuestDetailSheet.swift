@@ -283,8 +283,9 @@ struct GuestDetailSheet: View {
             } label: {
                 Image(systemName: "trash")
                     .font(.caption)
-                    .foregroundStyle(.red.opacity(0.7))
+                    .foregroundStyle(Color.rsvpNoFallback.opacity(0.7))
             }
+            .accessibilityLabel("Remove party member")
         }
         .padding(Spacing.sm)
         .background(Color.gatherBackground)
@@ -353,7 +354,7 @@ struct GuestDetailSheet: View {
                     case .sent:
                         Label("Sent", systemImage: "paperplane.fill")
                             .font(GatherFont.caption)
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Color.neonBlue)
                     case .responded:
                         if let response = invite.response {
                             Label(responseText(response), systemImage: responseIcon(response))
@@ -390,10 +391,10 @@ struct GuestDetailSheet: View {
                 }
                 .font(GatherFont.callout)
                 .fontWeight(.medium)
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.rsvpNoFallback)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.md)
-                .background(Color.red.opacity(0.1))
+                .background(Color.rsvpNoFallback.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             }
         }
@@ -447,7 +448,7 @@ struct GuestDetailSheet: View {
         )
         guest.metadata = metadata
 
-        try? modelContext.save()
+        modelContext.safeSave()
         dismiss()
     }
 
@@ -459,13 +460,13 @@ struct GuestDetailSheet: View {
         guest.partyMembers.append(member)
         newMemberName = ""
         newMemberRelationship = .spouse
-        try? modelContext.save()
+        modelContext.safeSave()
     }
 
     private func removePartyMember(_ member: PartyMember) {
         guest.partyMembers.removeAll { $0.id == member.id }
         modelContext.delete(member)
-        try? modelContext.save()
+        modelContext.safeSave()
     }
 
     private func removeGuest() {
@@ -475,7 +476,7 @@ struct GuestDetailSheet: View {
             function.invites.removeAll { $0.guestId == guest.id }
         }
         modelContext.delete(guest)
-        try? modelContext.save()
+        modelContext.safeSave()
         dismiss()
     }
 
@@ -497,14 +498,14 @@ struct GuestDetailSheet: View {
 
     private func responseColor(_ response: RSVPResponse) -> Color {
         switch response {
-        case .yes: return .green
-        case .no: return .red
-        case .maybe: return .orange
+        case .yes: return .rsvpYesFallback
+        case .no: return .rsvpNoFallback
+        case .maybe: return .rsvpMaybeFallback
         }
     }
 
     private var avatarColor: Color {
-        let colors: [Color] = [.purple, .blue, .green, .orange, .pink, .teal]
+        let colors: [Color] = [.accentPurpleFallback, .neonBlue, .rsvpYesFallback, .rsvpMaybeFallback, .accentPinkFallback, .mintGreen]
         let index = abs(name.hashValue) % colors.count
         return colors[index]
     }

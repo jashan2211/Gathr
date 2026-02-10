@@ -94,6 +94,22 @@ enum AvatarSize {
     static let xxl: CGFloat = 120
 }
 
+// MARK: - Animation Durations
+
+enum AnimationDuration {
+    /// 0.15s - Micro-interactions (press effects, highlights)
+    static let fast: Double = 0.15
+
+    /// 0.3s - Standard transitions (tabs, filters, sheets)
+    static let standard: Double = 0.3
+
+    /// 0.5s - Medium transitions (loading states, page changes)
+    static let medium: Double = 0.5
+
+    /// 0.8s - Slow animations (progress bars, entrance effects)
+    static let slow: Double = 0.8
+}
+
 // MARK: - Layout Constants
 
 enum Layout {
@@ -123,6 +139,49 @@ enum Layout {
 
     /// Content overlap above hero (Luma-style card overlap)
     static let heroContentOverlap: CGFloat = 30
+
+    // MARK: Hero Image Heights
+
+    /// 200pt - Standard hero card image
+    static let heroHeight: CGFloat = 200
+
+    /// 240pt - Featured card hero
+    static let heroHeightFeatured: CGFloat = 240
+
+    /// 300pt - Event detail hero
+    static let heroHeightDetail: CGFloat = 300
+
+    // MARK: Photo Displays
+
+    /// 150pt - Photo display height
+    static let photoHeight: CGFloat = 150
+
+    // MARK: Scroll Bottom Insets
+
+    /// 100pt - Bottom inset for floating buttons
+    static let scrollBottomInset: CGFloat = 100
+
+    /// 80pt - Compact bottom inset for floating buttons
+    static let scrollBottomInsetCompact: CGFloat = 80
+
+    // MARK: Avatar Sizes
+
+    /// 32pt - Small avatar
+    static let avatarSmall: CGFloat = 32
+
+    /// 40pt - Medium avatar
+    static let avatarMedium: CGFloat = 40
+
+    /// 48pt - Large avatar
+    static let avatarLarge: CGFloat = 48
+
+    // MARK: Input Fields
+
+    /// 52pt - Standard input field height
+    static let inputHeight: CGFloat = 52
+
+    /// 52pt - Standard button height
+    static let buttonHeight: CGFloat = 52
 }
 
 // MARK: - Padding Helpers
@@ -295,6 +354,20 @@ extension View {
     }
 }
 
+// MARK: - Card Press Button Style
+
+struct CardPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .rotation3DEffect(
+                .degrees(configuration.isPressed ? 0.5 : 0),
+                axis: (x: 1, y: 0, z: 0)
+            )
+            .animation(.spring(response: 0.15, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
 // MARK: - Confetti View
 
 struct ConfettiView: View {
@@ -328,7 +401,7 @@ struct ConfettiView: View {
                 x: CGFloat.random(in: 50...350),
                 y: CGFloat.random(in: -100...(-20)),
                 size: CGFloat.random(in: 6...12),
-                color: colors.randomElement()!,
+                color: colors.randomElement() ?? .warmCoral,
                 velocityX: CGFloat.random(in: -2...2),
                 velocityY: CGFloat.random(in: 2...6),
                 opacity: 1.0,
@@ -426,6 +499,8 @@ struct AvatarStack: View {
                     .zIndex(0)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(names.count) \(names.count == 1 ? "person" : "people")")
     }
 
     private func avatarColor(for index: Int) -> Color {

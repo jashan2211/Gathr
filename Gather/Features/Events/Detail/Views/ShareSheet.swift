@@ -128,9 +128,7 @@ struct ShareSheet: View {
     }
 
     private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d 'at' h:mm a"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.fullEventDate.string(from: event.startDate)
     }
 
     // MARK: - Actions
@@ -182,7 +180,8 @@ struct ShareSheet: View {
         generator.impactOccurred()
 
         // Reset after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        Task {
+            try? await Task.sleep(for: .seconds(2))
             withAnimation {
                 linkCopied = false
             }

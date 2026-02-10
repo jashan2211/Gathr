@@ -9,7 +9,6 @@ struct GuestsTab: View {
     @State private var showSendInvites = false
     @State private var selectedGuest: Guest?
     @State private var filterStatus: GuestFilter = .all
-    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
 
     private var isHost: Bool {
@@ -41,11 +40,11 @@ struct GuestsTab: View {
 
         var color: Color {
             switch self {
-            case .all: return .purple
-            case .pending: return .gray
-            case .sent: return .blue
-            case .confirmed: return .green
-            case .declined: return .red
+            case .all: return .accentPurpleFallback
+            case .pending: return .gatherSecondaryText
+            case .sent: return .neonBlue
+            case .confirmed: return .rsvpYesFallback
+            case .declined: return .rsvpNoFallback
             }
         }
     }
@@ -82,15 +81,21 @@ struct GuestsTab: View {
         }
         .sheet(isPresented: $showAddGuest) {
             AddGuestSheet(event: event)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showSendInvites) {
             SendInvitesSheet(
                 event: event,
                 preselectedGuests: Array(selectedGuests)
             )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $selectedGuest) { guest in
             GuestDetailSheet(guest: guest, event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -174,6 +179,7 @@ struct GuestsTab: View {
                                 .font(.title3)
                                 .foregroundStyle(Color.gatherSecondaryText)
                         }
+                        .accessibilityLabel("Select guests")
 
                         // Quick send button
                         Button {
@@ -184,6 +190,7 @@ struct GuestsTab: View {
                                 .font(.title3)
                                 .foregroundStyle(Color.accentPurpleFallback)
                         }
+                        .accessibilityLabel("Send invites")
                     }
 
                     // Add button
@@ -194,6 +201,7 @@ struct GuestsTab: View {
                             .font(.title3)
                             .foregroundStyle(Color.accentPurpleFallback)
                     }
+                    .accessibilityLabel("Add guest")
                 }
             }
         }
@@ -220,6 +228,7 @@ struct GuestsTab: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                         .font(.callout)
                 }
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(Spacing.sm)
@@ -304,7 +313,7 @@ struct GuestsTab: View {
                 }
             }
             .padding(.horizontal)
-            .padding(.bottom, 100)
+            .padding(.bottom, Layout.scrollBottomInset)
         }
     }
 
@@ -406,7 +415,7 @@ struct GuestsTab: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.bottom, 100)
+                .padding(.bottom, Layout.scrollBottomInset)
             }
         }
     }
@@ -536,6 +545,8 @@ struct StatusPill: View {
                     )
             )
         }
+        .accessibilityLabel("\(filter.rawValue), \(count)")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 
@@ -596,10 +607,10 @@ struct ImprovedGuestCard: View {
                         if guest.role != .guest {
                             Text(guest.role.displayName)
                                 .font(.caption2)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Color.rsvpMaybeFallback)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.15))
+                                .background(Color.rsvpMaybeFallback.opacity(0.15))
                                 .clipShape(Capsule())
                         }
                     }
@@ -651,7 +662,11 @@ struct ImprovedGuestCard: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(guest.name), \(guest.status.displayName)\(guest.totalHeadcount > 1 ? ", plus \(guest.totalHeadcount - 1)" : "")")
+        .accessibilityHint(isSelectionMode ? "Double tap to toggle selection" : "Double tap for details")
+        .accessibilityValue(isSelectionMode ? (isSelected ? "Selected" : "Not selected") : "")
     }
 
     private var functionStatusRow: some View {
@@ -669,15 +684,15 @@ struct ImprovedGuestCard: View {
 
     private var statusColor: Color {
         switch guest.status {
-        case .attending: return .green
-        case .declined: return .red
-        case .maybe: return .orange
+        case .attending: return .rsvpYesFallback
+        case .declined: return .rsvpNoFallback
+        case .maybe: return .rsvpMaybeFallback
         case .pending, .waitlisted: return Color.gatherSecondaryText.opacity(0.3)
         }
     }
 
     private var avatarColor: Color {
-        let colors: [Color] = [.purple, .blue, .green, .orange, .pink, .teal]
+        let colors: [Color] = [.accentPurpleFallback, .neonBlue, .mintGreen, .warmCoral, .accentPinkFallback, .softLavender]
         let index = abs(guest.name.hashValue) % colors.count
         return colors[index]
     }
@@ -702,16 +717,16 @@ struct FunctionStatusChip: View {
     }
 
     private var chipColor: Color {
-        guard let invite = invite else { return .gray.opacity(0.3) }
+        guard let invite = invite else { return Color.gatherSecondaryText.opacity(0.3) }
         switch invite.inviteStatus {
-        case .notSent: return .gray
-        case .sent: return .blue
+        case .notSent: return .gatherSecondaryText
+        case .sent: return .neonBlue
         case .responded:
             switch invite.response {
-            case .yes: return .green
-            case .no: return .red
-            case .maybe: return .orange
-            case .none: return .blue
+            case .yes: return .rsvpYesFallback
+            case .no: return .rsvpNoFallback
+            case .maybe: return .rsvpMaybeFallback
+            case .none: return .neonBlue
             }
         }
     }
@@ -736,7 +751,7 @@ struct FunctionStatusChip: View {
                 .font(.caption2)
                 .fontWeight(.medium)
         }
-        .foregroundStyle(chipColor == .gray || chipColor == .gray.opacity(0.3) ? Color.gatherSecondaryText : .white)
+        .foregroundStyle(chipColor == .gatherSecondaryText || chipColor == Color.gatherSecondaryText.opacity(0.3) ? Color.gatherSecondaryText : .white)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
         .background(chipColor)
@@ -762,6 +777,8 @@ struct StatusBadge: View {
         .padding(.vertical, Spacing.xs)
         .background(Color.forRSVPStatus(status).opacity(0.15))
         .clipShape(Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(status.displayName)
     }
 }
 

@@ -15,7 +15,15 @@ struct BudgetTab: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
 
-    @Query private var allBudgets: [Budget]
+    @Query private var eventBudgets: [Budget]
+
+    init(event: Event) {
+        self.event = event
+        let eventId = event.id
+        _eventBudgets = Query(
+            filter: #Predicate<Budget> { $0.eventId == eventId }
+        )
+    }
 
     var body: some View {
         ScrollView {
@@ -62,43 +70,57 @@ struct BudgetTab: View {
                 }
             }
             .padding()
-            .padding(.bottom, 80)
+            .padding(.bottom, Layout.scrollBottomInsetCompact)
         }
         .sheet(isPresented: $showAddCategory) {
             if let budget = eventBudget {
                 AddCategorySheet(budget: budget, functions: event.functions, filterFunction: filterFunction)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
             }
         }
         .sheet(item: $addExpenseCategory) { category in
             AddExpenseSheet(category: category, functions: event.functions)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showEditBudget) {
             if let budget = eventBudget {
                 EditBudgetSheet(budget: budget)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $showAddSplit) {
             if let budget = eventBudget {
                 AddSplitSheet(budget: budget)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
             }
         }
         .sheet(item: $editingExpense) { expense in
             ExpenseDetailSheet(expense: expense, functions: event.functions, onDelete: {
                 deleteExpense(expense)
             })
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showAddExpense) {
             if let budget = eventBudget {
                 QuickAddExpenseSheet(budget: budget, functions: event.functions)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $showTeam) {
             EventTeamSheet(event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 
     private var eventBudget: Budget? {
-        allBudgets.first { $0.eventId == event.id }
+        eventBudgets.first
     }
 
     private var isHost: Bool {
@@ -597,13 +619,13 @@ struct BudgetTab: View {
                         .fontWeight(.bold)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Spacing.xxs)
                         .background(Color.rsvpYesFallback)
                         .clipShape(Capsule())
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.xxs)
     }
 
     // MARK: - Categories Section
@@ -735,7 +757,7 @@ struct BudgetTab: View {
                             } label: {
                                 expenseRow(expense)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(CardPressStyle())
                         }
                     }
 
@@ -1028,9 +1050,9 @@ struct BudgetTab: View {
                                     .foregroundStyle(expense.isPaid ? Color.rsvpYesFallback : Color.rsvpMaybeFallback)
                             }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Spacing.xxs)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(CardPressStyle())
                 }
             }
             .padding()
@@ -1048,7 +1070,7 @@ struct BudgetTab: View {
             newBudget.categories.append(category)
         }
         modelContext.insert(newBudget)
-        try? modelContext.save()
+        modelContext.safeSave()
 
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
@@ -1164,615 +1186,6 @@ struct BudgetTab: View {
             if days == 1 { return "Due tomorrow" }
             if days <= 7 { return "Due in \(days) days" }
             return "Due \(date.formatted(date: .abbreviated, time: .omitted))"
-        }
-    }
-}
-
-// MARK: - Quick Add Expense Sheet (picks category inside form)
-
-struct QuickAddExpenseSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var budget: Budget
-    let functions: [EventFunction]
-
-    @State private var name = ""
-    @State private var amount: Double = 0
-    @State private var vendorName = ""
-    @State private var paidByName = ""
-    @State private var isPaid = false
-    @State private var hasDueDate = false
-    @State private var dueDate = Date()
-    @State private var notes = ""
-    @State private var selectedCategoryId: UUID?
-    @State private var selectedFunctionId: UUID?
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("What did you spend on?") {
-                    TextField("e.g. Venue deposit, DJ booking", text: $name)
-                    TextField("Amount", value: $amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .keyboardType(.decimalPad)
-                }
-
-                Section("Category") {
-                    if budget.categories.isEmpty {
-                        Text("No categories yet")
-                            .foregroundStyle(Color.gatherSecondaryText)
-                    } else {
-                        Picker("Category", selection: $selectedCategoryId) {
-                            Text("Select category").tag(UUID?.none)
-                            ForEach(budget.categories.sorted { $0.sortOrder < $1.sortOrder }) { category in
-                                HStack {
-                                    Image(systemName: category.icon)
-                                    Text(category.name)
-                                }
-                                .tag(Optional(category.id))
-                            }
-                        }
-                    }
-                }
-
-                Section("Vendor (Optional)") {
-                    TextField("e.g. Grand Hyatt, DJ Mike", text: $vendorName)
-                }
-
-                Section("Who Paid?") {
-                    TextField("e.g. You, Aisha, Jordan", text: $paidByName)
-                }
-
-                Section("Payment Status") {
-                    Toggle("Already Paid", isOn: $isPaid)
-
-                    if isPaid {
-                        // No due date needed
-                    } else {
-                        Toggle("Has Due Date", isOn: $hasDueDate)
-                        if hasDueDate {
-                            DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
-                        }
-                    }
-                }
-
-                if !functions.isEmpty {
-                    Section("Link to Function") {
-                        Picker("Function", selection: $selectedFunctionId) {
-                            Text("General").tag(UUID?.none)
-                            ForEach(functions.sorted { $0.date < $1.date }) { function in
-                                Text(function.name).tag(Optional(function.id))
-                            }
-                        }
-                    }
-                }
-
-                if !isPaid {
-                    Section("Notes (Optional)") {
-                        TextField("e.g. 50% deposit, balance due on event day", text: $notes, axis: .vertical)
-                            .lineLimit(3, reservesSpace: true)
-                    }
-                }
-            }
-            .navigationTitle("Add Expense")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        guard let categoryId = selectedCategoryId,
-                              let category = budget.categories.first(where: { $0.id == categoryId }) else { return }
-
-                        let expense = Expense(
-                            name: name,
-                            amount: amount,
-                            isPaid: isPaid,
-                            paidDate: isPaid ? Date() : nil,
-                            dueDate: hasDueDate ? dueDate : nil,
-                            notes: notes.isEmpty ? nil : notes,
-                            vendorName: vendorName.isEmpty ? nil : vendorName,
-                            paidByName: paidByName.isEmpty ? nil : paidByName,
-                            functionId: selectedFunctionId
-                        )
-                        category.expenses.append(expense)
-                        category.spent += amount
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty || amount <= 0 || selectedCategoryId == nil)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Expense Detail Sheet
-
-struct ExpenseDetailSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var expense: Expense
-    let functions: [EventFunction]
-    var onDelete: () -> Void
-
-    @State private var showDeleteConfirm = false
-
-    var body: some View {
-        NavigationStack {
-            List {
-                // Amount header
-                Section {
-                    VStack(spacing: Spacing.sm) {
-                        Text(expense.amount.asCurrency)
-                            .font(.system(size: 36, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.gatherPrimaryText)
-
-                        HStack(spacing: Spacing.xs) {
-                            Image(systemName: expense.isPaid ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(expense.isPaid ? Color.rsvpYesFallback : Color.gatherTertiaryText)
-                            Text(expense.isPaid ? "Paid" : "Unpaid")
-                                .fontWeight(.medium)
-                                .foregroundStyle(expense.isPaid ? Color.rsvpYesFallback : Color.gatherSecondaryText)
-                        }
-                        .font(GatherFont.callout)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.sm)
-                    .listRowBackground(Color.clear)
-                }
-
-                // Details
-                Section("Details") {
-                    LabeledContent("Name", value: expense.name)
-
-                    if let vendor = expense.vendorName, !vendor.isEmpty {
-                        LabeledContent("Vendor", value: vendor)
-                    }
-
-                    if let paidBy = expense.paidByName, !paidBy.isEmpty {
-                        LabeledContent("Paid by", value: paidBy)
-                    }
-
-                    LabeledContent("Added", value: expense.createdAt.formatted(date: .abbreviated, time: .shortened))
-
-                    if let notes = expense.notes, !notes.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Notes")
-                                .font(GatherFont.caption)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                            Text(notes)
-                                .font(GatherFont.callout)
-                        }
-                    }
-                }
-
-                // Payment status
-                Section("Payment") {
-                    Toggle("Paid", isOn: Binding(
-                        get: { expense.isPaid },
-                        set: { newValue in
-                            expense.isPaid = newValue
-                            if newValue {
-                                expense.paidDate = Date()
-                            } else {
-                                expense.paidDate = nil
-                            }
-                        }
-                    ))
-
-                    if expense.isPaid, let paidDate = expense.paidDate {
-                        LabeledContent("Paid on", value: paidDate.formatted(date: .abbreviated, time: .omitted))
-                    }
-
-                    if !expense.isPaid {
-                        if let dueDate = expense.dueDate {
-                            LabeledContent("Due date", value: dueDate.formatted(date: .abbreviated, time: .omitted))
-
-                            if dueDate < Date() {
-                                HStack {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundStyle(Color.rsvpNoFallback)
-                                    Text("This payment is overdue")
-                                        .font(GatherFont.caption)
-                                        .foregroundStyle(Color.rsvpNoFallback)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Function link
-                if !functions.isEmpty {
-                    Section("Function") {
-                        if let funcId = expense.functionId,
-                           let function = functions.first(where: { $0.id == funcId }) {
-                            LabeledContent("Linked to", value: function.name)
-                        } else {
-                            Text("General (not linked)")
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-                    }
-                }
-
-                // Delete
-                Section {
-                    Button(role: .destructive) {
-                        showDeleteConfirm = true
-                    } label: {
-                        Label("Delete Expense", systemImage: "trash")
-                    }
-                }
-            }
-            .navigationTitle("Expense")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            .confirmationDialog("Delete Expense", isPresented: $showDeleteConfirm) {
-                Button("Delete", role: .destructive) {
-                    onDelete()
-                    dismiss()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Are you sure you want to delete \"\(expense.name)\"? This cannot be undone.")
-            }
-        }
-    }
-}
-
-// MARK: - Add Category Sheet
-
-struct AddCategorySheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var budget: Budget
-    let functions: [EventFunction]
-    var filterFunction: EventFunction?
-
-    @State private var name = ""
-    @State private var icon = "dollarsign.circle"
-    @State private var allocated: Double = 0
-    @State private var color = "purple"
-    @State private var selectedFunctionId: UUID?
-
-    private let iconOptions = [
-        "dollarsign.circle", "building.2", "fork.knife", "camera",
-        "music.note", "sparkles", "gift", "car",
-        "tshirt", "envelope", "leaf", "cup.and.saucer",
-        "bag", "paintbrush", "film", "mic"
-    ]
-
-    private let colorOptions = ["purple", "pink", "blue", "green", "orange", "teal", "indigo", "red"]
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Category Name") {
-                    TextField("e.g. Venue, Catering", text: $name)
-                }
-
-                Section("Budget Amount") {
-                    TextField("Allocated budget", value: $allocated, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .keyboardType(.decimalPad)
-                }
-
-                Section("Icon") {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 12) {
-                        ForEach(iconOptions, id: \.self) { opt in
-                            Button {
-                                icon = opt
-                            } label: {
-                                Image(systemName: opt)
-                                    .font(.title3)
-                                    .foregroundStyle(icon == opt ? .white : Color.gatherPrimaryText)
-                                    .frame(width: 36, height: 36)
-                                    .background(icon == opt ? Color.accentPurpleFallback : Color.gatherTertiaryBackground)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                        }
-                    }
-                }
-
-                Section("Color") {
-                    HStack(spacing: 12) {
-                        ForEach(colorOptions, id: \.self) { opt in
-                            Circle()
-                                .fill(colorForName(opt))
-                                .frame(width: 28, height: 28)
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(.white, lineWidth: color == opt ? 3 : 0)
-                                )
-                                .shadow(color: color == opt ? colorForName(opt).opacity(0.5) : .clear, radius: 4)
-                                .onTapGesture { color = opt }
-                        }
-                    }
-                }
-
-                if !functions.isEmpty {
-                    Section("Link to Function (Optional)") {
-                        Picker("Function", selection: $selectedFunctionId) {
-                            Text("None").tag(UUID?.none)
-                            ForEach(functions.sorted { $0.date < $1.date }) { function in
-                                Text(function.name).tag(Optional(function.id))
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Add Category")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        let category = BudgetCategory(
-                            name: name,
-                            icon: icon,
-                            allocated: allocated,
-                            color: color,
-                            sortOrder: budget.categories.count,
-                            functionId: selectedFunctionId ?? filterFunction?.id
-                        )
-                        budget.categories.append(category)
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty)
-                }
-            }
-        }
-    }
-
-    private func colorForName(_ name: String) -> Color {
-        switch name {
-        case "purple": return .purple
-        case "pink": return .pink
-        case "blue": return .blue
-        case "green": return .green
-        case "orange": return .orange
-        case "teal": return .teal
-        case "indigo": return .indigo
-        case "red": return .red
-        default: return .purple
-        }
-    }
-}
-
-// MARK: - Add Expense Sheet (for specific category)
-
-struct AddExpenseSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var category: BudgetCategory
-    let functions: [EventFunction]
-
-    @State private var name = ""
-    @State private var amount: Double = 0
-    @State private var vendorName = ""
-    @State private var paidByName = ""
-    @State private var isPaid = false
-    @State private var hasDueDate = false
-    @State private var dueDate = Date()
-    @State private var notes = ""
-    @State private var selectedFunctionId: UUID?
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Expense Details") {
-                    TextField("Name", text: $name)
-                    TextField("Amount", value: $amount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .keyboardType(.decimalPad)
-                }
-
-                Section("Vendor (Optional)") {
-                    TextField("Vendor name", text: $vendorName)
-                }
-
-                Section("Who Paid?") {
-                    TextField("e.g. You, Aisha, Jordan", text: $paidByName)
-                }
-
-                Section("Payment") {
-                    Toggle("Already Paid", isOn: $isPaid)
-
-                    if !isPaid {
-                        Toggle("Set Due Date", isOn: $hasDueDate)
-                        if hasDueDate {
-                            DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
-                        }
-                    }
-                }
-
-                if !functions.isEmpty {
-                    Section("Link to Function") {
-                        Picker("Function", selection: $selectedFunctionId) {
-                            Text("General").tag(UUID?.none)
-                            ForEach(functions.sorted { $0.date < $1.date }) { function in
-                                Text(function.name).tag(Optional(function.id))
-                            }
-                        }
-                    }
-                }
-
-                Section("Notes (Optional)") {
-                    TextField("e.g. 50% deposit, balance on event day", text: $notes, axis: .vertical)
-                        .lineLimit(3, reservesSpace: true)
-                }
-            }
-            .navigationTitle("Add to \(category.name)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        let expense = Expense(
-                            name: name,
-                            amount: amount,
-                            isPaid: isPaid,
-                            paidDate: isPaid ? Date() : nil,
-                            dueDate: hasDueDate ? dueDate : nil,
-                            notes: notes.isEmpty ? nil : notes,
-                            vendorName: vendorName.isEmpty ? nil : vendorName,
-                            paidByName: paidByName.isEmpty ? nil : paidByName,
-                            functionId: selectedFunctionId
-                        )
-                        category.expenses.append(expense)
-                        category.spent += amount
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty || amount <= 0)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Edit Budget Sheet
-
-struct EditBudgetSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var budget: Budget
-    @State private var totalBudget: Double = 0
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        Text("Total Budget")
-                            .font(GatherFont.callout)
-                            .foregroundStyle(Color.gatherSecondaryText)
-
-                        TextField("Budget amount", value: $totalBudget, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .keyboardType(.decimalPad)
-                    }
-                    .padding(.vertical, Spacing.sm)
-                }
-
-                Section("Current Spending") {
-                    HStack {
-                        Text("Total Spent")
-                        Spacer()
-                        Text(budget.totalSpent.asCurrency)
-                            .fontWeight(.semibold)
-                    }
-                    HStack {
-                        Text("Remaining")
-                        Spacer()
-                        let remaining = totalBudget - budget.totalSpent
-                        Text(remaining.asCurrency)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(remaining >= 0 ? .green : .red)
-                    }
-                    HStack {
-                        Text("Categories")
-                        Spacer()
-                        Text("\(budget.categories.count)")
-                    }
-                }
-            }
-            .navigationTitle("Edit Budget")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        budget.totalBudget = totalBudget
-                        budget.updatedAt = Date()
-                        dismiss()
-                    }
-                }
-            }
-            .onAppear {
-                totalBudget = budget.totalBudget
-            }
-        }
-    }
-}
-
-// MARK: - Add Split Sheet
-
-struct AddSplitSheet: View {
-    @Environment(\.dismiss) var dismiss
-    @Bindable var budget: Budget
-
-    @State private var name = ""
-    @State private var email = ""
-    @State private var shareAmount: Double = 0
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Co-Host Info") {
-                    TextField("Name", text: $name)
-                    TextField("Email (optional)", text: $email)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                }
-
-                Section("Share Amount") {
-                    TextField("Amount", value: $shareAmount, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .keyboardType(.decimalPad)
-                }
-            }
-            .navigationTitle("Add Split")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        let split = PaymentSplit(
-                            name: name,
-                            email: email.isEmpty ? nil : email,
-                            shareAmount: shareAmount
-                        )
-                        budget.splits.append(split)
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty || shareAmount <= 0)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Supporting Views
-
-struct BudgetFilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(GatherFont.caption)
-                .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
-                .padding(.horizontal, Spacing.md)
-                .padding(.vertical, Spacing.xs)
-                .background(isSelected ? AnyShapeStyle(Color.accentPurpleFallback) : AnyShapeStyle(.ultraThinMaterial))
-                .clipShape(Capsule())
-                .overlay(
-                    isSelected ? nil : Capsule()
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 0.5
-                        )
-                )
         }
     }
 }

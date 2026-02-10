@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AuthenticationServices
 
 struct ProfileView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -7,6 +8,7 @@ struct ProfileView: View {
     @Query private var allEvents: [Event]
     @State private var showDeleteConfirmation = false
     @State private var showSignOutConfirmation = false
+    @State private var showReauthSheet = false
     @State private var isLoadingData = false
     @State private var loadedDataMessage: String?
 
@@ -49,8 +51,10 @@ struct ProfileView: View {
                     // Account Actions
                     accountSection
 
-                    // Developer Tools
-                    devToolsSection
+                    // Developer Tools (DEBUG only)
+                    if AppConfig.isDemoMode {
+                        devToolsSection
+                    }
 
                     // Version
                     versionBadge
@@ -71,13 +75,18 @@ struct ProfileView: View {
             }
             .confirmationDialog("Delete Account", isPresented: $showDeleteConfirmation) {
                 Button("Delete Account", role: .destructive) {
-                    Task {
-                        await authManager.deleteAccount(modelContext: modelContext)
-                    }
+                    showReauthSheet = true
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will permanently delete your account and all associated data. This action cannot be undone.")
+            }
+            .sheet(isPresented: $showReauthSheet) {
+                ReauthenticateSheet {
+                    Task {
+                        await authManager.deleteAccount(modelContext: modelContext)
+                    }
+                }
             }
         }
     }
@@ -274,10 +283,10 @@ struct ProfileView: View {
             } label: {
                 HStack {
                     Image(systemName: "trash")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.rsvpNoFallback)
                     Text("Delete Account")
                         .font(GatherFont.callout)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.rsvpNoFallback)
                     Spacer()
                 }
                 .padding(Spacing.md)
@@ -421,7 +430,8 @@ struct ProfileView: View {
         isLoadingData = true
         loadedDataMessage = nil
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        Task {
+            try? await Task.sleep(for: .seconds(0.1))
             if size == .standard {
                 DemoDataService.shared.loadDemoData(modelContext: modelContext, hostId: userId)
             } else {
@@ -433,7 +443,8 @@ struct ProfileView: View {
             isLoadingData = false
             loadedDataMessage = "\(size.label) data loaded!"
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            Task {
+                try? await Task.sleep(for: .seconds(3))
                 withAnimation { loadedDataMessage = nil }
             }
         }
@@ -604,32 +615,6 @@ struct AppearanceSettingsView: View {
     }
 }
 
-// MARK: - Profile Stat Item (legacy compat)
-
-struct ProfileStatItem: View {
-    let value: Int
-    let label: String
-    let icon: String
-
-    var body: some View {
-        VStack(spacing: Spacing.xs) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(Color.accentPurpleFallback)
-
-            Text("\(value)")
-                .font(GatherFont.title2)
-                .fontWeight(.bold)
-                .foregroundStyle(Color.gatherPrimaryText)
-
-            Text(label)
-                .font(GatherFont.caption)
-                .foregroundStyle(Color.gatherSecondaryText)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
 // MARK: - Dev Tool Stat
 
 struct DevToolStat: View {
@@ -696,6 +681,128 @@ struct DataLoadButton: View {
         }
         .disabled(isLoading)
         .opacity(isLoading ? 0.5 : 1)
+    }
+}
+
+// MARK: - Re-authenticate Sheet
+
+struct ReauthenticateSheet: View {
+    @EnvironmentObject var authManager: AuthManager
+    @Environment(\.dismiss) var dismiss
+    @State private var email = ""
+    @State private var errorMessage: String?
+    @State private var appleSignInCompleted = false
+    let onConfirm: () -> Void
+
+    private var isAppleUser: Bool {
+        authManager.currentAuthProvider == "apple"
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: Spacing.lg) {
+                VStack(spacing: Spacing.md) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.rsvpNoFallback.opacity(0.1))
+                            .frame(width: 80, height: 80)
+                        Image(systemName: "exclamationmark.shield.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(Color.rsvpNoFallback)
+                    }
+
+                    Text("Confirm Your Identity")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.gatherPrimaryText)
+
+                    Text("To delete your account, please verify your identity.")
+                        .font(GatherFont.body)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, Spacing.lg)
+
+                if isAppleUser {
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.email]
+                    } onCompletion: { result in
+                        switch result {
+                        case .success:
+                            appleSignInCompleted = true
+                            onConfirm()
+                            dismiss()
+                        case .failure:
+                            errorMessage = "Apple Sign In failed. Please try again."
+                        }
+                    }
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 52)
+                    .clipShape(Capsule())
+                } else {
+                    // Email users re-enter their email
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Enter your email to confirm")
+                            .font(GatherFont.callout)
+                            .foregroundStyle(Color.gatherSecondaryText)
+
+                        TextField("email@example.com", text: $email)
+                            .font(GatherFont.body)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(Spacing.sm)
+                            .background(Color.gatherSecondaryBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    }
+
+                    Button {
+                        verifyEmail()
+                    } label: {
+                        Text("Delete My Account")
+                            .font(GatherFont.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                email.isEmpty
+                                    ? Color.gatherSecondaryText
+                                    : Color.rsvpNoFallback
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .disabled(email.isEmpty)
+                }
+
+                if let error = errorMessage {
+                    Text(error)
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.rsvpNoFallback)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, Spacing.md)
+            .navigationTitle("Delete Account")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func verifyEmail() {
+        let currentEmail = authManager.currentUser?.email?.lowercased() ?? ""
+        if email.lowercased() == currentEmail {
+            onConfirm()
+            dismiss()
+        } else {
+            errorMessage = "Email does not match your account"
+        }
     }
 }
 

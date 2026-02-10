@@ -109,7 +109,7 @@ final class EventMember {
     }
 
     private static func generateInviteCode() -> String {
-        let chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        return String((0..<6).map { _ in chars.randomElement()! })
+        let chars = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+        return String((0..<6).compactMap { _ in chars.randomElement() })
     }
 }

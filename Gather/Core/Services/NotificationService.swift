@@ -1,6 +1,9 @@
 import Foundation
 import UserNotifications
 import SwiftUI
+import os
+
+private let logger = Logger(subsystem: "ca.thebighead.gathr", category: "NotificationService")
 
 @MainActor
 class NotificationService: ObservableObject {
@@ -30,8 +33,18 @@ class NotificationService: ObservableObject {
             isAuthorized = granted
             return granted
         } catch {
-            print("Notification permission error: \(error)")
+            logger.error("Notification permission error: \(error.localizedDescription)")
             return false
+        }
+    }
+
+    /// Request permission only if not yet determined. Call at point-of-use (RSVP, create event).
+    func requestPermissionIfNeeded() {
+        Task {
+            let settings = await notificationCenter.notificationSettings()
+            if settings.authorizationStatus == .notDetermined {
+                _ = await requestPermission()
+            }
         }
     }
 
@@ -81,7 +94,7 @@ class NotificationService: ObservableObject {
 
         notificationCenter.add(request) { error in
             if let error = error {
-                print("Failed to schedule notification: \(error)")
+                logger.error("Failed to schedule notification: \(error.localizedDescription)")
             }
         }
     }
@@ -129,7 +142,7 @@ class NotificationService: ObservableObject {
 
         notificationCenter.add(request) { error in
             if let error = error {
-                print("Failed to schedule reminder: \(error)")
+                logger.error("Failed to schedule reminder: \(error.localizedDescription)")
             }
         }
     }
@@ -159,9 +172,7 @@ class NotificationService: ObservableObject {
     // MARK: - Helpers
 
     private func formattedTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
+        GatherDateFormatter.timeOnly.string(from: date)
     }
 }
 

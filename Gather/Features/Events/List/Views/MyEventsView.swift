@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 
 struct MyEventsView: View {
-    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
     @Query(sort: \Event.startDate) private var events: [Event]
     @State private var selectedTab: EventTab = .active
@@ -50,7 +49,7 @@ struct MyEventsView: View {
                             } label: {
                                 MyEventCard(event: event)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(CardPressStyle())
                             .bouncyAppear(delay: Double(index) * 0.04)
                         }
 
@@ -60,6 +59,9 @@ struct MyEventsView: View {
                     }
                     .padding()
                     .padding(.bottom, 20)
+                }
+                .refreshable {
+                    try? await Task.sleep(for: .milliseconds(500))
                 }
             }
             .navigationTitle("My Events")
@@ -85,6 +87,7 @@ struct MyEventsView: View {
             ForEach(EventTab.allCases, id: \.self) { tab in
                 let count = countForTab(tab)
                 Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         selectedTab = tab
                     }
@@ -104,8 +107,8 @@ struct MyEventsView: View {
                                 .frame(width: 20, height: 20)
                                 .background(
                                     selectedTab == tab
-                                        ? Color.white.opacity(0.9)
-                                        : Color.accentPurpleFallback.opacity(0.4)
+                                        ? Color.gatherBackground.opacity(0.9)
+                                        : Color.accentPurpleFallback.opacity(0.7)
                                 )
                                 .clipShape(Circle())
                                 .contentTransition(.numericText())
@@ -453,24 +456,20 @@ struct MyEventCard: View {
             .padding(Spacing.sm)
         }
         .glassCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(event.title). \(formattedTime). \(event.guests.count) guests, \(event.totalAttendingHeadcount) attending\(event.isDraft ? ". Draft" : event.privacy == .publicEvent ? ". Public" : "")")
     }
 
     private var monthAbbrev: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        return formatter.string(from: event.startDate).uppercased()
+        GatherDateFormatter.monthAbbrev.string(from: event.startDate).uppercased()
     }
 
     private var dayNumber: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.dayNumber.string(from: event.startDate)
     }
 
     private var formattedTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d 'at' h:mm a"
-        return formatter.string(from: event.startDate)
+        GatherDateFormatter.fullEventDate.string(from: event.startDate)
     }
 }
 

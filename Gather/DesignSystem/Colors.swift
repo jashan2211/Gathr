@@ -94,6 +94,55 @@ extension Color {
 
     /// Error/Destructive color
     static let gatherError = Color(red: 239/255, green: 68/255, blue: 68/255)           // #EF4444
+
+    // MARK: - Category Gradient Colors
+
+    // Wedding
+    static let weddingRose = Color(red: 0.95, green: 0.4, blue: 0.6)
+    static let weddingRoseLight = Color(red: 0.98, green: 0.6, blue: 0.7)
+    static let weddingRoseDeep = Color(red: 0.9, green: 0.3, blue: 0.5)
+    static let weddingRoseMid = Color(red: 0.95, green: 0.5, blue: 0.7)
+    static let weddingBlush = Color(red: 1.0, green: 0.7, blue: 0.8)
+
+    // Party
+    static let partyPurple = Color(red: 0.49, green: 0.23, blue: 0.93)
+
+    // Office
+    static let officeBlue = Color(red: 0.2, green: 0.5, blue: 0.9)
+    static let officeBlueLight = Color(red: 0.4, green: 0.7, blue: 1.0)
+    static let officeBlueDeep = Color(red: 0.1, green: 0.4, blue: 0.85)
+    static let officeBlueBright = Color(red: 0.3, green: 0.6, blue: 1.0)
+    static let officeBlueSky = Color(red: 0.5, green: 0.8, blue: 1.0)
+
+    // Conference
+    static let conferenceAmber = Color(red: 0.95, green: 0.6, blue: 0.2)
+    static let conferenceGold = Color(red: 1.0, green: 0.8, blue: 0.3)
+    static let conferenceAmberDeep = Color(red: 0.9, green: 0.5, blue: 0.1)
+    static let conferenceOrangeGold = Color(red: 1.0, green: 0.7, blue: 0.2)
+    static let conferenceGoldLight = Color(red: 1.0, green: 0.85, blue: 0.4)
+
+    // Concert
+    static let concertRed = Color(red: 0.9, green: 0.2, blue: 0.3)
+    static let concertSalmon = Color(red: 1.0, green: 0.4, blue: 0.5)
+    static let concertRedDeep = Color(red: 0.85, green: 0.1, blue: 0.2)
+    static let concertCrimson = Color(red: 0.95, green: 0.3, blue: 0.4)
+
+    // Meetup
+    static let meetupTeal = Color(red: 0.1, green: 0.7, blue: 0.5)
+    static let meetupGreenLight = Color(red: 0.3, green: 0.9, blue: 0.6)
+    static let meetupTealDeep = Color(red: 0.0, green: 0.6, blue: 0.45)
+    static let meetupEmerald = Color(red: 0.2, green: 0.8, blue: 0.55)
+    static let meetupEmeraldLight = Color(red: 0.4, green: 0.95, blue: 0.7)
+
+    // Custom
+    static let customSlate = Color(red: 0.5, green: 0.5, blue: 0.6)
+    static let customSlateLight = Color(red: 0.7, green: 0.7, blue: 0.8)
+    static let customSlateDark = Color(red: 0.4, green: 0.4, blue: 0.55)
+    static let customSlateMid = Color(red: 0.6, green: 0.6, blue: 0.75)
+    static let customSlatePale = Color(red: 0.75, green: 0.75, blue: 0.85)
+
+    // Shared
+    static let warmOrange = Color(red: 1.0, green: 0.5, blue: 0.3)
 }
 
 // MARK: - Color Scheme Helpers
@@ -227,7 +276,7 @@ extension LinearGradient {
 
     /// Soft purple card gradient
     static let cardGradientPurple = LinearGradient(
-        colors: [Color(red: 0.49, green: 0.23, blue: 0.93).opacity(0.15), Color(red: 0.49, green: 0.23, blue: 0.93).opacity(0.05)],
+        colors: [Color.partyPurple.opacity(0.15), Color.partyPurple.opacity(0.05)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )

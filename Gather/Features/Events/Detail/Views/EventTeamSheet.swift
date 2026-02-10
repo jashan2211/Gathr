@@ -5,7 +5,7 @@ struct EventTeamSheet: View {
     let event: Event
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query private var allMembers: [EventMember]
+    @Query private var members: [EventMember]
     @EnvironmentObject var authManager: AuthManager
 
     @State private var showAddMember = false
@@ -13,8 +13,12 @@ struct EventTeamSheet: View {
     @State private var selectedRole: EventRole = .manager
     @State private var copiedCode: String?
 
-    private var members: [EventMember] {
-        allMembers.filter { $0.eventId == event.id }
+    init(event: Event) {
+        self.event = event
+        let eventId = event.id
+        _members = Query(
+            filter: #Predicate<EventMember> { $0.eventId == eventId }
+        )
     }
 
     var body: some View {
@@ -163,7 +167,8 @@ struct EventTeamSheet: View {
                     Button {
                         UIPasteboard.general.string = code
                         copiedCode = code
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
                             copiedCode = nil
                         }
                     } label: {
@@ -171,7 +176,7 @@ struct EventTeamSheet: View {
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundStyle(copiedCode == code ? Color.rsvpYesFallback : Color.accentPurpleFallback)
                             .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
+                            .padding(.vertical, Spacing.xxs)
                             .background(Color.accentPurpleFallback.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
@@ -197,7 +202,7 @@ struct EventTeamSheet: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .foregroundStyle(Color.gatherSecondaryText)
-                        .padding(8)
+                        .padding(Spacing.xs)
                 }
             }
         }
@@ -338,7 +343,8 @@ struct InviteLinkSheet: View {
                         copied = true
                         let generator = UINotificationFeedbackGenerator()
                         generator.notificationOccurred(.success)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
                             copied = false
                         }
                     } label: {

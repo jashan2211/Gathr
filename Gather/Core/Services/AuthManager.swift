@@ -12,7 +12,6 @@ class AuthManager: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var isLoading: Bool = false
     @Published var authError: AuthError?
-    @Published var pendingGoogleSignIn: Bool = false
 
     // MARK: - Private Properties
 
@@ -20,29 +19,64 @@ class AuthManager: ObservableObject {
     private let userIdKey = "currentUserId"
     private let userNameKey = "currentUserName"
     private let userEmailKey = "currentUserEmail"
+    private let authProviderKey = "currentAuthProvider"
+    private let migratedToKeychainKey = "authMigratedToKeychain"
 
     // MARK: - Initialization
 
     init() {
+        migrateToKeychainIfNeeded()
         checkExistingAuth()
+    }
+
+    // MARK: - Migration
+
+    private func migrateToKeychainIfNeeded() {
+        guard !userDefaults.bool(forKey: migratedToKeychainKey) else { return }
+
+        // Migrate from UserDefaults to Keychain
+        if let userId = userDefaults.string(forKey: userIdKey) {
+            KeychainService.save(key: userIdKey, value: userId)
+        }
+        if let name = userDefaults.string(forKey: userNameKey) {
+            KeychainService.save(key: userNameKey, value: name)
+        }
+        if let email = userDefaults.string(forKey: userEmailKey) {
+            KeychainService.save(key: userEmailKey, value: email)
+        }
+        if let provider = userDefaults.string(forKey: authProviderKey) {
+            KeychainService.save(key: authProviderKey, value: provider)
+        }
+
+        // Clean up UserDefaults auth data
+        userDefaults.removeObject(forKey: userIdKey)
+        userDefaults.removeObject(forKey: userNameKey)
+        userDefaults.removeObject(forKey: userEmailKey)
+        userDefaults.removeObject(forKey: authProviderKey)
+        userDefaults.set(true, forKey: migratedToKeychainKey)
     }
 
     // MARK: - Auth State
 
     private func checkExistingAuth() {
-        if let storedUserId = userDefaults.string(forKey: userIdKey),
+        if let storedUserId = KeychainService.load(key: userIdKey),
            let uuid = UUID(uuidString: storedUserId) {
-            let name = userDefaults.string(forKey: userNameKey) ?? "User"
-            let email = userDefaults.string(forKey: userEmailKey) ?? ""
+            let name = KeychainService.load(key: userNameKey) ?? "User"
+            let email = KeychainService.load(key: userEmailKey) ?? ""
             currentUser = User(id: uuid, name: name, email: email)
             isAuthenticated = true
         }
     }
 
     private func persistUser(_ user: User) {
-        userDefaults.set(user.id.uuidString, forKey: userIdKey)
-        userDefaults.set(user.name, forKey: userNameKey)
-        userDefaults.set(user.email ?? "", forKey: userEmailKey)
+        KeychainService.save(key: userIdKey, value: user.id.uuidString)
+        KeychainService.save(key: userNameKey, value: user.name)
+        KeychainService.save(key: userEmailKey, value: user.email ?? "")
+    }
+
+    /// The auth provider used for the current session
+    var currentAuthProvider: String? {
+        KeychainService.load(key: authProviderKey)
     }
 
     // MARK: - Demo Sign In (for testing)
@@ -50,6 +84,7 @@ class AuthManager: ObservableObject {
     func signInAsDemo() {
         let user = User(name: "Demo User", email: "demo@gather.app")
         persistUser(user)
+        KeychainService.save(key: authProviderKey, value: "demo")
         currentUser = user
         isAuthenticated = true
     }
@@ -73,91 +108,39 @@ class AuthManager: ObservableObject {
             authProviders: [.apple]
         )
 
-        userDefaults.set(userId, forKey: userIdKey)
-        userDefaults.set(user.name, forKey: userNameKey)
-        userDefaults.set(user.email ?? "", forKey: userEmailKey)
+        KeychainService.save(key: userIdKey, value: userId)
+        KeychainService.save(key: userNameKey, value: user.name)
+        KeychainService.save(key: userEmailKey, value: user.email ?? "")
+        KeychainService.save(key: authProviderKey, value: "apple")
 
         currentUser = user
         isAuthenticated = true
         isLoading = false
     }
 
-    // MARK: - Google Sign In
+    // MARK: - Email Sign In
 
-    func signInWithGoogle() async {
-        // Show the Google sign-in sheet (simulated OAuth)
-        pendingGoogleSignIn = true
-    }
-
-    func completeGoogleSignIn(name: String, email: String) {
+    func signInWithEmail(email: String) {
         isLoading = true
         authError = nil
 
         let user = User(
-            name: name.isEmpty ? "Google User" : name,
+            name: email.components(separatedBy: "@").first ?? "User",
             email: email,
-            authProviders: [.google]
+            authProviders: [.email]
         )
 
         persistUser(user)
+        KeychainService.save(key: authProviderKey, value: "email")
         currentUser = user
         isAuthenticated = true
         isLoading = false
-        pendingGoogleSignIn = false
-    }
-
-    func cancelGoogleSignIn() {
-        pendingGoogleSignIn = false
-        isLoading = false
-    }
-
-    // MARK: - Email Magic Link
-
-    func sendMagicLink(email: String) async -> Bool {
-        isLoading = true
-        authError = nil
-
-        do {
-            try await Task.sleep(nanoseconds: 500_000_000)
-            isLoading = false
-            return true
-        } catch {
-            authError = .signInFailed(error.localizedDescription)
-            isLoading = false
-            return false
-        }
-    }
-
-    func verifyMagicLink(email: String, link: String) async {
-        isLoading = true
-        authError = nil
-
-        do {
-            try await Task.sleep(nanoseconds: 500_000_000)
-
-            let user = User(
-                name: email.components(separatedBy: "@").first ?? "User",
-                email: email,
-                authProviders: [.email]
-            )
-
-            persistUser(user)
-            currentUser = user
-            isAuthenticated = true
-            isLoading = false
-
-        } catch {
-            authError = .signInFailed(error.localizedDescription)
-            isLoading = false
-        }
     }
 
     // MARK: - Sign Out
 
     func signOut() {
-        userDefaults.removeObject(forKey: userIdKey)
-        userDefaults.removeObject(forKey: userNameKey)
-        userDefaults.removeObject(forKey: userEmailKey)
+        KeychainService.deleteAll()
         currentUser = nil
         isAuthenticated = false
     }
@@ -215,7 +198,7 @@ class AuthManager: ObservableObject {
                 }
             }
 
-            try? modelContext.save()
+            modelContext.safeSave()
 
             signOut()
             isLoading = false

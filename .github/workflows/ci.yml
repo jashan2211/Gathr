@@ -23,36 +23,17 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: List available simulators
-        run: xcrun simctl list devices available --json | head -100
-
-      - name: Show project info
-        run: |
-          echo "=== Working directory ==="
-          pwd && ls -la
-          echo "=== Available schemes ==="
-          xcodebuild -list 2>&1 || true
-          echo "=== Available destinations ==="
-          xcodebuild -scheme Gather -showdestinations 2>&1 | head -30 || true
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
 
       - name: Build for testing
         run: |
-          set -o pipefail
           xcodebuild build-for-testing \
             -scheme Gather \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/DerivedData \
             CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            2>&1 | tee build.log
-
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-log
-          path: build.log
-          retention-days: 7
+            CODE_SIGNING_REQUIRED=NO
 
   test:
     name: Test
@@ -65,10 +46,12 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
+
       - name: Find simulator
         id: sim
         run: |
-          # Pick the first available iPhone simulator
           SIM_NAME=$(xcrun simctl list devices available -j | python3 -c "
           import json, sys
           data = json.load(sys.stdin)
@@ -136,6 +119,9 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
 
       - name: Analyze
         run: |

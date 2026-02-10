@@ -69,6 +69,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ca.thebighead.gathr.tests
+        GENERATE_INFOPLIST_FILE: true
     dependencies:
       - target: Gather
 
@@ -80,6 +81,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ca.thebighead.gathr.uitests
+        GENERATE_INFOPLIST_FILE: true
     dependencies:
       - target: Gather
 

@@ -555,8 +555,14 @@ struct NotificationSettingsView: View {
 }
 
 struct PrivacySettingsView: View {
+    @EnvironmentObject var authManager: AuthManager
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("showMeAsAttending") private var showMeAsAttending = true
     @AppStorage("defaultPrivacy") private var defaultPrivacy = "inviteOnly"
+    @State private var isExporting = false
+    @State private var exportURL: URL?
+    @State private var showShareSheet = false
+    @State private var exportError: String?
 
     var body: some View {
         List {
@@ -575,9 +581,75 @@ struct PrivacySettingsView: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             }
+
+            Section {
+                Button {
+                    exportData()
+                } label: {
+                    HStack {
+                        Label("Export My Data", systemImage: "square.and.arrow.up")
+                        Spacer()
+                        if isExporting {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isExporting)
+            } header: {
+                Text("Your Data")
+            } footer: {
+                Text("Download a copy of all your data including events, RSVPs, and tickets in JSON format.")
+            }
+
+            if let error = exportError {
+                Section {
+                    Text(error)
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                }
+            }
         }
         .navigationTitle("Privacy")
+        .sheet(isPresented: $showShareSheet) {
+            if let url = exportURL {
+                ActivitySheet(items: [url])
+            }
+        }
     }
+
+    private func exportData() {
+        guard let user = authManager.currentUser else { return }
+        isExporting = true
+        exportError = nil
+
+        Task {
+            do {
+                let url = try DataExportService.shared.exportUserData(
+                    userId: user.id,
+                    userName: user.name,
+                    userEmail: user.email,
+                    modelContext: modelContext
+                )
+                exportURL = url
+                showShareSheet = true
+            } catch {
+                exportError = "Failed to export data: \(error.localizedDescription)"
+            }
+            isExporting = false
+        }
+    }
+}
+
+// MARK: - Activity Sheet (Data Export)
+
+struct ActivitySheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 struct CalendarSettingsView: View {

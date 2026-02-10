@@ -3,13 +3,10 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B12890B5DE6A790F378BD896 /* GatherSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2685DD1394ECFA9AA359E8 /* GatherSchema.swift */; };
-		79C7848CF331C0D25E95B917 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E062B445AB9FDBFED2181503 /* KeychainService.swift */; };
-		5DD98838D8EAE929E47738F5 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CE52888EFC9B47195E7D465 /* AppConfig.swift */; };
 		004095CF12912AF0E2EB9A5A /* GatherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACD33DF71781DE0D67D6CDD9 /* GatherApp.swift */; };
 		069F553B4D9E49FB3120BE09 /* TicketConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EA5250786947CF2523F2F7D /* TicketConfirmationView.swift */; };
 		0823EA36A1AE6751B76BFA04 /* ManageRSVPSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F750B3A2DE04B0D0BC2193 /* ManageRSVPSheet.swift */; };
@@ -28,6 +25,7 @@
 		20012B85C4E0327270C22962 /* InviteComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B839C92C610C1AFF40156756 /* InviteComponents.swift */; };
 		217EF4F996021C5A62636814 /* ContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04278371F501F302319BC5D8 /* ContactsView.swift */; };
 		22F1B7737E69413C60FE0DCE /* EventTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB1FB56CAEE7F2F2EB906F2 /* EventTemplate.swift */; };
+		25B64784079F9149D5BF3F44 /* TicketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E0880AEA2684892609B8A98 /* TicketTests.swift */; };
 		285A2E1B8C86210DB14F257C /* GuestListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93543939E79191E57393AF8A /* GuestListSheet.swift */; };
 		297F119220B8327A29E891C7 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A97CDE73D47D3EEEEE737A2 /* AuthManager.swift */; };
 		29B0A030FECDA1A27F824498 /* RSVPSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AEB78447E826A0186CEBF1 /* RSVPSheet.swift */; };
@@ -61,15 +59,18 @@
 		8232FFF575FE076A3B65BD6C /* PhotosTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A4B20227FAE11F3F9CD5B40 /* PhotosTab.swift */; };
 		87BA07BC12726D4675312130 /* ModelContext+SafeSave.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18DB5ACA50F0F25529C91D6A /* ModelContext+SafeSave.swift */; };
 		883B056491F89FB7D6F2E8AD /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDF55449A3608E8891725067 /* MainTabView.swift */; };
+		9020F3F4476B307B9164D11C /* GatherSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 312E4412118C0C8C055B4EC0 /* GatherSchema.swift */; };
 		97009CC3D3085BA944678533 /* PaymentTransaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9936A27AE711C0DDFBA01BC /* PaymentTransaction.swift */; };
 		A48E316F2C7E8F30D85DE013 /* ExpenseDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A8C367D8DE85BEC4ABEF318 /* ExpenseDetailSheet.swift */; };
 		A646751E33D1136EB9160936 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3541CAD43936EAC9F1E5CC /* Typography.swift */; };
+		A842E01E1B485F09A2978B60 /* DataExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C21F36728CF1F54BCA69FD8 /* DataExportService.swift */; };
 		A8A5DE4EBAAB54CD42455E1D /* LocationFilterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7EE658E3A8946723A4312A3 /* LocationFilterSheet.swift */; };
 		A8D758C5634735B6695EF8A2 /* SendInvitesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C2F06AC5744C64DBB4AF5E /* SendInvitesSheet.swift */; };
 		AB6260D7EA17C67F59375F15 /* AddExpenseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62E71C32CB32D2E4A566CAEE /* AddExpenseSheet.swift */; };
 		AE3E4443FA4A1B6739243CE2 /* UserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0665B66C36A2026B2BAE2F4 /* UserTests.swift */; };
 		B0B922CEB274680817B56B3D /* SeatingChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67E403052F7372867F3451EB /* SeatingChartView.swift */; };
 		B2C4833720688302C33B8917 /* GoingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55816C0B0D2B271D3A4923AA /* GoingView.swift */; };
+		B934F25D56FC02C5055C3264 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F116767086C5E5E3C7F676A4 /* KeychainService.swift */; };
 		BBBEC4830932DAEAA17A77C0 /* DemoEventFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E973FE42E36FD5598C0E85 /* DemoEventFactory.swift */; };
 		BD2D9B812292039003C24302 /* EventMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE4BD893AD8DB60B33095BDE /* EventMember.swift */; };
 		C394EB212D3509C9F51814F4 /* BudgetTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F5A1891E00911E9E98F8E2 /* BudgetTab.swift */; };
@@ -89,6 +90,7 @@
 		E559A24C1B201CA12FDAB4C2 /* FunctionInvite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 174DB501ECBE6A672C0DB1B6 /* FunctionInvite.swift */; };
 		E7D1267DCD6F513699539681 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5793B428F51770A06E1FD0EF /* Assets.xcassets */; };
 		E7F00CB4B245F2DE2C64EA0C /* EventTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F27F21615A2A3C2BB63E95A /* EventTests.swift */; };
+		EB7F81B85D31BC1D651F143C /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75CEE33C1A1190A2841EED0 /* AppConfig.swift */; };
 		EBE78E8A1CA09A9353B084C2 /* FunctionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FF68E6D321CF0FDC9645005 /* FunctionCard.swift */; };
 		F489E5C738AF6126D547D7CF /* EventTeamSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B4D8BD4BB161C366814EA9F /* EventTeamSheet.swift */; };
 		F7D9E0F13D6632F360E55BA1 /* QuickAddExpenseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7864600E3A447857463581BD /* QuickAddExpenseSheet.swift */; };
@@ -115,13 +117,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		4C2685DD1394ECFA9AA359E8 /* GatherSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherSchema.swift; sourceTree = "<group>"; };
-		E062B445AB9FDBFED2181503 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
-		7CE52888EFC9B47195E7D465 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		01AEB78447E826A0186CEBF1 /* RSVPSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSVPSheet.swift; sourceTree = "<group>"; };
 		04278371F501F302319BC5D8 /* ContactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsView.swift; sourceTree = "<group>"; };
 		046498E046B15E6AA44A70FB /* EventFunction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventFunction.swift; sourceTree = "<group>"; };
-		0C30D092DB4F757F84F4E850 /* Gather.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Gather.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0C30D092DB4F757F84F4E850 /* Gather.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Gather.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0F27F21615A2A3C2BB63E95A /* EventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTests.swift; sourceTree = "<group>"; };
 		115B66B914A4A5BAECE7FB76 /* EventFormComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventFormComponents.swift; sourceTree = "<group>"; };
 		1320DC634E90CD9DA0C1AAF4 /* BudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetView.swift; sourceTree = "<group>"; };
@@ -131,9 +130,12 @@
 		18DB5ACA50F0F25529C91D6A /* ModelContext+SafeSave.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelContext+SafeSave.swift"; sourceTree = "<group>"; };
 		1A4B20227FAE11F3F9CD5B40 /* PhotosTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosTab.swift; sourceTree = "<group>"; };
 		1A97CDE73D47D3EEEEE737A2 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		1E0880AEA2684892609B8A98 /* TicketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketTests.swift; sourceTree = "<group>"; };
 		27D2986C330D256FD0BF3DE6 /* EditBudgetSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditBudgetSheet.swift; sourceTree = "<group>"; };
 		2B4D8BD4BB161C366814EA9F /* EventTeamSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTeamSheet.swift; sourceTree = "<group>"; };
+		2C21F36728CF1F54BCA69FD8 /* DataExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataExportService.swift; sourceTree = "<group>"; };
 		302988B8D84F1A7924514B00 /* AddGuestSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGuestSheet.swift; sourceTree = "<group>"; };
+		312E4412118C0C8C055B4EC0 /* GatherSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatherSchema.swift; sourceTree = "<group>"; };
 		3259B684BF5785DF65C29291 /* OverviewTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTab.swift; sourceTree = "<group>"; };
 		3DB709D71F9E2EE7A6A25AD8 /* WaitlistSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitlistSheet.swift; sourceTree = "<group>"; };
 		3E755727F6D8D04516D6C7C3 /* GuestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestTests.swift; sourceTree = "<group>"; };
@@ -170,7 +172,7 @@
 		90AEF265B59F8F189CB8FE4C /* CalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
 		93543939E79191E57393AF8A /* GuestListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestListSheet.swift; sourceTree = "<group>"; };
 		950D7B23A74B7C993ABF400F /* FunctionsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunctionsTab.swift; sourceTree = "<group>"; };
-		987ECBE23E5DDB13E96059AD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		987ECBE23E5DDB13E96059AD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		98DF62CB3C56D5725150D2AE /* BudgetFilterChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetFilterChip.swift; sourceTree = "<group>"; };
 		98EBEEDF26D6D7E7C7F9386C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A0448E5116329A27DA2460B8 /* FunctionDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunctionDetailSheet.swift; sourceTree = "<group>"; };
@@ -186,6 +188,7 @@
 		AE84E75047EC0249EBA3C82D /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
 		AF3F21D416B34677A4E0FB94 /* GatherUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GatherUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B21EC58D914E3DDB37B928FE /* GuestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestDetailSheet.swift; sourceTree = "<group>"; };
+		B75CEE33C1A1190A2841EED0 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		B7EE658E3A8946723A4312A3 /* LocationFilterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationFilterSheet.swift; sourceTree = "<group>"; };
 		B839C92C610C1AFF40156756 /* InviteComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteComponents.swift; sourceTree = "<group>"; };
 		B8DE1A98670B421389C52E22 /* Ticket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ticket.swift; sourceTree = "<group>"; };
@@ -203,6 +206,7 @@
 		ECB1FB56CAEE7F2F2EB906F2 /* EventTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTemplate.swift; sourceTree = "<group>"; };
 		F0399447FECD256274E38B1A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		F0CD13EECAAB3F8E35040BE7 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
+		F116767086C5E5E3C7F676A4 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		F507402810A216E2A36C321F /* GuestFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestFilterBar.swift; sourceTree = "<group>"; };
 		F9936A27AE711C0DDFBA01BC /* PaymentTransaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentTransaction.swift; sourceTree = "<group>"; };
 		FA40E0DDEF7662119DC7C7D8 /* TicketPurchaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketPurchaseSheet.swift; sourceTree = "<group>"; };
@@ -293,6 +297,7 @@
 			children = (
 				0F27F21615A2A3C2BB63E95A /* EventTests.swift */,
 				3E755727F6D8D04516D6C7C3 /* GuestTests.swift */,
+				1E0880AEA2684892609B8A98 /* TicketTests.swift */,
 				A0665B66C36A2026B2BAE2F4 /* UserTests.swift */,
 			);
 			path = GatherTests;
@@ -312,13 +317,14 @@
 			children = (
 				1A97CDE73D47D3EEEEE737A2 /* AuthManager.swift */,
 				90AEF265B59F8F189CB8FE4C /* CalendarService.swift */,
+				2C21F36728CF1F54BCA69FD8 /* DataExportService.swift */,
 				655DF380F6666EE9E4A260E7 /* DemoDataService.swift */,
 				C9E973FE42E36FD5598C0E85 /* DemoEventFactory.swift */,
 				150520D585D2B79EB7128836 /* DemoGuestFactory.swift */,
 				15B7111D0C1B3786D3D10BC4 /* EventService.swift */,
+				312E4412118C0C8C055B4EC0 /* GatherSchema.swift */,
 				AB97DB43D833C4D336D65B36 /* InviteService.swift */,
-				4C2685DD1394ECFA9AA359E8 /* GatherSchema.swift */,
-				E062B445AB9FDBFED2181503 /* KeychainService.swift */,
+				F116767086C5E5E3C7F676A4 /* KeychainService.swift */,
 				F0399447FECD256274E38B1A /* NotificationService.swift */,
 			);
 			path = Services;
@@ -490,8 +496,8 @@
 		8E7307E295B410E6D200823F /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				B75CEE33C1A1190A2841EED0 /* AppConfig.swift */,
 				4CE43924F82D8F86FA687A36 /* DateFormatters.swift */,
-				7CE52888EFC9B47195E7D465 /* AppConfig.swift */,
 				18DB5ACA50F0F25529C91D6A /* ModelContext+SafeSave.swift */,
 			);
 			path = Utilities;
@@ -802,6 +808,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					6022918118A1B800B69E1EA2 = {
+						DevelopmentTeam = 7HTTY6JAP6;
 						ProvisioningStyle = Automatic;
 					};
 					E9CAD071E176383166DBEED2 = {
@@ -819,6 +826,7 @@
 			);
 			mainGroup = 8C032FB3C6FC3588D0B34824;
 			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -878,6 +886,7 @@
 			files = (
 				E7F00CB4B245F2DE2C64EA0C /* EventTests.swift in Sources */,
 				0AB4388916B2E10FA7407AC7 /* GuestTests.swift in Sources */,
+				25B64784079F9149D5BF3F44 /* TicketTests.swift in Sources */,
 				AE3E4443FA4A1B6739243CE2 /* UserTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -893,6 +902,7 @@
 				D50C2BB87C6E0011199A6F1D /* AddFunctionSheet.swift in Sources */,
 				DA04486F3F0A1C27511565AB /* AddGuestSheet.swift in Sources */,
 				0D8A9C5E0C82175C30170D23 /* AddSplitSheet.swift in Sources */,
+				EB7F81B85D31BC1D651F143C /* AppConfig.swift in Sources */,
 				DC40F9567716B966F62749A4 /* AppNotification.swift in Sources */,
 				297F119220B8327A29E891C7 /* AuthManager.swift in Sources */,
 				DF98D0B1D7096FCEF7F2786F /* AuthView.swift in Sources */,
@@ -905,10 +915,8 @@
 				3B6976788E8AFDCF5B9EEF9F /* Comment.swift in Sources */,
 				217EF4F996021C5A62636814 /* ContactsView.swift in Sources */,
 				56E4F6D73AF85E7BA0B154F0 /* CreateEventView.swift in Sources */,
+				A842E01E1B485F09A2978B60 /* DataExportService.swift in Sources */,
 				FDDB2D112CB26EE8D86BA5D1 /* DateFormatters.swift in Sources */,
-				B12890B5DE6A790F378BD896 /* GatherSchema.swift in Sources */,
-				79C7848CF331C0D25E95B917 /* KeychainService.swift in Sources */,
-				5DD98838D8EAE929E47738F5 /* AppConfig.swift in Sources */,
 				7EC0FC92E83F43E53CD6B097 /* DemoDataService.swift in Sources */,
 				BBBEC4830932DAEAA17A77C0 /* DemoEventFactory.swift in Sources */,
 				668B5B54342D364574A2F61B /* DemoGuestFactory.swift in Sources */,
@@ -932,6 +940,7 @@
 				17C3EEC82DCCC02E57D5ABE8 /* FunctionRSVPSheet.swift in Sources */,
 				49A8211432159A57EF47014E /* FunctionsTab.swift in Sources */,
 				004095CF12912AF0E2EB9A5A /* GatherApp.swift in Sources */,
+				9020F3F4476B307B9164D11C /* GatherSchema.swift in Sources */,
 				B2C4833720688302C33B8917 /* GoingView.swift in Sources */,
 				5E3BB929594C1FC6456CC555 /* Guest.swift in Sources */,
 				75807C7A7A03213404FD59BA /* GuestActionBar.swift in Sources */,
@@ -942,6 +951,7 @@
 				639E78F4363B51E81CA2A7B9 /* GuestsTab.swift in Sources */,
 				20012B85C4E0327270C22962 /* InviteComponents.swift in Sources */,
 				4FDE5A886F91C43A0DE7DCBB /* InviteService.swift in Sources */,
+				B934F25D56FC02C5055C3264 /* KeychainService.swift in Sources */,
 				A8A5DE4EBAAB54CD42455E1D /* LocationFilterSheet.swift in Sources */,
 				883B056491F89FB7D6F2E8AD /* MainTabView.swift in Sources */,
 				0823EA36A1AE6751B76BFA04 /* ManageRSVPSheet.swift in Sources */,
@@ -1046,7 +1056,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
@@ -1076,12 +1085,10 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -1097,7 +1104,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0.0;
@@ -1121,7 +1128,7 @@
 				CODE_SIGN_ENTITLEMENTS = Gather/Gather.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = F385ZL83XQ;
+				DEVELOPMENT_TEAM = 7HTTY6JAP6;
 				INFOPLIST_FILE = Gather/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Gathr;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1139,7 +1146,6 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -1172,12 +1178,10 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -1187,7 +1191,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0.0;
@@ -1227,7 +1231,7 @@
 				CODE_SIGN_ENTITLEMENTS = Gather/Gather.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = F385ZL83XQ;
+				DEVELOPMENT_TEAM = 7HTTY6JAP6;
 				INFOPLIST_FILE = Gather/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Gathr;
 				LD_RUNPATH_SEARCH_PATHS = (

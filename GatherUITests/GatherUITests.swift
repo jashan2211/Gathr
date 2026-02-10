@@ -26,68 +26,69 @@ final class GatherUITests: XCTestCase {
 
     func testTabBarNavigation() throws {
         // Skip if not authenticated
-        guard app.tabBars.buttons["Home"].exists else {
+        // Tab bar is a custom floating bar; tabs are regular buttons with accessibility labels
+        guard app.buttons["Going"].exists else {
             throw XCTSkip("User not authenticated")
         }
 
         // Test tab navigation
-        let homeTab = app.tabBars.buttons["Home"]
-        let myEventsTab = app.tabBars.buttons["My Events"]
-        let contactsTab = app.tabBars.buttons["Contacts"]
-        let profileTab = app.tabBars.buttons["Profile"]
+        let goingTab = app.buttons["Going"]
+        let myEventsTab = app.buttons["My Events"]
+        let exploreTab = app.buttons["Explore"]
+        let profileTab = app.buttons["Profile"]
 
-        XCTAssertTrue(homeTab.exists)
+        XCTAssertTrue(goingTab.exists)
         XCTAssertTrue(myEventsTab.exists)
-        XCTAssertTrue(contactsTab.exists)
+        XCTAssertTrue(exploreTab.exists)
         XCTAssertTrue(profileTab.exists)
 
         // Navigate through tabs
         myEventsTab.tap()
         XCTAssertTrue(app.navigationBars["My Events"].exists)
 
-        contactsTab.tap()
-        XCTAssertTrue(app.navigationBars["Contacts"].exists)
+        exploreTab.tap()
+        // ExploreView uses an empty navigationTitle with inline search
+        XCTAssertTrue(exploreTab.isSelected)
 
         profileTab.tap()
         XCTAssertTrue(app.navigationBars["Profile"].exists)
 
-        homeTab.tap()
-        XCTAssertTrue(app.navigationBars["Home"].exists)
+        goingTab.tap()
+        XCTAssertTrue(app.navigationBars["Going"].exists)
     }
 
     // MARK: - Create Event Tests
 
     func testCreateEventButton() throws {
         // Skip if not authenticated
-        guard app.buttons["Create Event"].exists else {
+        guard app.buttons["Create New Event"].exists else {
             throw XCTSkip("Create button not found")
         }
 
-        app.buttons["Create Event"].tap()
+        app.buttons["Create New Event"].tap()
 
         // Verify create event sheet appears
-        XCTAssertTrue(app.navigationBars["Create Event"].exists)
-        XCTAssertTrue(app.buttons["Cancel"].exists)
+        XCTAssertTrue(app.navigationBars["New Event"].exists)
     }
 
     func testCreateEventValidation() throws {
         // Skip if not authenticated
-        guard app.buttons["Create Event"].exists else {
+        guard app.buttons["Create New Event"].exists else {
             throw XCTSkip("Create button not found")
         }
 
-        app.buttons["Create Event"].tap()
+        app.buttons["Create New Event"].tap()
 
-        // Create button should be disabled without title
-        let createButton = app.buttons["Create"]
+        // Create Event button should be disabled without title
+        let createButton = app.buttons["Create Event"]
         XCTAssertFalse(createButton.isEnabled)
 
         // Enter title
-        let titleField = app.textFields["Give your event a name"]
+        let titleField = app.textFields["Give your event a vibe..."]
         titleField.tap()
         titleField.typeText("Test Event")
 
-        // Create button should now be enabled
+        // Create Event button should now be enabled
         XCTAssertTrue(createButton.isEnabled)
     }
 
@@ -113,11 +114,12 @@ final class GatherUITests: XCTestCase {
 
     func testProfileSettings() throws {
         // Skip if not authenticated
-        guard app.tabBars.buttons["Profile"].exists else {
+        // Tab bar is a custom floating bar; tabs are regular buttons
+        guard app.buttons["Profile"].exists else {
             throw XCTSkip("Profile tab not found")
         }
 
-        app.tabBars.buttons["Profile"].tap()
+        app.buttons["Profile"].tap()
 
         // Check for settings options
         XCTAssertTrue(app.staticTexts["Notifications"].exists)

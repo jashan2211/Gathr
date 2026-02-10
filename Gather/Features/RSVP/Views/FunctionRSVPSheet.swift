@@ -374,14 +374,12 @@ struct FunctionRSVPSheet: View {
         modelContext.safeSave()
 
         // Send notification to host
-        Task {
-            await NotificationService.shared.scheduleRSVPNotification(
-                guestName: currentUser.name,
-                eventTitle: event.title,
-                functionName: function.name,
-                response: selectedResponse
-            )
-        }
+        NotificationService.shared.scheduleRSVPNotification(
+            guestName: currentUser.name,
+            eventTitle: event.title,
+            functionName: function.name,
+            response: selectedResponse
+        )
 
         // Haptic success feedback
         Task {

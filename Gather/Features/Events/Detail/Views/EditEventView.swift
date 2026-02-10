@@ -53,7 +53,7 @@ struct EditEventView: View {
         _privacy = State(initialValue: event.privacy)
         _guestListVisibility = State(initialValue: event.guestListVisibility)
         _selectedCategory = State(initialValue: event.category)
-        _enabledFeatures = State(initialValue: event.enabledFeatures ?? EventCategory.custom.defaultFeatures)
+        _enabledFeatures = State(initialValue: event.enabledFeatures)
     }
 
     var body: some View {

@@ -150,12 +150,13 @@ class NotificationService: ObservableObject {
     // MARK: - Cancel Notifications
 
     func cancelEventReminders(for eventId: UUID) {
-        notificationCenter.getPendingNotificationRequests { [weak self] requests in
+        Task {
+            let requests = await notificationCenter.pendingNotificationRequests()
             let identifiersToRemove = requests
                 .filter { $0.identifier.contains(eventId.uuidString) }
                 .map { $0.identifier }
 
-            self?.notificationCenter.removePendingNotificationRequests(withIdentifiers: identifiersToRemove)
+            notificationCenter.removePendingNotificationRequests(withIdentifiers: identifiersToRemove)
         }
     }
 

@@ -261,7 +261,7 @@ struct TicketPurchaseSheet: View {
                 HStack(spacing: Spacing.xs) {
                     Image(systemName: "tag.fill")
                         .foregroundStyle(Color.accentPurpleFallback)
-                    Text("Add \(next.minQuantity - totalQuantity) more for \(next.discountPercent)% off!")
+                    Text(verbatim: "Add \(next.minQuantity - totalQuantity) more for \(next.discountPercent)% off!")
                         .font(GatherFont.callout)
                         .foregroundStyle(Color.gatherSecondaryText)
                 }

@@ -14,14 +14,15 @@ xcuserdata/
 *.moved-aside
 *.xcuserstate
 *.xcscmblueprint
-*.xcworkspace
-!default.xcworkspace
+*.xcworkspace/
+!Gather.xcodeproj/project.xcworkspace/
+Gather.xcodeproj/project.xcworkspace/xcuserdata/
+Gather.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 
 # Swift Package Manager
 .build/
 Packages/
 Package.resolved
-*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 
 # CocoaPods (if used)
 Pods/

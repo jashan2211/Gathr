@@ -23,11 +23,14 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: List available simulators
+        run: xcrun simctl list devices available --json | head -100
+
       - name: Build for testing
         run: |
           xcodebuild build-for-testing \
             -scheme Gather \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/DerivedData \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO
@@ -43,11 +46,29 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
+      - name: Find simulator
+        id: sim
+        run: |
+          # Pick the first available iPhone simulator
+          SIM_NAME=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in data.get('devices', {}).items():
+              if 'iOS' in runtime or 'iphone' in runtime.lower():
+                  for d in devices:
+                      if 'iPhone' in d['name'] and d['isAvailable']:
+                          print(d['name'])
+                          sys.exit(0)
+          print('iPhone 16 Pro')
+          ")
+          echo "name=$SIM_NAME" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $SIM_NAME"
+
       - name: Run Unit Tests
         run: |
           xcodebuild test \
             -scheme Gather \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            -destination 'platform=iOS Simulator,name=${{ steps.sim.outputs.name }}' \
             -only-testing:GatherTests \
             -resultBundlePath TestResults/UnitTests \
             CODE_SIGN_IDENTITY="" \
@@ -57,7 +78,7 @@ jobs:
         run: |
           xcodebuild test \
             -scheme Gather \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            -destination 'platform=iOS Simulator,name=${{ steps.sim.outputs.name }}' \
             -only-testing:GatherUITests \
             -resultBundlePath TestResults/UITests \
             CODE_SIGN_IDENTITY="" \
@@ -101,7 +122,7 @@ jobs:
         run: |
           xcodebuild analyze \
             -scheme Gather \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=latest' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO

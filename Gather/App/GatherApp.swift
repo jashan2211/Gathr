@@ -20,19 +20,28 @@ struct GatherApp: App {
                 configurations: [modelConfiguration]
             )
         } catch {
-            // If persistent store fails (e.g. schema migration), fall back to in-memory
-            let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            // Migration failed (unknown model version from pre-versioned store).
+            // Delete the incompatible store and retry with a fresh persistent store.
+            let storeURL = modelConfiguration.url
+            let relatedFiles = [
+                storeURL,
+                storeURL.appendingPathExtension("wal"),
+                storeURL.appendingPathExtension("shm"),
+                URL(fileURLWithPath: storeURL.path + "-wal"),
+                URL(fileURLWithPath: storeURL.path + "-shm")
+            ]
+            for file in relatedFiles {
+                try? FileManager.default.removeItem(at: file)
+            }
+
             do {
                 return try ModelContainer(
                     for: schema,
                     migrationPlan: GatherMigrationPlan.self,
-                    configurations: [fallbackConfig]
+                    configurations: [modelConfiguration]
                 )
             } catch {
-                // Both persistent and in-memory stores failed — the data layer is
-                // completely non-functional and no meaningful UI can be shown.
-                // This mirrors Apple's recommended pattern for ModelContainer init.
-                fatalError("Could not create ModelContainer (persistent + in-memory both failed): \(error)")
+                fatalError("Could not create ModelContainer after store reset: \(error)")
             }
         }
     }()

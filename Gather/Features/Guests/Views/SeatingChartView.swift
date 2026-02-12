@@ -1,27 +1,33 @@
 import SwiftUI
+import SwiftData
 
 struct SeatingChartView: View {
     @Bindable var event: Event
-    @State private var tables: [Table] = []
+    @Environment(\.modelContext) private var modelContext
+    @Query private var tables: [SeatingTable]
     @State private var showAddTable = false
-    @State private var selectedTable: Table?
+    @State private var selectedTable: SeatingTable?
     @State private var showAssignGuests = false
+
+    init(event: Event) {
+        self.event = event
+        let eventId = event.id
+        _tables = Query(
+            filter: #Predicate<SeatingTable> { $0.eventId == eventId },
+            sort: \SeatingTable.name
+        )
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
-                    // Stats
                     seatingStats
-
-                    // Tables Grid
                     if tables.isEmpty {
                         emptyState
                     } else {
                         tablesGrid
                     }
-
-                    // Unassigned Guests
                     unassignedGuestsSection
                 }
                 .padding()
@@ -38,18 +44,11 @@ struct SeatingChartView: View {
                 }
             }
             .sheet(isPresented: $showAddTable) {
-                AddTableSheet(tables: $tables)
+                AddTableSheet(eventId: event.id)
             }
             .sheet(isPresented: $showAssignGuests) {
                 if let table = selectedTable {
-                    AssignGuestsSheet(event: event, table: Binding(
-                        get: { table },
-                        set: { newValue in
-                            if let index = tables.firstIndex(where: { $0.id == table.id }) {
-                                tables[index] = newValue
-                            }
-                        }
-                    ))
+                    AssignGuestsSheet(event: event, table: table)
                 }
             }
         }
@@ -59,23 +58,9 @@ struct SeatingChartView: View {
 
     private var seatingStats: some View {
         HStack(spacing: Spacing.lg) {
-            StatCard(
-                title: "Tables",
-                value: "\(tables.count)",
-                icon: "tablecells"
-            )
-
-            StatCard(
-                title: "Seated",
-                value: "\(seatedCount)",
-                icon: "person.fill.checkmark"
-            )
-
-            StatCard(
-                title: "Unassigned",
-                value: "\(unassignedGuests.count)",
-                icon: "person.fill.questionmark"
-            )
+            StatCard(title: "Tables", value: "\(tables.count)", icon: "tablecells")
+            StatCard(title: "Seated", value: "\(seatedCount)", icon: "person.fill.checkmark")
+            StatCard(title: "Unassigned", value: "\(unassignedGuests.count)", icon: "person.fill.questionmark")
         }
     }
 
@@ -114,12 +99,13 @@ struct SeatingChartView: View {
 
     private var tablesGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.md) {
-            ForEach($tables) { $table in
-                TableCard(table: $table) {
+            ForEach(tables) { table in
+                TableCard(table: table) {
                     selectedTable = table
                     showAssignGuests = true
                 } onDelete: {
-                    tables.removeAll { $0.id == table.id }
+                    modelContext.delete(table)
+                    modelContext.safeSave()
                 }
             }
         }
@@ -141,9 +127,7 @@ struct SeatingChartView: View {
             HStack {
                 Text("Unassigned Guests")
                     .font(GatherFont.headline)
-
                 Spacer()
-
                 Text("\(unassignedGuests.count)")
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
@@ -168,46 +152,19 @@ struct SeatingChartView: View {
                                 Text(guest.name.prefix(1))
                                     .font(GatherFont.caption)
                             }
-
                         Text(guest.name)
                             .font(GatherFont.body)
-
                         if guest.plusOneCount > 0 {
                             Text("+\(guest.plusOneCount)")
                                 .font(GatherFont.caption)
                                 .foregroundStyle(Color.gatherSecondaryText)
                         }
-
                         Spacer()
                     }
                     .padding(.vertical, Spacing.xs)
                 }
             }
         }
-    }
-}
-
-// MARK: - Table Model
-
-struct Table: Identifiable {
-    let id: UUID
-    var name: String
-    var capacity: Int
-    var guestIds: [UUID]
-
-    init(id: UUID = UUID(), name: String, capacity: Int = 8, guestIds: [UUID] = []) {
-        self.id = id
-        self.name = name
-        self.capacity = capacity
-        self.guestIds = guestIds
-    }
-
-    var remainingSeats: Int {
-        capacity - guestIds.count
-    }
-
-    var isFull: Bool {
-        guestIds.count >= capacity
     }
 }
 
@@ -223,11 +180,9 @@ struct StatCard: View {
             Image(systemName: icon)
                 .font(.title2)
                 .foregroundStyle(Color.accentPurpleFallback)
-
             Text(value)
                 .font(GatherFont.title2)
                 .fontWeight(.bold)
-
             Text(title)
                 .font(GatherFont.caption)
                 .foregroundStyle(Color.gatherSecondaryText)
@@ -240,18 +195,16 @@ struct StatCard: View {
 }
 
 struct TableCard: View {
-    @Binding var table: Table
+    let table: SeatingTable
     let onAssign: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         VStack(spacing: Spacing.sm) {
-            // Table icon
             ZStack {
                 Circle()
                     .fill(Color.accentPurpleFallback.opacity(0.1))
                     .frame(width: 60, height: 60)
-
                 Image(systemName: "tablecells")
                     .font(.title)
                     .foregroundStyle(Color.accentPurpleFallback)
@@ -264,17 +217,15 @@ struct TableCard: View {
                 .font(GatherFont.caption)
                 .foregroundStyle(Color.gatherSecondaryText)
 
-            // Progress indicator
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.gatherSecondaryBackground)
                         .frame(height: 4)
-
                     RoundedRectangle(cornerRadius: 2)
                         .fill(table.isFull ? Color.gatherSuccess : Color.accentPurpleFallback)
                         .frame(
-                            width: geometry.size.width * CGFloat(table.guestIds.count) / CGFloat(table.capacity),
+                            width: geometry.size.width * CGFloat(table.guestIds.count) / CGFloat(max(table.capacity, 1)),
                             height: 4
                         )
                 }
@@ -290,7 +241,6 @@ struct TableCard: View {
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.accentPurpleFallback)
                 }
-
                 Button {
                     onDelete()
                 } label: {
@@ -310,7 +260,8 @@ struct TableCard: View {
 
 struct AddTableSheet: View {
     @Environment(\.dismiss) var dismiss
-    @Binding var tables: [Table]
+    @Environment(\.modelContext) private var modelContext
+    let eventId: UUID
 
     @State private var name = ""
     @State private var capacity = 8
@@ -320,12 +271,10 @@ struct AddTableSheet: View {
             Form {
                 Section("Table Details") {
                     TextField("Table name (e.g., Table 1)", text: $name)
-
                     Stepper("Capacity: \(capacity)", value: $capacity, in: 2...20)
                 }
-
                 Section {
-                    Button("Add Multiple Tables") {
+                    Button("Add Multiple Tables (10)") {
                         addMultipleTables()
                     }
                 }
@@ -338,23 +287,44 @@ struct AddTableSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let table = Table(
-                            name: name.isEmpty ? "Table \(tables.count + 1)" : name,
-                            capacity: capacity
-                        )
-                        tables.append(table)
-                        dismiss()
+                        addSingleTable()
                     }
                 }
             }
         }
     }
 
+    private func addSingleTable() {
+        let existingCount = (try? modelContext.fetchCount(FetchDescriptor<SeatingTable>(
+            predicate: #Predicate { $0.eventId == eventId }
+        ))) ?? 0
+
+        let table = SeatingTable(
+            name: name.isEmpty ? "Table \(existingCount + 1)" : name,
+            capacity: capacity,
+            eventId: eventId
+        )
+        modelContext.insert(table)
+        modelContext.safeSave()
+        HapticService.success()
+        dismiss()
+    }
+
     private func addMultipleTables() {
+        let existingCount = (try? modelContext.fetchCount(FetchDescriptor<SeatingTable>(
+            predicate: #Predicate { $0.eventId == eventId }
+        ))) ?? 0
+
         for i in 1...10 {
-            let table = Table(name: "Table \(tables.count + i)", capacity: capacity)
-            tables.append(table)
+            let table = SeatingTable(
+                name: "Table \(existingCount + i)",
+                capacity: capacity,
+                eventId: eventId
+            )
+            modelContext.insert(table)
         }
+        modelContext.safeSave()
+        HapticService.success()
         dismiss()
     }
 }
@@ -363,8 +333,9 @@ struct AddTableSheet: View {
 
 struct AssignGuestsSheet: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) private var modelContext
     let event: Event
-    @Binding var table: Table
+    @Bindable var table: SeatingTable
 
     var body: some View {
         NavigationStack {
@@ -388,15 +359,12 @@ struct AssignGuestsSheet: View {
                     ForEach(availableGuests) { guest in
                         HStack {
                             Text(guest.name)
-
                             if guest.plusOneCount > 0 {
                                 Text("+\(guest.plusOneCount)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-
                             Spacer()
-
                             Button {
                                 assignGuest(guest)
                             } label: {
@@ -429,10 +397,13 @@ struct AssignGuestsSheet: View {
     private func assignGuest(_ guest: Guest) {
         guard !table.isFull else { return }
         table.guestIds.append(guest.id)
+        modelContext.safeSave()
+        HapticService.selection()
     }
 
     private func removeGuest(_ guest: Guest) {
         table.guestIds.removeAll { $0 == guest.id }
+        modelContext.safeSave()
     }
 }
 

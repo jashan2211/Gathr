@@ -18,6 +18,8 @@ struct ManageRSVPSheet: View {
     @State private var showRequestCancellation = false
     @State private var isSubmitting = false
     @State private var cancellationReason = ""
+    @State private var calendarMessage: String?
+    @State private var isAddingToCalendar = false
 
     init(event: Event, guest: Guest, ticket: Ticket? = nil) {
         self.event = event
@@ -382,19 +384,26 @@ struct ManageRSVPSheet: View {
                 // Add to calendar (if attending)
                 if guest.status == .attending {
                     Button {
-                        // Add to calendar
+                        addToCalendar()
                     } label: {
                         HStack {
-                            Image(systemName: "calendar.badge.plus")
-                            Text("Add to Calendar")
+                            if isAddingToCalendar {
+                                ProgressView()
+                                    .tint(Color.accentPurpleFallback)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: calendarMessage != nil ? "checkmark.circle.fill" : "calendar.badge.plus")
+                            }
+                            Text(calendarMessage ?? "Add to Calendar")
                         }
                         .font(GatherFont.headline)
-                        .foregroundStyle(Color.accentPurpleFallback)
+                        .foregroundStyle(calendarMessage != nil ? Color.rsvpYesFallback : Color.accentPurpleFallback)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accentPurpleFallback.opacity(0.1))
+                        .background((calendarMessage != nil ? Color.rsvpYesFallback : Color.accentPurpleFallback).opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
+                    .disabled(isAddingToCalendar || calendarMessage != nil)
                     .accessibilityLabel("Add to Calendar")
                 }
             }
@@ -439,10 +448,7 @@ struct ManageRSVPSheet: View {
     }
 
     private func formatPrice(_ price: Decimal) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
+        GatherPriceFormatter.format(price)
     }
 
     private func saveChanges() {
@@ -464,8 +470,7 @@ struct ManageRSVPSheet: View {
         modelContext.safeSave()
 
         // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
 
         Task {
             try? await Task.sleep(for: .seconds(0.5))
@@ -474,13 +479,28 @@ struct ManageRSVPSheet: View {
         }
     }
 
+    private func addToCalendar() {
+        isAddingToCalendar = true
+        Task {
+            let result = await CalendarService.shared.addEventToCalendar(event: event)
+            isAddingToCalendar = false
+            withAnimation {
+                calendarMessage = result
+            }
+            if result.contains("added") {
+                HapticService.success()
+            } else {
+                HapticService.warning()
+            }
+        }
+    }
+
     private func cancelRSVP() {
         guest.status = .declined
         guest.respondedAt = Date()
         modelContext.safeSave()
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
 
         dismiss()
     }
@@ -663,8 +683,7 @@ struct RequestCancellationSheet: View {
         // Simulate sending request
         Task {
             try? await Task.sleep(for: .seconds(1))
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
+            HapticService.success()
 
             withAnimation {
                 isSending = false

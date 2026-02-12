@@ -29,11 +29,7 @@ final class TicketTier {
     var remainingCount: Int { max(0, capacity - soldCount) }
 
     var formattedPrice: String {
-        if isFree { return "Free" }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = Locale.current.currency?.identifier ?? "USD"
-        return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
+        GatherPriceFormatter.format(price)
     }
 
     var salesStatus: SalesStatus {

@@ -200,8 +200,7 @@ struct OnboardingView: View {
     private func roleCard(_ role: UserRole, icon: String, title: String, subtitle: String) -> some View {
         Button {
             selectedRole = role
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
+            HapticService.buttonTap()
         } label: {
             HStack(spacing: Spacing.md) {
                 ZStack {
@@ -280,8 +279,7 @@ struct OnboardingView: View {
             } else {
                 selectedCategories.insert(category)
             }
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
+            HapticService.buttonTap()
         } label: {
             VStack(spacing: Spacing.sm) {
                 Image(systemName: category.icon)
@@ -364,8 +362,7 @@ struct OnboardingView: View {
             hasCompletedOnboarding = true
         }
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
     }
 }
 

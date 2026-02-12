@@ -282,8 +282,7 @@ struct AddMemberSheet: View {
                         )
                         modelContext.insert(notification)
 
-                        let generator = UINotificationFeedbackGenerator()
-                        generator.notificationOccurred(.success)
+                        HapticService.success()
                         dismiss()
                     }
                     .disabled(name.isEmpty)
@@ -341,8 +340,7 @@ struct InviteLinkSheet: View {
                     Button {
                         UIPasteboard.general.string = inviteLink
                         copied = true
-                        let generator = UINotificationFeedbackGenerator()
-                        generator.notificationOccurred(.success)
+                        HapticService.success()
                         Task {
                             try? await Task.sleep(for: .seconds(2))
                             copied = false

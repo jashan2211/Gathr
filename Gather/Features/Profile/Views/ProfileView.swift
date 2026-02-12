@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import AuthenticationServices
+import UserNotifications
+import EventKit
 
 struct ProfileView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -11,17 +13,20 @@ struct ProfileView: View {
     @State private var showReauthSheet = false
     @State private var isLoadingData = false
     @State private var loadedDataMessage: String?
+    @State private var showEditProfile = false
 
-    private var hostedEvents: Int {
-        guard let userId = authManager.currentUser?.id else { return 0 }
-        return allEvents.filter { $0.hostId == userId }.count
-    }
-
-    private var attendingEvents: Int {
-        guard let userId = authManager.currentUser?.id else { return 0 }
-        return allEvents.filter { event in
-            event.guests.contains { $0.userId == userId && $0.status == .attending }
-        }.count
+    private var profileStats: (hosted: Int, attending: Int, totalGuests: Int, publicCount: Int) {
+        let userId = authManager.currentUser?.id
+        var hosted = 0, attending = 0, totalGuests = 0, publicCount = 0
+        for event in allEvents {
+            totalGuests += event.guests.count
+            if event.hostId == userId { hosted += 1 }
+            if event.privacy == .publicEvent { publicCount += 1 }
+            if event.guests.contains(where: { $0.userId == userId && $0.status == .attending }) {
+                attending += 1
+            }
+        }
+        return (hosted, attending, totalGuests, publicCount)
     }
 
     var body: some View {
@@ -53,7 +58,32 @@ struct ProfileView: View {
 
                     // Developer Tools (DEBUG only)
                     if AppConfig.isDemoMode {
+                        // Demo mode banner
+                        HStack(spacing: Spacing.xs) {
+                            Image(systemName: "hammer.fill")
+                                .font(.caption2)
+                            Text("Demo Mode Active")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundStyle(Color.gatherBackground)
+                        .padding(.horizontal, Spacing.sm)
+                        .padding(.vertical, Spacing.xxs)
+                        .background(Color.sunshineYellow)
+                        .clipShape(Capsule())
+
                         devToolsSection
+                            .overlay(
+                                RoundedRectangle(cornerRadius: CornerRadius.lg)
+                                    .strokeBorder(
+                                        style: StrokeStyle(lineWidth: 1, dash: [5, 3])
+                                    )
+                                    .foregroundStyle(Color.sunshineYellow.opacity(0.5))
+                            )
+                            .background(
+                                RoundedRectangle(cornerRadius: CornerRadius.lg)
+                                    .fill(Color.sunshineYellow.opacity(0.04))
+                            )
                     }
 
                     // Version
@@ -87,6 +117,9 @@ struct ProfileView: View {
                         await authManager.deleteAccount(modelContext: modelContext)
                     }
                 }
+            }
+            .sheet(isPresented: $showEditProfile) {
+                EditProfileSheet()
             }
         }
     }
@@ -124,7 +157,7 @@ struct ProfileView: View {
             Spacer()
 
             Button {
-                // Edit profile
+                showEditProfile = true
             } label: {
                 Text("Edit")
                     .font(GatherFont.callout)
@@ -139,6 +172,7 @@ struct ProfileView: View {
                             .strokeBorder(Color.accentPurpleFallback.opacity(0.3), lineWidth: 1)
                     )
             }
+            .accessibilityLabel("Edit profile")
         }
         .padding(Spacing.md)
         .glassCard()
@@ -149,19 +183,19 @@ struct ProfileView: View {
     private var statsRow: some View {
         HStack(spacing: Spacing.sm) {
             ProfileStatCard(
-                value: hostedEvents,
+                value: profileStats.hosted,
                 label: "Hosted",
                 icon: "calendar.badge.plus",
                 color: Color.accentPurpleFallback
             )
             ProfileStatCard(
-                value: attendingEvents,
+                value: profileStats.attending,
                 label: "Attending",
                 icon: "ticket.fill",
                 color: Color.accentPinkFallback
             )
             ProfileStatCard(
-                value: totalGuests,
+                value: profileStats.totalGuests,
                 label: "Total Guests",
                 icon: "person.2.fill",
                 color: Color.mintGreen
@@ -181,32 +215,36 @@ struct ProfileView: View {
                     .foregroundStyle(Color.gatherPrimaryText)
             }
 
-            HStack(spacing: Spacing.md) {
-                Image(systemName: "qrcode")
-                    .font(.title2)
-                    .foregroundStyle(Color.accentPurpleFallback)
-                    .frame(width: 44, height: 44)
-                    .background(Color.accentPurpleFallback.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+            NavigationLink {
+                MyTicketsView()
+            } label: {
+                HStack(spacing: Spacing.md) {
+                    Image(systemName: "qrcode")
+                        .font(.title2)
+                        .foregroundStyle(Color.accentPurpleFallback)
+                        .frame(width: 44, height: 44)
+                        .background(Color.accentPurpleFallback.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("View Purchased Tickets")
-                        .font(GatherFont.callout)
-                        .fontWeight(.medium)
-                        .foregroundStyle(Color.gatherPrimaryText)
-                    Text("Access QR codes and event details")
-                        .font(.caption2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("View Purchased Tickets")
+                            .font(GatherFont.callout)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.gatherPrimaryText)
+                        Text("Access QR codes and event details")
+                            .font(.caption2)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(Color.gatherSecondaryText)
+                .padding(Spacing.md)
+                .glassCard()
             }
-            .padding(Spacing.md)
-            .glassCard()
         }
     }
 
@@ -217,6 +255,7 @@ struct ProfileView: View {
             Text("Preferences")
                 .font(GatherFont.headline)
                 .foregroundStyle(Color.gatherPrimaryText)
+                .accessibilityAddTraits(.isHeader)
 
             VStack(spacing: 1) {
                 ProfileMenuItem(icon: "bell", title: "Notifications", color: Color.accentPurpleFallback) {
@@ -243,16 +282,17 @@ struct ProfileView: View {
             Text("Support")
                 .font(GatherFont.headline)
                 .foregroundStyle(Color.gatherPrimaryText)
+                .accessibilityAddTraits(.isHeader)
 
             VStack(spacing: 1) {
                 ProfileMenuItem(icon: "questionmark.circle", title: "Help", color: Color.mintGreen) {
-                    Text("Help Center")
+                    HelpCenterView()
                 }
                 ProfileMenuItem(icon: "envelope", title: "Send Feedback", color: Color.accentPurpleFallback) {
                     Text("Feedback")
                 }
                 ProfileMenuItem(icon: "info.circle", title: "About Gather", color: Color.neonBlue) {
-                    Text("About")
+                    AboutGatherView()
                 }
             }
             .glassCard(cornerRadius: CornerRadius.md)
@@ -305,13 +345,14 @@ struct ProfileView: View {
                 Text("Developer Tools")
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.gatherPrimaryText)
+                    .accessibilityAddTraits(.isHeader)
             }
 
             // Data stats
             HStack(spacing: Spacing.md) {
                 DevToolStat(value: allEvents.count, label: "Events", color: Color.accentPurpleFallback)
-                DevToolStat(value: totalGuests, label: "Guests", color: Color.accentPinkFallback)
-                DevToolStat(value: publicEventsCount, label: "Public", color: Color.mintGreen)
+                DevToolStat(value: profileStats.totalGuests, label: "Guests", color: Color.accentPinkFallback)
+                DevToolStat(value: profileStats.publicCount, label: "Public", color: Color.mintGreen)
             }
             .padding(Spacing.sm)
             .glassCard()
@@ -393,16 +434,6 @@ struct ProfileView: View {
         .padding(.top, Spacing.sm)
     }
 
-    // MARK: - Computed
-
-    private var totalGuests: Int {
-        allEvents.reduce(0) { $0 + $1.guests.count }
-    }
-
-    private var publicEventsCount: Int {
-        allEvents.filter { $0.privacy == .publicEvent }.count
-    }
-
     // MARK: - Data Sizes
 
     enum DataSize {
@@ -438,8 +469,7 @@ struct ProfileView: View {
                 DemoDataService.shared.loadMassiveData(modelContext: modelContext, hostId: userId, eventCount: size.eventCount)
             }
 
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
+            HapticService.success()
             isLoadingData = false
             loadedDataMessage = "\(size.label) data loaded!"
 
@@ -454,8 +484,7 @@ struct ProfileView: View {
         DemoDataService.shared.resetAllData(modelContext: modelContext)
         loadedDataMessage = nil
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
+        HapticService.warning()
     }
 }
 
@@ -486,6 +515,8 @@ struct ProfileStatCard: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.md)
         .glassCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(value) \(label)")
     }
 }
 
@@ -535,22 +566,183 @@ struct ProfileMenuItem: View {
 // MARK: - Settings Views (Placeholders)
 
 struct NotificationSettingsView: View {
-    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @AppStorage("eventReminders") private var eventReminders = true
     @AppStorage("rsvpUpdates") private var rsvpUpdates = true
+    @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var isRequesting = false
 
     var body: some View {
         List {
+            // MARK: - System Permission Section
             Section {
-                Toggle("Enable Notifications", isOn: $notificationsEnabled)
+                permissionRow
+            } header: {
+                Text("System Permission")
+            } footer: {
+                Text(permissionFooterText)
             }
 
-            Section("Event Notifications") {
-                Toggle("Event Reminders", isOn: $eventReminders)
-                Toggle("RSVP Updates", isOn: $rsvpUpdates)
+            // MARK: - Notification Preferences (only when authorized)
+            if authorizationStatus == .authorized {
+                Section("Event Notifications") {
+                    Toggle("Event Reminders", isOn: $eventReminders)
+                    Toggle("RSVP Updates", isOn: $rsvpUpdates)
+                }
             }
         }
         .navigationTitle("Notifications")
+        .task {
+            await checkNotificationStatus()
+        }
+    }
+
+    // MARK: - Permission Row
+
+    @ViewBuilder
+    private var permissionRow: some View {
+        switch authorizationStatus {
+        case .authorized:
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.gatherSuccess)
+                    .font(.title3)
+                Text("Notifications enabled")
+                    .font(GatherFont.callout)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Spacer()
+            }
+
+        case .denied:
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(Color.warmCoral)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Notifications denied")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Text("Enable in System Settings")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                Spacer()
+                Button {
+                    openAppSettings()
+                } label: {
+                    Text("Open Settings")
+                        .font(GatherFont.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.sm)
+                        .padding(.vertical, Spacing.xs)
+                        .background(Color.accentPurpleFallback)
+                        .clipShape(Capsule())
+                }
+            }
+
+        case .notDetermined:
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "bell.badge")
+                    .foregroundStyle(Color.accentPurpleFallback)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Not configured")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Text("Allow Gather to send you notifications")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                Spacer()
+                Button {
+                    Task { await requestNotificationPermission() }
+                } label: {
+                    HStack(spacing: 4) {
+                        if isRequesting {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text("Enable")
+                            .font(GatherFont.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xs)
+                    .background(Color.accentPurpleFallback)
+                    .clipShape(Capsule())
+                }
+                .disabled(isRequesting)
+            }
+
+        case .provisional, .ephemeral:
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "bell.circle")
+                    .foregroundStyle(Color.sunshineYellow)
+                    .font(.title3)
+                Text("Provisional notifications enabled")
+                    .font(GatherFont.callout)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Spacer()
+            }
+
+        @unknown default:
+            Text("Unknown notification status")
+                .font(GatherFont.callout)
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+    }
+
+    // MARK: - Footer Text
+
+    private var permissionFooterText: String {
+        switch authorizationStatus {
+        case .authorized:
+            return "You'll receive alerts, sounds, and badges for event updates."
+        case .denied:
+            return "Notifications are blocked. Tap \"Open Settings\" to enable them in iOS Settings."
+        case .notDetermined:
+            return "Tap \"Enable\" to allow push notifications for event reminders and RSVP updates."
+        default:
+            return "Manage your notification preferences."
+        }
+    }
+
+    // MARK: - Actions
+
+    private func checkNotificationStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        await MainActor.run {
+            authorizationStatus = settings.authorizationStatus
+        }
+    }
+
+    private func requestNotificationPermission() async {
+        isRequesting = true
+        do {
+            let granted = try await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .badge, .sound])
+            await MainActor.run {
+                authorizationStatus = granted ? .authorized : .denied
+                if granted {
+                    HapticService.success()
+                }
+                isRequesting = false
+            }
+        } catch {
+            await MainActor.run {
+                isRequesting = false
+            }
+        }
+    }
+
+    private func openAppSettings() {
+        #if !targetEnvironment(macCatalyst)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+        #endif
     }
 }
 
@@ -654,17 +846,192 @@ struct ActivitySheet: UIViewControllerRepresentable {
 
 struct CalendarSettingsView: View {
     @AppStorage("calendarSyncEnabled") private var calendarSyncEnabled = true
-    @AppStorage("selectedCalendar") private var selectedCalendar = "default"
+    @State private var calendarAuthStatus: EKAuthorizationStatus = .notDetermined
+    @State private var isRequesting = false
+    private let eventStore = EKEventStore()
 
     var body: some View {
         List {
+            // MARK: - System Permission Section
             Section {
-                Toggle("Sync to Calendar", isOn: $calendarSyncEnabled)
+                calendarPermissionRow
+            } header: {
+                Text("System Permission")
             } footer: {
-                Text("Automatically add events you RSVP to your calendar")
+                Text(calendarFooterText)
+            }
+
+            // MARK: - Sync Preferences (only when authorized)
+            if calendarAuthStatus == .fullAccess || calendarAuthStatus == .authorized {
+                Section {
+                    Toggle("Auto-sync RSVPs to Calendar", isOn: $calendarSyncEnabled)
+                } footer: {
+                    Text("Automatically add events you RSVP to your device calendar")
+                }
             }
         }
         .navigationTitle("Calendar")
+        .onAppear {
+            calendarAuthStatus = EKEventStore.authorizationStatus(for: .event)
+        }
+    }
+
+    // MARK: - Calendar Permission Row
+
+    @ViewBuilder
+    private var calendarPermissionRow: some View {
+        if calendarAuthStatus == .fullAccess || calendarAuthStatus == .authorized {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.gatherSuccess)
+                    .font(.title3)
+                Text("Calendar access enabled")
+                    .font(GatherFont.callout)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Spacer()
+            }
+        } else if calendarAuthStatus == .denied || calendarAuthStatus == .restricted {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(Color.warmCoral)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Calendar access denied")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Text("Enable in System Settings")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                Spacer()
+                Button {
+                    openAppSettings()
+                } label: {
+                    Text("Open Settings")
+                        .font(GatherFont.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.sm)
+                        .padding(.vertical, Spacing.xs)
+                        .background(Color.accentPurpleFallback)
+                        .clipShape(Capsule())
+                }
+            }
+        } else if calendarAuthStatus == .writeOnly {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "pencil.circle.fill")
+                    .foregroundStyle(Color.sunshineYellow)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Write-only access")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Text("Full access needed for calendar sync")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                Spacer()
+                Button {
+                    Task { await requestCalendarAccess() }
+                } label: {
+                    HStack(spacing: 4) {
+                        if isRequesting {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text("Upgrade")
+                            .font(GatherFont.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xs)
+                    .background(Color.accentPurpleFallback)
+                    .clipShape(Capsule())
+                }
+                .disabled(isRequesting)
+            }
+        } else {
+            // notDetermined
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "calendar.badge.plus")
+                    .foregroundStyle(Color.neonBlue)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Not configured")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Text("Allow Gather to access your calendar")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                Spacer()
+                Button {
+                    Task { await requestCalendarAccess() }
+                } label: {
+                    HStack(spacing: 4) {
+                        if isRequesting {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text("Enable")
+                            .font(GatherFont.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xs)
+                    .background(Color.accentPurpleFallback)
+                    .clipShape(Capsule())
+                }
+                .disabled(isRequesting)
+            }
+        }
+    }
+
+    // MARK: - Footer Text
+
+    private var calendarFooterText: String {
+        if calendarAuthStatus == .fullAccess || calendarAuthStatus == .authorized {
+            return "Gather can read and write events to your device calendar."
+        } else if calendarAuthStatus == .denied || calendarAuthStatus == .restricted {
+            return "Calendar access is blocked. Tap \"Open Settings\" to enable it in iOS Settings."
+        } else if calendarAuthStatus == .writeOnly {
+            return "Gather can add events but cannot read your calendar. Upgrade for full sync."
+        } else {
+            return "Tap \"Enable\" to allow Gather to add RSVPed events to your calendar."
+        }
+    }
+
+    // MARK: - Actions
+
+    private func requestCalendarAccess() async {
+        isRequesting = true
+        do {
+            let granted = try await eventStore.requestFullAccessToEvents()
+            await MainActor.run {
+                calendarAuthStatus = EKEventStore.authorizationStatus(for: .event)
+                if granted {
+                    HapticService.success()
+                }
+                isRequesting = false
+            }
+        } catch {
+            await MainActor.run {
+                calendarAuthStatus = EKEventStore.authorizationStatus(for: .event)
+                isRequesting = false
+            }
+        }
+    }
+
+    private func openAppSettings() {
+        #if !targetEnvironment(macCatalyst)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+        #endif
     }
 }
 
@@ -706,6 +1073,8 @@ struct DevToolStat: View {
                 .foregroundStyle(Color.gatherSecondaryText)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(value) \(label)")
     }
 }
 
@@ -750,9 +1119,127 @@ struct DataLoadButton: View {
             }
             .padding(Spacing.sm)
             .glassCard()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Load \(title) data. \(subtitle)")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(isLoading ? "Loading in progress" : "Double tap to load demo data")
         }
         .disabled(isLoading)
         .opacity(isLoading ? 0.5 : 1)
+    }
+}
+
+// MARK: - Edit Profile Sheet
+
+struct EditProfileSheet: View {
+    @EnvironmentObject var authManager: AuthManager
+    @Environment(\.dismiss) var dismiss
+    @State private var displayName: String = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: Spacing.lg) {
+                // Avatar
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient.gatherAccentGradient)
+                        .frame(width: AvatarSize.xl, height: AvatarSize.xl)
+                        .overlay {
+                            Text(displayName.prefix(1).uppercased())
+                                .font(.largeTitle)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.white)
+                        }
+                        .modifier(GradientRing(color: Color.accentPurpleFallback, lineWidth: 3))
+                }
+                .padding(.top, Spacing.lg)
+
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    Text("Display Name")
+                        .font(GatherFont.headline)
+                        .foregroundStyle(Color.gatherPrimaryText)
+
+                    TextField("Your name", text: $displayName)
+                        .font(GatherFont.body)
+                        .padding(Spacing.sm)
+                        .background(Color.gatherSecondaryBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                }
+                .padding(.horizontal)
+
+                if let email = authManager.currentUser?.email {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text("Email")
+                            .font(GatherFont.headline)
+                            .foregroundStyle(Color.gatherPrimaryText)
+
+                        Text(email)
+                            .font(GatherFont.body)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .padding(Spacing.sm)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.gatherSecondaryBackground.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    }
+                    .padding(.horizontal)
+                }
+
+                Spacer()
+
+                Button {
+                    saveProfile()
+                } label: {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(LinearGradient.gatherAccentGradient)
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    } else {
+                        Text("Save Changes")
+                            .font(GatherFont.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(LinearGradient.gatherAccentGradient)
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    }
+                }
+                .disabled(displayName.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                .padding(.horizontal)
+                .padding(.bottom)
+            }
+            .navigationTitle("Edit Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            displayName = authManager.currentUser?.name ?? ""
+        }
+    }
+
+    private func saveProfile() {
+        let trimmed = displayName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        isSaving = true
+
+        authManager.currentUser?.name = trimmed
+
+        HapticService.success()
+
+        Task {
+            try? await Task.sleep(for: .seconds(0.3))
+            isSaving = false
+            dismiss()
+        }
     }
 }
 
@@ -784,7 +1271,7 @@ struct ReauthenticateSheet: View {
                     }
 
                     Text("Confirm Your Identity")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(.title2, design: .rounded, weight: .bold))
                         .foregroundStyle(Color.gatherPrimaryText)
 
                     Text("To delete your account, please verify your identity.")
@@ -875,6 +1362,181 @@ struct ReauthenticateSheet: View {
         } else {
             errorMessage = "Email does not match your account"
         }
+    }
+}
+
+// MARK: - Help Center View
+
+struct HelpCenterView: View {
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.md) {
+                FAQItem(
+                    question: "How do I create an event?",
+                    answer: "Tap the + button on the My Events tab. Fill in your event details, choose a category, and enable the features you need like guest management, ticketing, or budget tracking."
+                )
+                FAQItem(
+                    question: "How do RSVPs work?",
+                    answer: "Guests can RSVP as Attending, Maybe, or Decline. If your event has functions (sub-events), guests RSVP to each function individually. You can track all responses on the Guests tab."
+                )
+                FAQItem(
+                    question: "How do tickets work?",
+                    answer: "Enable ticketing when creating an event to set up ticket tiers with different prices and perks. Guests can purchase tickets directly from the event page. Group discounts are applied automatically."
+                )
+                FAQItem(
+                    question: "How do I invite guests?",
+                    answer: "Go to your event's Guests tab and tap Send Invites. You can select guests individually or in bulk, then send via WhatsApp, SMS, Email, or copy the invite link."
+                )
+                FAQItem(
+                    question: "How do I manage my budget?",
+                    answer: "Enable the Budget feature on your event. Add categories and expenses, mark items as paid, and track spending against your allocated budget with visual progress bars."
+                )
+
+                Divider()
+                    .padding(.vertical, Spacing.sm)
+
+                Button {
+                    if let url = URL(string: "mailto:support@gatherapp.com") {
+                        #if !targetEnvironment(macCatalyst)
+                        UIApplication.shared.open(url)
+                        #endif
+                    }
+                } label: {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "envelope.fill")
+                        Text("Contact Support")
+                    }
+                    .font(GatherFont.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(LinearGradient.gatherAccentGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("Help")
+    }
+}
+
+struct FAQItem: View {
+    let question: String
+    let answer: String
+    @State private var isExpanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            Text(answer)
+                .font(GatherFont.body)
+                .foregroundStyle(Color.gatherSecondaryText)
+                .padding(.top, Spacing.xs)
+        } label: {
+            Text(question)
+                .font(GatherFont.callout)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.gatherPrimaryText)
+        }
+        .padding(Spacing.sm)
+        .glassCard(cornerRadius: CornerRadius.md)
+    }
+}
+
+// MARK: - About Gather View
+
+struct AboutGatherView: View {
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: Spacing.lg) {
+                // App icon + name
+                VStack(spacing: Spacing.sm) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: CornerRadius.lg)
+                            .fill(LinearGradient.gatherAccentGradient)
+                            .frame(width: 80, height: 80)
+                        Text("G")
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+
+                    Text("Gather")
+                        .font(GatherFont.title2)
+                        .foregroundStyle(Color.gatherPrimaryText)
+
+                    Text("Version \(appVersion) (\(buildNumber))")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .padding(.top, Spacing.lg)
+
+                // Info cards
+                VStack(spacing: Spacing.sm) {
+                    aboutRow(icon: "heart.fill", title: "Made with love", subtitle: "Built for event organizers everywhere")
+                    aboutRow(icon: "shield.checkered", title: "Privacy First", subtitle: "Your data stays on your device")
+                    aboutRow(icon: "sparkles", title: "Glassmorphism Design", subtitle: "Modern, beautiful event management")
+                }
+                .padding()
+                .glassCard()
+
+                // Links
+                VStack(spacing: 1) {
+                    linkRow(icon: "doc.text", title: "Privacy Policy")
+                    linkRow(icon: "doc.plaintext", title: "Terms of Service")
+                    linkRow(icon: "star.fill", title: "Rate on App Store")
+                }
+                .glassCard(cornerRadius: CornerRadius.md)
+
+                Text("\u{00A9} 2026 Gather App. All rights reserved.")
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .padding(.top, Spacing.lg)
+            }
+            .padding()
+        }
+        .navigationTitle("About")
+    }
+
+    private func aboutRow(icon: String, title: String, subtitle: String) -> some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundStyle(Color.accentPurpleFallback)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(GatherFont.callout)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            Spacer()
+        }
+    }
+
+    private func linkRow(icon: String, title: String) -> some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundStyle(Color.accentPurpleFallback)
+                .frame(width: 30)
+            Text(title)
+                .font(GatherFont.callout)
+                .foregroundStyle(Color.gatherPrimaryText)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+        .padding(Spacing.sm)
     }
 }
 

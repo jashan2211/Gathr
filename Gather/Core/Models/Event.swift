@@ -29,6 +29,9 @@ final class Event {
     // Draft status
     var isDraft: Bool = false
 
+    // Demo/sample event flag
+    var isDemo: Bool = false
+
     // Store host ID for reference
     var hostId: UUID?
 
@@ -82,7 +85,8 @@ final class Event {
         category: EventCategory = .custom,
         enabledFeatures: Set<EventFeature>? = nil,
         hostId: UUID? = nil,
-        isDraft: Bool = false
+        isDraft: Bool = false,
+        isDemo: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -103,6 +107,7 @@ final class Event {
         self.enabledFeaturesRaw = (enabledFeatures ?? category.defaultFeatures).map { $0.rawValue }
         self.hostId = hostId
         self.isDraft = isDraft
+        self.isDemo = isDemo
         self.createdAt = Date()
         self.updatedAt = Date()
     }

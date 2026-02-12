@@ -518,11 +518,7 @@ struct TicketPurchaseSheet: View {
     }
 
     private func formatPrice(_ price: Decimal) -> String {
-        if price == 0 { return "Free" }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = Locale.current.currency?.identifier ?? "USD"
-        return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
+        GatherPriceFormatter.format(price)
     }
 
     private func applyPromoCode() {

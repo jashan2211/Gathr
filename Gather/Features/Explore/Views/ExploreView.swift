@@ -4,6 +4,8 @@ import SwiftData
 struct ExploreView: View {
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var searchText = ""
+    @State private var debouncedSearchText = ""
+    @State private var searchTask: Task<Void, Never>?
     @State private var selectedCategory: EventCategory?
     @State private var selectedEvent: Event?
     @State private var showCreateEvent = false
@@ -16,6 +18,7 @@ struct ExploreView: View {
     @State private var selectedCountry: String?
 
     var body: some View {
+        let result = filterResult
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
@@ -41,7 +44,7 @@ struct ExploreView: View {
                         .padding(.bottom, Spacing.lg)
 
                     // Featured Event
-                    if let featured = featuredEvent {
+                    if let featured = result.featuredEvent {
                         featuredCard(event: featured)
                             .padding(.horizontal)
                             .padding(.bottom, Spacing.lg)
@@ -49,19 +52,21 @@ struct ExploreView: View {
                     }
 
                     // Happening Soon
-                    if !happeningSoonEvents.isEmpty {
-                        happeningSoonSection
+                    if !result.happeningSoonEvents.isEmpty {
+                        happeningSoonSection(events: result.happeningSoonEvents)
                             .padding(.bottom, Spacing.lg)
                             .bouncyAppear(delay: 0.05)
                     }
 
                     // Events
-                    if filteredEvents.isEmpty {
+                    if result.filteredEvents.isEmpty {
                         emptyState
                             .padding(.horizontal)
+                            .transition(.opacity)
                     } else {
-                        eventsGrid
+                        eventsGrid(events: result.nonFeaturedGridEvents)
                             .padding(.horizontal)
+                            .animation(.easeInOut(duration: 0.2), value: result.filteredEvents.map(\.id))
                     }
 
                     // Create Event CTA
@@ -90,16 +95,27 @@ struct ExploreView: View {
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showFilterSheet) {
+                let cities = Array(Set(publicEvents.compactMap { $0.location?.city })).sorted()
+                let states = Array(Set(publicEvents.compactMap { $0.location?.state })).sorted()
+                let countries = Array(Set(publicEvents.compactMap { $0.location?.country })).sorted()
                 LocationFilterSheet(
-                    availableCities: availableCities,
-                    availableStates: availableStates,
-                    availableCountries: availableCountries,
+                    availableCities: cities,
+                    availableStates: states,
+                    availableCountries: countries,
                     selectedCity: $selectedCity,
                     selectedState: $selectedState,
                     selectedCountry: $selectedCountry
                 )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+            }
+            .onChange(of: searchText) { _, newValue in
+                searchTask?.cancel()
+                searchTask = Task {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run { debouncedSearchText = newValue }
+                }
             }
         }
     }
@@ -114,8 +130,9 @@ struct ExploreView: View {
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 Text("Explore")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .font(GatherFont.largeTitle)
                     .foregroundStyle(Color.gatherPrimaryText)
+                    .accessibilityAddTraits(.isHeader)
             }
 
             Spacer()
@@ -180,6 +197,8 @@ struct ExploreView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(Color.gatherSecondaryText)
                             .font(.body)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Clear search")
                 }
@@ -205,7 +224,7 @@ struct ExploreView: View {
 
             // Filter button
             Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                HapticService.tabSwitch()
                 showFilterSheet = true
             } label: {
                 ZStack(alignment: .topTrailing) {
@@ -301,23 +320,23 @@ struct ExploreView: View {
     }
 
     private func filterChip(label: String, icon: String, onRemove: @escaping () -> Void) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.caption2)
-            Text(label)
-                .font(GatherFont.caption)
-                .fontWeight(.medium)
-            Button(action: onRemove) {
+        Button(action: onRemove) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                Text(label)
+                    .font(GatherFont.caption)
+                    .fontWeight(.medium)
                 Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.caption2.weight(.bold))
             }
-            .accessibilityLabel("Remove \(label) filter")
+            .foregroundStyle(.white)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, 6)
+            .background(LinearGradient.gatherAccentGradient)
+            .clipShape(Capsule())
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, Spacing.sm)
-        .padding(.vertical, 6)
-        .background(LinearGradient.gatherAccentGradient)
-        .clipShape(Capsule())
+        .accessibilityLabel("Remove \(label) filter")
         .transition(.scale.combined(with: .opacity))
     }
 
@@ -333,14 +352,14 @@ struct ExploreView: View {
                     gradient: LinearGradient.gatherAccentGradient,
                     isSelected: selectedCategory == nil
                 ) {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    HapticService.tabSwitch()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         selectedCategory = nil
                     }
                 }
 
                 ForEach(EventCategory.allCases, id: \.self) { category in
-                    let count = publicEvents.filter { $0.category == category }.count
+                    let count = categoryCounts[category] ?? 0
                     ExploreCategoryChip(
                         title: category.displayName,
                         emoji: category.emoji,
@@ -348,7 +367,7 @@ struct ExploreView: View {
                         gradient: LinearGradient.categoryGradient(for: category),
                         isSelected: selectedCategory == category
                     ) {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        HapticService.tabSwitch()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             selectedCategory = category
                         }
@@ -402,6 +421,17 @@ struct ExploreView: View {
                         .background(.ultraThinMaterial.opacity(0.8))
                         .clipShape(Capsule())
 
+                        if event.isDemo {
+                            Text("SAMPLE")
+                                .font(.caption2)
+                                .fontWeight(.heavy)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.orange.opacity(0.85))
+                                .clipShape(Capsule())
+                        }
+
                         Spacer()
 
                         // Countdown
@@ -419,7 +449,8 @@ struct ExploreView: View {
 
                     // Event info
                     Text(event.title)
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(GatherFont.title2)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -464,11 +495,15 @@ struct ExploreView: View {
             .shadow(color: .black.opacity(0.15), radius: 12, y: 6)
         }
         .buttonStyle(CardPressStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Featured event: \(event.title). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double tap to view event details")
     }
 
     // MARK: - Happening Soon Section
 
-    private var happeningSoonSection: some View {
+    private func happeningSoonSection(events: [Event]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             // Section header
             HStack {
@@ -479,11 +514,12 @@ struct ExploreView: View {
                     Text("Happening Soon")
                         .font(GatherFont.title3)
                         .foregroundStyle(Color.gatherPrimaryText)
+                        .accessibilityAddTraits(.isHeader)
                 }
 
                 Spacer()
 
-                Text("\(happeningSoonEvents.count) events")
+                Text("\(events.count) events")
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
@@ -492,14 +528,15 @@ struct ExploreView: View {
             // Horizontal scroll
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.sm) {
-                    ForEach(Array(happeningSoonEvents.enumerated()), id: \.element.id) { index, event in
+                    ForEach(events, id: \.id) { event in
                         Button {
                             selectedEvent = event
                         } label: {
                             HappeningSoonCard(event: event)
-                                .bouncyAppear(delay: Double(index) * 0.05)
                         }
                         .buttonStyle(CardPressStyle())
+                        .accessibilityElement(children: .combine)
+                        .accessibilityHint("Double tap to view event details")
                     }
                 }
                 .padding(.horizontal)
@@ -509,17 +546,18 @@ struct ExploreView: View {
 
     // MARK: - Events Grid
 
-    private var eventsGrid: some View {
+    private func eventsGrid(events: [Event]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             // Section header
             HStack(alignment: .firstTextBaseline) {
                 Text(sectionTitle)
                     .font(GatherFont.title3)
                     .foregroundStyle(Color.gatherPrimaryText)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
-                Text("\(nonFeaturedGridEvents.count) events")
+                Text("\(events.count) events")
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
@@ -529,12 +567,11 @@ struct ExploreView: View {
                 GridItem(.flexible(), spacing: Spacing.sm),
                 GridItem(.flexible(), spacing: Spacing.sm)
             ], spacing: Spacing.sm) {
-                ForEach(Array(nonFeaturedGridEvents.enumerated()), id: \.element.id) { index, event in
+                ForEach(events, id: \.id) { event in
                     Button {
                         selectedEvent = event
                     } label: {
                         ExploreGridCard(event: event)
-                            .bouncyAppear(delay: Double(index) * 0.04)
                     }
                     .buttonStyle(CardPressStyle())
                 }
@@ -577,6 +614,9 @@ struct ExploreView: View {
             }
             .padding(Spacing.md)
             .glassCard()
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Host your own event. Create and share with friends.")
+            .accessibilityAddTraits(.isButton)
         }
     }
 
@@ -609,6 +649,7 @@ struct ExploreView: View {
                 Text("No Events Found")
                     .font(GatherFont.title3)
                     .foregroundStyle(Color.gatherPrimaryText)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text(emptyMessage)
                     .font(GatherFont.body)
@@ -648,15 +689,46 @@ struct ExploreView: View {
         allEvents.filter { $0.privacy == .publicEvent && $0.isUpcoming }
     }
 
-    private var filteredEvents: [Event] {
+    /// Pre-computed category counts to avoid redundant filtering per chip
+    private var categoryCounts: [EventCategory: Int] {
+        Dictionary(grouping: publicEvents, by: \.category).mapValues(\.count)
+    }
+
+    /// Single-pass computation of all filtered/derived event lists
+    private struct FilteredResult {
+        let filteredEvents: [Event]
+        let featuredEvent: Event?
+        let happeningSoonEvents: [Event]
+        let nonFeaturedGridEvents: [Event]
+    }
+
+    private func featuredScore(_ event: Event) -> Int {
+        var score = event.totalAttendingHeadcount * 3
+
+        // Hero media bonus
+        if event.heroMediaURL != nil { score += 5 }
+
+        // Urgency bonus: events within 7 days get +10
+        let daysUntilStart = Calendar.current.dateComponents([.day], from: Date(), to: event.startDate).day ?? 0
+        if daysUntilStart >= 0 && daysUntilStart < 7 { score += 10 }
+        if daysUntilStart > 30 { score -= 20 }
+
+        // Past events should never be featured
+        if daysUntilStart < 0 { return -1 }
+
+        return score
+    }
+
+    private var filterResult: FilteredResult {
+        // 1. Filter events
         var events = publicEvents
 
-        if !searchText.isEmpty {
+        if !debouncedSearchText.isEmpty {
             events = events.filter { event in
-                event.title.localizedCaseInsensitiveContains(searchText) ||
-                (event.eventDescription?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                (event.location?.name.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                (event.location?.city?.localizedCaseInsensitiveContains(searchText) ?? false)
+                event.title.localizedStandardContains(debouncedSearchText) ||
+                (event.eventDescription?.localizedStandardContains(debouncedSearchText) ?? false) ||
+                (event.location?.name.localizedStandardContains(debouncedSearchText) ?? false) ||
+                (event.location?.city?.localizedStandardContains(debouncedSearchText) ?? false)
             }
         }
 
@@ -676,29 +748,34 @@ struct ExploreView: View {
             events = events.filter { $0.location?.country == country }
         }
 
-        return events
-    }
+        // 2. Determine featured event
+        let featured: Event?
+        if let best = events.max(by: { featuredScore($0) < featuredScore($1) }),
+           featuredScore(best) > 0 {
+            featured = best
+        } else {
+            featured = nil
+        }
 
-    private var featuredEvent: Event? {
-        filteredEvents.max(by: { $0.totalAttendingHeadcount < $1.totalAttendingHeadcount })
-    }
+        // 3. Non-featured events
+        let nonFeatured = events.filter { $0.id != featured?.id }
 
-    private var nonFeaturedEvents: [Event] {
-        filteredEvents.filter { $0.id != featuredEvent?.id }
-    }
-
-    /// Events happening within 7 days (excluding featured)
-    private var happeningSoonEvents: [Event] {
+        // 4. Happening soon (within 7 days, excluding featured)
         let weekFromNow = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
-        return nonFeaturedEvents
+        let happeningSoon = nonFeatured
             .filter { $0.startDate <= weekFromNow }
             .sorted { $0.startDate < $1.startDate }
-    }
 
-    /// Events for the grid (excluding featured and happening-soon)
-    private var nonFeaturedGridEvents: [Event] {
-        let soonIds = Set(happeningSoonEvents.map { $0.id })
-        return nonFeaturedEvents.filter { !soonIds.contains($0.id) }
+        // 5. Grid events (excluding featured and happening-soon)
+        let soonIds = Set(happeningSoon.map { $0.id })
+        let gridEvents = nonFeatured.filter { !soonIds.contains($0.id) }
+
+        return FilteredResult(
+            filteredEvents: events,
+            featuredEvent: featured,
+            happeningSoonEvents: happeningSoon,
+            nonFeaturedGridEvents: gridEvents
+        )
     }
 
     private var hasLocationFilter: Bool {
@@ -732,19 +809,6 @@ struct ExploreView: View {
         return "Check back later or create your own event"
     }
 
-    // Available locations from public events
-    private var availableCities: [String] {
-        Array(Set(publicEvents.compactMap { $0.location?.city })).sorted()
-    }
-
-    private var availableStates: [String] {
-        Array(Set(publicEvents.compactMap { $0.location?.state })).sorted()
-    }
-
-    private var availableCountries: [String] {
-        Array(Set(publicEvents.compactMap { $0.location?.country })).sorted()
-    }
-
     private func featuredFormattedDate(_ date: Date) -> String {
         GatherDateFormatter.monthDay.string(from: date)
     }
@@ -776,14 +840,15 @@ struct ExploreCategoryChip: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Text(emoji)
-                    .font(.system(size: 14))
+                    .font(.footnote)
                 Text(title)
                     .font(GatherFont.caption)
                     .fontWeight(.semibold)
 
                 if count > 0 {
                     Text("\(count)")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.caption2)
+                        .fontWeight(.bold)
                         .foregroundStyle(isSelected ? .white.opacity(0.8) : Color.gatherSecondaryText)
                         .contentTransition(.numericText())
                         .padding(.horizontal, 5)

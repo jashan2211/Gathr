@@ -29,17 +29,21 @@ struct BudgetTab: View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
                 if let budget = eventBudget {
+                    // PERF-004: Compute expenses once and build category lookup
+                    let expenses = allExpenses(budget)
+                    let categoryLookup = buildCategoryLookup(budget)
+
                     // Overdue / Over-budget alerts
-                    alertBanners(budget)
+                    alertBanners(budget, expenses: expenses)
 
                     // Budget Summary
                     summaryCard(budget)
 
                     // Payment Breakdown (Paid / Owed / Overdue)
-                    paymentBreakdown(budget)
+                    paymentBreakdown(budget, expenses: expenses)
 
                     // Who Paid What
-                    whoPaidWhat(budget)
+                    whoPaidWhat(budget, expenses: expenses)
 
                     // Quick Actions
                     quickActions(budget)
@@ -50,13 +54,13 @@ struct BudgetTab: View {
                     }
 
                     // Upcoming Payments
-                    upcomingPayments(budget)
+                    upcomingPayments(budget, expenses: expenses, categoryLookup: categoryLookup)
 
                     // Categories
                     categoriesSection(budget)
 
                     // Vendors
-                    vendorSection(budget)
+                    vendorSection(budget, expenses: expenses)
 
                     // Co-Host Splits
                     if !budget.splits.isEmpty || isHost {
@@ -64,7 +68,7 @@ struct BudgetTab: View {
                     }
 
                     // All Transactions
-                    allTransactions(budget)
+                    allTransactions(budget, expenses: expenses, categoryLookup: categoryLookup)
                 } else {
                     emptyState
                 }
@@ -165,9 +169,9 @@ struct BudgetTab: View {
     // MARK: - Alert Banners
 
     @ViewBuilder
-    private func alertBanners(_ budget: Budget) -> some View {
+    private func alertBanners(_ budget: Budget, expenses: [Expense]) -> some View {
         let overBudgetCategories = filteredCategories(budget).filter { $0.isOverBudget }
-        let overdueExpenses = allExpenses(budget).filter { expense in
+        let overdueExpenses = expenses.filter { expense in
             !expense.isPaid && (expense.dueDate.map { $0 < Date() } ?? false)
         }
 
@@ -189,6 +193,9 @@ struct BudgetTab: View {
             .padding(Spacing.sm)
             .background(Color.red.gradient)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            // A11Y-019: Alert banner accessibility
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(overdueExpenses.count) overdue \(overdueExpenses.count == 1 ? "payment" : "payments"). \(overdueExpenses.reduce(0) { $0 + $1.amount }.asCurrency) needs attention")
         }
 
         if !overBudgetCategories.isEmpty {
@@ -204,17 +211,26 @@ struct BudgetTab: View {
             .padding(Spacing.sm)
             .background(Color.rsvpMaybeFallback.gradient)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            // A11Y-019: Alert banner accessibility
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(overBudgetCategories.count) \(overBudgetCategories.count == 1 ? "category" : "categories") over budget")
         }
     }
 
     // MARK: - Summary Card
 
     private func summaryCard(_ budget: Budget) -> some View {
-        VStack(spacing: Spacing.md) {
+        let spentAmount = filteredSpent(budget)
+        let percentUsed = Int(filteredPercentSpent(budget))
+        let remainingAmount = filteredRemaining(budget)
+
+        return VStack(spacing: Spacing.md) {
             HStack {
                 Text("Budget Overview")
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.gatherPrimaryText)
+                    // A11Y-007: Section header trait
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button {
                     showEditBudget = true
@@ -234,7 +250,7 @@ struct BudgetTab: View {
                         .font(.caption2)
                         .foregroundStyle(Color.gatherSecondaryText)
                     Text(budget.totalBudget.asCurrency)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(GatherFont.title)
                         .foregroundStyle(Color.gatherPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -246,8 +262,8 @@ struct BudgetTab: View {
                     Text("Spent")
                         .font(.caption2)
                         .foregroundStyle(Color.gatherSecondaryText)
-                    Text(filteredSpent(budget).asCurrency)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                    Text(spentAmount.asCurrency)
+                        .font(GatherFont.title)
                         .foregroundStyle(spentColor(budget))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -269,29 +285,31 @@ struct BudgetTab: View {
                 .frame(height: 12)
 
                 HStack {
-                    Text("\(Int(filteredPercentSpent(budget)))% used")
+                    Text("\(percentUsed)% used")
                         .font(.caption2)
                         .fontWeight(.medium)
                         .foregroundStyle(spentColor(budget))
 
                     Spacer()
 
-                    Text("\(filteredRemaining(budget).asCurrency) left")
+                    Text("\(remainingAmount.asCurrency) left")
                         .font(.caption2)
                         .fontWeight(.medium)
-                        .foregroundStyle(filteredRemaining(budget) >= 0 ? Color.rsvpYesFallback : Color.rsvpNoFallback)
+                        .foregroundStyle(remainingAmount >= 0 ? Color.rsvpYesFallback : Color.rsvpNoFallback)
                 }
             }
         }
         .padding()
         .glassCard()
+        // A11Y-009: Financial data grouping for budget summary
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Budget overview. Total budget \(budget.totalBudget.asCurrency). Spent \(spentAmount.asCurrency). \(percentUsed) percent used. \(remainingAmount.asCurrency) remaining.")
         .bouncyAppear()
     }
 
     // MARK: - Payment Breakdown
 
-    private func paymentBreakdown(_ budget: Budget) -> some View {
-        let expenses = allExpenses(budget)
+    private func paymentBreakdown(_ budget: Budget, expenses: [Expense]) -> some View {
         let totalAmount = expenses.reduce(0) { $0 + $1.amount }
         let paidAmount = expenses.filter { $0.isPaid }.reduce(0) { $0 + $1.amount }
         let pendingAmount = expenses.filter { !$0.isPaid }.reduce(0) { $0 + $1.amount }
@@ -349,7 +367,7 @@ struct BudgetTab: View {
                             .fill(Color.gatherTertiaryBackground)
                         RoundedRectangle(cornerRadius: 2)
                             .fill(color)
-                            .frame(width: max(0, geometry.size.width * (amount / total)))
+                            .frame(width: max(0, min(geometry.size.width, geometry.size.width * (amount / total))))
                     }
                 }
                 .frame(height: 4)
@@ -359,13 +377,15 @@ struct BudgetTab: View {
         .padding(.vertical, Spacing.sm)
         .padding(.horizontal, Spacing.xs)
         .glassCard()
+        // A11Y-009: Financial data grouping for payment stat cards
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label). \(amount.asCurrency)")
     }
 
     // MARK: - Who Paid What
 
     @ViewBuilder
-    private func whoPaidWhat(_ budget: Budget) -> some View {
-        let expenses = allExpenses(budget)
+    private func whoPaidWhat(_ budget: Budget, expenses: [Expense]) -> some View {
         let paidExpenses = expenses.filter { $0.paidByName != nil && !$0.paidByName!.isEmpty }
         let grouped = Dictionary(grouping: paidExpenses) { $0.paidByName! }
 
@@ -377,6 +397,8 @@ struct BudgetTab: View {
                     Text("Who Paid What")
                         .font(GatherFont.headline)
                         .foregroundStyle(Color.gatherPrimaryText)
+                        // A11Y-007: Section header trait
+                        .accessibilityAddTraits(.isHeader)
                     Spacer()
                 }
 
@@ -391,14 +413,14 @@ struct BudgetTab: View {
                             .fill(avatarColor(for: person))
                             .frame(width: 36, height: 36)
                             .overlay {
-                                Text(person.prefix(1).uppercased())
+                                Text(person.isEmpty ? "?" : person.prefix(1).uppercased())
                                     .font(GatherFont.caption)
                                     .fontWeight(.bold)
                                     .foregroundStyle(.white)
                             }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(person)
+                            Text(person.isEmpty ? "Unknown" : person)
                                 .font(GatherFont.callout)
                                 .fontWeight(.medium)
                                 .foregroundStyle(Color.gatherPrimaryText)
@@ -455,6 +477,8 @@ struct BudgetTab: View {
                     .background(LinearGradient.gatherAccentGradient)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
+                // A11Y-023: Add Expense button touch target
+                .frame(minHeight: 44)
 
                 Button {
                     showTeam = true
@@ -484,6 +508,8 @@ struct BudgetTab: View {
                 .fontWeight(.medium)
                 .foregroundStyle(Color.gatherSecondaryText)
             }
+            // A11Y-023: Add Category button touch target
+            .frame(minHeight: 44)
         }
     }
 
@@ -507,8 +533,8 @@ struct BudgetTab: View {
     // MARK: - Upcoming Payments
 
     @ViewBuilder
-    private func upcomingPayments(_ budget: Budget) -> some View {
-        let upcoming = allExpenses(budget)
+    private func upcomingPayments(_ budget: Budget, expenses: [Expense], categoryLookup: [UUID: String]) -> some View {
+        let upcoming = expenses
             .filter { !$0.isPaid && $0.dueDate != nil }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
 
@@ -520,6 +546,8 @@ struct BudgetTab: View {
                     Text("Upcoming Payments")
                         .font(GatherFont.headline)
                         .foregroundStyle(Color.gatherPrimaryText)
+                        // A11Y-007: Section header trait
+                        .accessibilityAddTraits(.isHeader)
                     Spacer()
                     Text("\(upcoming.count)")
                         .font(GatherFont.caption)
@@ -535,7 +563,7 @@ struct BudgetTab: View {
                     Button {
                         editingExpense = expense
                     } label: {
-                        upcomingPaymentRow(expense, budget: budget)
+                        upcomingPaymentRow(expense, budget: budget, categoryLookup: categoryLookup)
                     }
                 }
             }
@@ -545,19 +573,21 @@ struct BudgetTab: View {
         }
     }
 
-    private func upcomingPaymentRow(_ expense: Expense, budget: Budget) -> some View {
+    private func upcomingPaymentRow(_ expense: Expense, budget: Budget, categoryLookup: [UUID: String]) -> some View {
         let isOverdue = expense.dueDate.map { $0 < Date() } ?? false
-        let categoryName = findCategoryName(for: expense, in: budget)
+        let categoryName = categoryLookup[expense.id]
 
         return HStack(spacing: Spacing.sm) {
             // Due date indicator
             VStack(spacing: 2) {
                 if let dueDate = expense.dueDate {
                     Text(dueDate.formatted(.dateTime.month(.abbreviated)))
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.caption2)
+                        .fontWeight(.medium)
                         .foregroundStyle(isOverdue ? Color.rsvpNoFallback : Color.gatherSecondaryText)
                     Text(dueDate.formatted(.dateTime.day()))
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        // A11Y-005: Dynamic Type-compatible font
+                        .font(.system(.title3, design: .rounded, weight: .bold))
                         .foregroundStyle(isOverdue ? Color.rsvpNoFallback : Color.gatherPrimaryText)
                 }
             }
@@ -572,7 +602,8 @@ struct BudgetTab: View {
 
                     if isOverdue {
                         Text("OVERDUE")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2)
+                            .fontWeight(.bold)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
@@ -587,7 +618,7 @@ struct BudgetTab: View {
                     }
                     if let cat = categoryName {
                         if expense.vendorName != nil {
-                            Text("·")
+                            Text("\u{00B7}")
                         }
                         Text(cat)
                     }
@@ -623,6 +654,9 @@ struct BudgetTab: View {
                         .background(Color.rsvpYesFallback)
                         .clipShape(Capsule())
                 }
+                // A11Y-008: Pay button touch target
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
         }
         .padding(.vertical, Spacing.xxs)
@@ -635,6 +669,8 @@ struct BudgetTab: View {
             Text("Categories")
                 .font(GatherFont.headline)
                 .foregroundStyle(Color.gatherPrimaryText)
+                // A11Y-007: Section header trait
+                .accessibilityAddTraits(.isHeader)
 
             let categories = filteredCategories(budget).sorted { $0.sortOrder < $1.sortOrder }
 
@@ -654,11 +690,13 @@ struct BudgetTab: View {
     }
 
     private func categoryCard(_ category: BudgetCategory, budget: Budget) -> some View {
-        VStack(spacing: Spacing.sm) {
+        let isExpanded = expandedCategoryId == category.id
+
+        return VStack(spacing: Spacing.sm) {
             // Main row - tap to expand
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    expandedCategoryId = expandedCategoryId == category.id ? nil : category.id
+                    expandedCategoryId = isExpanded ? nil : category.id
                 }
             } label: {
                 HStack(spacing: Spacing.sm) {
@@ -711,11 +749,11 @@ struct BudgetTab: View {
 
                         if catOwed > 0 {
                             Text("\(catOwed.asCurrency) owed")
-                                .font(.system(size: 10))
+                                .font(.caption2)
                                 .foregroundStyle(Color.rsvpMaybeFallback)
                         } else if catPaid > 0 {
                             Text("All paid")
-                                .font(.system(size: 10))
+                                .font(.caption2)
                                 .foregroundStyle(Color.rsvpYesFallback)
                         }
                     }
@@ -723,9 +761,11 @@ struct BudgetTab: View {
                     Image(systemName: "chevron.right")
                         .font(.caption2)
                         .foregroundStyle(Color.gatherTertiaryText)
-                        .rotationEffect(.degrees(expandedCategoryId == category.id ? 90 : 0))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
             }
+            // A11Y-009: Category expand/collapse hint
+            .accessibilityHint(isExpanded ? "Double tap to collapse" : "Double tap to expand")
 
             // Progress bar
             if category.allocated > 0 {
@@ -743,7 +783,7 @@ struct BudgetTab: View {
             }
 
             // Expanded expenses
-            if expandedCategoryId == category.id {
+            if isExpanded {
                 VStack(spacing: 0) {
                     if category.expenses.isEmpty {
                         Text("No expenses yet")
@@ -775,6 +815,8 @@ struct BudgetTab: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Spacing.xs)
                     }
+                    // A11Y-023: Add Expense button touch target
+                    .frame(minHeight: 44)
                 }
                 .padding(.leading, Spacing.xl)
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -786,6 +828,7 @@ struct BudgetTab: View {
 
     private func expenseRow(_ expense: Expense) -> some View {
         let isOverdue = !expense.isPaid && (expense.dueDate.map { $0 < Date() } ?? false)
+        let statusText = expense.isPaid ? "Paid" : (isOverdue ? "Overdue" : "Unpaid")
 
         return HStack(spacing: Spacing.sm) {
             // Status icon
@@ -801,16 +844,16 @@ struct BudgetTab: View {
                 HStack(spacing: 4) {
                     if let paidBy = expense.paidByName, !paidBy.isEmpty {
                         Text(paidBy)
-                        Text("·")
+                        Text("\u{00B7}")
                     }
                     if let vendor = expense.vendorName {
                         Text(vendor)
                     }
                     if expense.isPaid, let paidDate = expense.paidDate {
-                        if expense.vendorName != nil || expense.paidByName != nil { Text("·") }
+                        if expense.vendorName != nil || expense.paidByName != nil { Text("\u{00B7}") }
                         Text("Paid \(paidDate.formatted(date: .abbreviated, time: .omitted))")
                     } else if let dueDate = expense.dueDate {
-                        if expense.vendorName != nil || expense.paidByName != nil { Text("·") }
+                        if expense.vendorName != nil || expense.paidByName != nil { Text("\u{00B7}") }
                         Text("Due \(dueDate.formatted(date: .abbreviated, time: .omitted))")
                     }
                 }
@@ -830,13 +873,15 @@ struct BudgetTab: View {
                 .foregroundStyle(Color.gatherTertiaryText)
         }
         .padding(.vertical, 6)
+        // A11Y-022: Expense row accessibility grouping
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(expense.name). \(expense.amount.asCurrency). \(statusText)")
     }
 
     // MARK: - Vendor Section
 
     @ViewBuilder
-    private func vendorSection(_ budget: Budget) -> some View {
-        let expenses = allExpenses(budget)
+    private func vendorSection(_ budget: Budget, expenses: [Expense]) -> some View {
         let vendorExpenses = Dictionary(grouping: expenses.filter { $0.vendorName != nil }) { $0.vendorName! }
 
         if !vendorExpenses.isEmpty {
@@ -844,6 +889,8 @@ struct BudgetTab: View {
                 Text("Vendors")
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.gatherPrimaryText)
+                    // A11Y-007: Section header trait
+                    .accessibilityAddTraits(.isHeader)
 
                 ForEach(vendorExpenses.keys.sorted(), id: \.self) { vendor in
                     let vExpenses = vendorExpenses[vendor] ?? []
@@ -856,14 +903,14 @@ struct BudgetTab: View {
                             .fill(avatarColor(for: vendor))
                             .frame(width: 36, height: 36)
                             .overlay {
-                                Text(vendor.prefix(1).uppercased())
+                                Text(vendor.isEmpty ? "?" : vendor.prefix(1).uppercased())
                                     .font(GatherFont.caption)
                                     .fontWeight(.bold)
                                     .foregroundStyle(.white)
                             }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(vendor)
+                            Text(vendor.isEmpty ? "Unknown" : vendor)
                                 .font(GatherFont.callout)
                                 .fontWeight(.medium)
                                 .foregroundStyle(Color.gatherPrimaryText)
@@ -874,12 +921,12 @@ struct BudgetTab: View {
                                         .fill(Color.gatherTertiaryBackground)
                                     RoundedRectangle(cornerRadius: 2)
                                         .fill(Color.rsvpYesFallback)
-                                        .frame(width: totalOwed > 0 ? geometry.size.width * (totalPaid / totalOwed) : 0)
+                                        .frame(width: totalOwed > 0 ? min(geometry.size.width, geometry.size.width * (totalPaid / totalOwed)) : 0)
                                 }
                             }
                             .frame(height: 4)
 
-                            Text("\(vExpenses.count) expense\(vExpenses.count == 1 ? "" : "s")\(unpaidCount > 0 ? " · \(unpaidCount) unpaid" : "")")
+                            Text("\(vExpenses.count) expense\(vExpenses.count == 1 ? "" : "s")\(unpaidCount > 0 ? " \u{00B7} \(unpaidCount) unpaid" : "")")
                                 .font(.caption2)
                                 .foregroundStyle(Color.gatherSecondaryText)
                         }
@@ -919,6 +966,8 @@ struct BudgetTab: View {
                 Text("Co-Host Splits")
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.gatherPrimaryText)
+                    // A11Y-007: Section header trait
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button {
                     showAddSplit = true
@@ -960,7 +1009,7 @@ struct BudgetTab: View {
                                         .fill(Color.gatherTertiaryBackground)
                                     RoundedRectangle(cornerRadius: 2)
                                         .fill(split.isPaidUp ? Color.rsvpYesFallback : Color.accentPurpleFallback)
-                                        .frame(width: split.shareAmount > 0 ? geometry.size.width * (split.paidAmount / split.shareAmount) : 0)
+                                        .frame(width: split.shareAmount > 0 ? min(geometry.size.width, geometry.size.width * (split.paidAmount / split.shareAmount)) : 0)
                                 }
                             }
                             .frame(height: 4)
@@ -995,15 +1044,15 @@ struct BudgetTab: View {
     // MARK: - All Transactions
 
     @ViewBuilder
-    private func allTransactions(_ budget: Budget) -> some View {
-        let expenses = allExpenses(budget)
-
+    private func allTransactions(_ budget: Budget, expenses: [Expense], categoryLookup: [UUID: String]) -> some View {
         if !expenses.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack {
                     Text("All Transactions")
                         .font(GatherFont.headline)
                         .foregroundStyle(Color.gatherPrimaryText)
+                        // A11Y-007: Section header trait
+                        .accessibilityAddTraits(.isHeader)
                     Spacer()
                     Text("\(expenses.count)")
                         .font(GatherFont.caption)
@@ -1027,11 +1076,11 @@ struct BudgetTab: View {
                                     if let vendor = expense.vendorName {
                                         Text(vendor)
                                     }
-                                    if let cat = findCategoryName(for: expense, in: budget) {
-                                        if expense.vendorName != nil { Text("·") }
+                                    if let cat = categoryLookup[expense.id] {
+                                        if expense.vendorName != nil { Text("\u{00B7}") }
                                         Text(cat)
                                     }
-                                    Text("·")
+                                    Text("\u{00B7}")
                                     Text(expense.createdAt.formatted(date: .abbreviated, time: .omitted))
                                 }
                                 .font(.caption2)
@@ -1072,12 +1121,22 @@ struct BudgetTab: View {
         modelContext.insert(newBudget)
         modelContext.safeSave()
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
     }
 
     private func allExpenses(_ budget: Budget) -> [Expense] {
         budget.categories.flatMap { $0.expenses }.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    // PERF-004: O(1) category name lookup replacing O(n*m) findCategoryName
+    private func buildCategoryLookup(_ budget: Budget) -> [UUID: String] {
+        var lookup: [UUID: String] = [:]
+        for category in budget.categories {
+            for expense in category.expenses {
+                lookup[expense.id] = category.name
+            }
+        }
+        return lookup
     }
 
     private func filteredCategories(_ budget: Budget) -> [BudgetCategory] {
@@ -1156,19 +1215,20 @@ struct BudgetTab: View {
     private func markAsPaid(_ expense: Expense, in budget: Budget) {
         expense.isPaid = true
         expense.paidDate = Date()
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        modelContext.safeSave()
+        HapticService.success()
     }
 
     private func deleteExpense(_ expense: Expense) {
         guard let budget = eventBudget else { return }
         for category in budget.categories {
             if let index = category.expenses.firstIndex(where: { $0.id == expense.id }) {
-                category.spent -= expense.amount
+                category.spent = max(0, category.spent - expense.amount)
                 category.expenses.remove(at: index)
                 break
             }
         }
+        modelContext.safeSave()
     }
 
     private func dueDateLabel(_ date: Date) -> String {

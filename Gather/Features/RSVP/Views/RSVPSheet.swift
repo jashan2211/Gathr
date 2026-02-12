@@ -11,6 +11,8 @@ struct RSVPSheet: View {
     @State private var step: Step = .status
     @State private var isSubmitting = false
     @State private var isEditingExisting = false
+    @State private var calendarMessage: String?
+    @State private var isAddingToCalendar = false
 
     enum Step {
         case status
@@ -193,19 +195,26 @@ struct RSVPSheet: View {
             // Add to calendar prompt
             if selectedStatus == .attending {
                 Button {
-                    // Add to calendar
+                    addToCalendar()
                 } label: {
                     HStack {
-                        Image(systemName: "calendar.badge.plus")
-                        Text("Add to Calendar")
+                        if isAddingToCalendar {
+                            ProgressView()
+                                .tint(Color.accentPurpleFallback)
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: calendarMessage != nil ? "checkmark.circle.fill" : "calendar.badge.plus")
+                        }
+                        Text(calendarMessage ?? "Add to Calendar")
                     }
                     .font(GatherFont.headline)
-                    .foregroundStyle(Color.accentPurpleFallback)
+                    .foregroundStyle(calendarMessage != nil ? Color.rsvpYesFallback : Color.accentPurpleFallback)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color.accentPurpleFallback.opacity(0.1))
+                    .background((calendarMessage != nil ? Color.rsvpYesFallback : Color.accentPurpleFallback).opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
+                .disabled(isAddingToCalendar || calendarMessage != nil)
                 .accessibilityLabel("Add to Calendar")
                 .accessibilityHint("Adds this event to your device calendar")
             }
@@ -221,13 +230,13 @@ struct RSVPSheet: View {
                 Button {
                     withAnimation {
                         if selectedStatus == .declined {
-                            step = .details // Skip to details for decline
+                            submitRSVP() // Skip details for decline
                         } else {
                             step = .details
                         }
                     }
                 } label: {
-                    Text("Continue")
+                    Text(selectedStatus == .declined ? "Submit" : "Continue")
                         .font(GatherFont.headline)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -235,6 +244,7 @@ struct RSVPSheet: View {
                         .background(LinearGradient.gatherAccentGradient)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
+                .disabled(isSubmitting)
 
             case .details:
                 HStack(spacing: Spacing.md) {
@@ -336,6 +346,22 @@ struct RSVPSheet: View {
         }
     }
 
+    private func addToCalendar() {
+        isAddingToCalendar = true
+        Task {
+            let result = await CalendarService.shared.addEventToCalendar(event: event)
+            isAddingToCalendar = false
+            withAnimation {
+                calendarMessage = result
+            }
+            if result.contains("added") {
+                HapticService.success()
+            } else {
+                HapticService.warning()
+            }
+        }
+    }
+
     private func submitRSVP() {
         isSubmitting = true
 
@@ -384,8 +410,7 @@ struct RSVPSheet: View {
         // Haptic success feedback
         Task {
             try? await Task.sleep(for: .seconds(0.5))
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
+            HapticService.success()
 
             withAnimation(.spring(response: 0.4)) {
                 step = .confirmation
@@ -404,8 +429,7 @@ struct RSVPSheet: View {
     }
 
     private func hapticFeedback() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        HapticService.buttonTap()
     }
 }
 

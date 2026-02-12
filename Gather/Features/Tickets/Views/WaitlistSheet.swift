@@ -328,8 +328,7 @@ struct WaitlistSheet: View {
 
         Task {
             try? await Task.sleep(for: .seconds(0.5))
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
+            HapticService.success()
 
             withAnimation {
                 isSubmitting = false

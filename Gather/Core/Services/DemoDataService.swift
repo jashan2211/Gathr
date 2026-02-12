@@ -50,6 +50,14 @@ class DemoDataService {
         modelContext.insert(vinylMarket)
         modelContext.insert(hackathon)
 
+        // Mark all events as demo/sample
+        let allDemoEvents = [birthday, gameNight, friendsgiving, roadTrip,
+                             engagement, demoDay, bonfire,
+                             artWalk, foodFest, openMic, yogaFest, vinylMarket, hackathon]
+        for event in allDemoEvents {
+            event.isDemo = true
+        }
+
         // Add activity posts to hosted events
         addActivityPosts(to: birthday, hostId: hostId, modelContext: modelContext)
         addActivityPosts(to: friendsgiving, hostId: hostId, modelContext: modelContext)

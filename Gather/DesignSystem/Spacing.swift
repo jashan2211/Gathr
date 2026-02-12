@@ -26,6 +26,14 @@ enum Spacing {
 
     /// 64pt - Hero spacing
     static let xxxl: CGFloat = 64
+
+    /// Responsive spacing that scales for iPad (regular width)
+    static func responsive(_ base: CGFloat, for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        switch sizeClass {
+        case .regular: return base * 1.25
+        default: return base
+        }
+    }
 }
 
 // MARK: - Corner Radius
@@ -151,6 +159,19 @@ enum Layout {
     /// 300pt - Event detail hero
     static let heroHeightDetail: CGFloat = 300
 
+    /// Adaptive hero heights based on size class
+    static func heroHeight(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        sizeClass == .regular ? 280 : 200
+    }
+
+    static func heroHeightFeatured(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        sizeClass == .regular ? 320 : 240
+    }
+
+    static func heroHeightDetail(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        sizeClass == .regular ? 400 : 300
+    }
+
     // MARK: Photo Displays
 
     /// 150pt - Photo display height
@@ -208,37 +229,61 @@ extension View {
 struct GlassCardModifier: ViewModifier {
     var tint: Color = .clear
     var cornerRadius: CGFloat = CornerRadius.card
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content
             .background(.ultraThinMaterial)
             .background(
                 LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.15),
-                        Color.white.opacity(0.05)
-                    ],
+                    colors: colorScheme == .dark
+                        ? [Color.white.opacity(0.06), Color.white.opacity(0.02)]
+                        : [Color.white.opacity(0.15), Color.white.opacity(0.05)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
-            .background(tint.opacity(0.08))
+            .background(tint.opacity(colorScheme == .dark ? 0.12 : 0.08))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(
                         LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.3),
-                                Color.white.opacity(0.1)
-                            ],
+                            colors: colorScheme == .dark
+                                ? [Color.white.opacity(0.15), Color.white.opacity(0.05)]
+                                : [Color.white.opacity(0.3), Color.white.opacity(0.1)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
                         lineWidth: 0.5
                     )
             )
-            .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 12, y: 4)
+    }
+}
+
+// MARK: - Lightweight Glass Card (for scroll performance in lists)
+
+struct GlassCardLiteModifier: ViewModifier {
+    var cornerRadius: CGFloat = CornerRadius.card
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .background(colorScheme == .dark
+                ? Color.gatherSecondaryBackground.opacity(0.6)
+                : Color.gatherSecondaryBackground.opacity(0.4)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        colorScheme == .dark
+                            ? Color.white.opacity(0.08)
+                            : Color.white.opacity(0.15),
+                        lineWidth: 0.5
+                    )
+            )
     }
 }
 
@@ -246,6 +291,11 @@ extension View {
     /// Apply glassmorphic card style
     func glassCard(tint: Color = .clear, cornerRadius: CGFloat = CornerRadius.card) -> some View {
         modifier(GlassCardModifier(tint: tint, cornerRadius: cornerRadius))
+    }
+
+    /// Lightweight glass card — no material blur, better scroll performance
+    func glassCardLite(cornerRadius: CGFloat = CornerRadius.card) -> some View {
+        modifier(GlassCardLiteModifier(cornerRadius: cornerRadius))
     }
 }
 
@@ -314,12 +364,18 @@ extension View {
 struct BouncyAppearModifier: ViewModifier {
     let delay: Double
     @State private var isVisible = false
+    @State private var hasAppeared = false
 
     func body(content: Content) -> some View {
         content
             .scaleEffect(isVisible ? 1 : 0.8)
             .opacity(isVisible ? 1 : 0)
             .onAppear {
+                guard !hasAppeared else {
+                    isVisible = true  // instant show on navigation return
+                    return
+                }
+                hasAppeared = true
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.6).delay(delay)) {
                     isVisible = true
                 }
@@ -372,27 +428,40 @@ struct CardPressStyle: ButtonStyle {
 
 struct ConfettiView: View {
     @State private var particles: [ConfettiParticle] = []
-    @State private var isAnimating = false
+    @State private var startTime: Date?
     let colors: [Color] = [.warmCoral, .sunshineYellow, .mintGreen, .neonBlue, .neonPink, .accentPurpleFallback]
 
     var body: some View {
-        Canvas { context, size in
-            for particle in particles {
-                let rect = CGRect(
-                    x: particle.x - particle.size / 2,
-                    y: particle.y - particle.size / 2,
-                    width: particle.size,
-                    height: particle.size * 0.6
-                )
-                let path = Path(ellipseIn: rect)
-                context.fill(path, with: .color(particle.color.opacity(particle.opacity)))
+        TimelineView(.animation) { timeline in
+            let elapsed = startTime.map { timeline.date.timeIntervalSince($0) } ?? 0
+            Canvas { context, size in
+                for particle in particles {
+                    let pos = particlePosition(particle, elapsed: elapsed)
+                    guard pos.opacity > 0 else { continue }
+                    let rect = CGRect(
+                        x: pos.x - particle.size / 2,
+                        y: pos.y - particle.size / 2,
+                        width: particle.size,
+                        height: particle.size * 0.6
+                    )
+                    context.fill(Path(ellipseIn: rect), with: .color(particle.color.opacity(pos.opacity)))
+                }
             }
         }
         .allowsHitTesting(false)
         .onAppear {
             spawnParticles()
-            animateParticles()
+            startTime = Date()
         }
+    }
+
+    private func particlePosition(_ p: ConfettiParticle, elapsed: Double) -> (x: CGFloat, y: CGFloat, opacity: Double) {
+        let frames = elapsed * 60
+        let x = p.x + p.velocityX * frames
+        let gravity: CGFloat = 0.15
+        let y = p.y + p.velocityY * frames + 0.5 * gravity * frames * frames
+        let opacity = y > 800 ? max(0, p.opacity - Double((y - 800) * 0.002)) : p.opacity
+        return (x, y, opacity)
     }
 
     private func spawnParticles() {
@@ -407,26 +476,6 @@ struct ConfettiView: View {
                 opacity: 1.0,
                 rotation: Double.random(in: 0...360)
             )
-        }
-    }
-
-    private func animateParticles() {
-        Timer.scheduledTimer(withTimeInterval: 1/60, repeats: true) { timer in
-            var allDone = true
-            for i in particles.indices {
-                particles[i].y += particles[i].velocityY
-                particles[i].x += particles[i].velocityX
-                particles[i].velocityY += 0.15 // gravity
-                particles[i].velocityX *= 0.99 // air resistance
-                particles[i].rotation += Double.random(in: -5...5)
-
-                if particles[i].y > 800 {
-                    particles[i].opacity = max(0, particles[i].opacity - 0.05)
-                }
-
-                if particles[i].opacity > 0 { allDone = false }
-            }
-            if allDone { timer.invalidate() }
         }
     }
 }
@@ -575,6 +624,7 @@ extension View {
 struct CategoryMeshBackground: View {
     let category: EventCategory
     @State private var animationPhase: CGFloat = 0
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         if #available(iOS 18.0, *) {
@@ -615,14 +665,27 @@ struct CategoryMeshBackground: View {
         )
     }
 
+    /// Neutral fill that adapts to color scheme — avoids white patches in dark mode
+    private var neutralFill: Color {
+        colorScheme == .dark ? Color(white: 0.15) : .white.opacity(0.9)
+    }
+
+    private var neutralFillMid: Color {
+        colorScheme == .dark ? Color(white: 0.12) : .white.opacity(0.8)
+    }
+
+    private var neutralFillLight: Color {
+        colorScheme == .dark ? Color(white: 0.1) : .white.opacity(0.7)
+    }
+
     @available(iOS 18.0, *)
     private func meshColors(for category: EventCategory) -> [Color] {
         switch category {
         case .wedding:
             return [
-                .accentPinkFallback, .softLavender, .white.opacity(0.9),
+                .accentPinkFallback, .softLavender, neutralFill,
                 .softLavender.opacity(0.8), .accentPinkFallback.opacity(0.6), .softLavender,
-                .white.opacity(0.9), .accentPinkFallback.opacity(0.4), .softLavender.opacity(0.7)
+                neutralFill, .accentPinkFallback.opacity(0.4), .softLavender.opacity(0.7)
             ]
         case .party:
             return [
@@ -638,27 +701,27 @@ struct CategoryMeshBackground: View {
             ]
         case .conference:
             return [
-                Color(red: 0.35, green: 0.55, blue: 1.0), .sunshineYellow.opacity(0.6), .white.opacity(0.8),
+                Color(red: 0.35, green: 0.55, blue: 1.0), .sunshineYellow.opacity(0.6), neutralFillMid,
                 .sunshineYellow.opacity(0.4), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.5), .sunshineYellow,
-                .white.opacity(0.7), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.3), .sunshineYellow.opacity(0.5)
+                neutralFillLight, Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.3), .sunshineYellow.opacity(0.5)
             ]
         case .meetup:
             return [
-                .mintGreen, .neonBlue.opacity(0.4), .white.opacity(0.9),
-                .neonBlue.opacity(0.3), .mintGreen.opacity(0.6), .white.opacity(0.8),
-                .white.opacity(0.9), .mintGreen.opacity(0.4), .neonBlue.opacity(0.3)
+                .mintGreen, .neonBlue.opacity(0.4), neutralFill,
+                .neonBlue.opacity(0.3), .mintGreen.opacity(0.6), neutralFillMid,
+                neutralFill, .mintGreen.opacity(0.4), .neonBlue.opacity(0.3)
             ]
         case .office:
             return [
-                Color(red: 0.35, green: 0.55, blue: 1.0), .softLavender.opacity(0.5), .white.opacity(0.9),
-                .softLavender.opacity(0.4), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.3), .white.opacity(0.8),
-                .white.opacity(0.9), .softLavender.opacity(0.3), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.2)
+                Color(red: 0.35, green: 0.55, blue: 1.0), .softLavender.opacity(0.5), neutralFill,
+                .softLavender.opacity(0.4), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.3), neutralFillMid,
+                neutralFill, .softLavender.opacity(0.3), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.2)
             ]
         case .custom:
             return [
-                .accentPurpleFallback.opacity(0.5), .gatherSecondaryBackground, .white.opacity(0.8),
+                .accentPurpleFallback.opacity(0.5), .gatherSecondaryBackground, neutralFillMid,
                 .gatherSecondaryBackground, .accentPurpleFallback.opacity(0.3), .gatherSecondaryBackground,
-                .white.opacity(0.7), .gatherSecondaryBackground, .accentPurpleFallback.opacity(0.2)
+                neutralFillLight, .gatherSecondaryBackground, .accentPurpleFallback.opacity(0.2)
             ]
         }
     }

@@ -93,7 +93,8 @@ struct GuestDetailSheet: View {
                     .frame(width: 72, height: 72)
                     .overlay {
                         Text(name.prefix(1).uppercased())
-                            .font(.system(size: 28, weight: .semibold))
+                            .font(.title)
+                            .fontWeight(.semibold)
                             .foregroundStyle(.white)
                     }
             }

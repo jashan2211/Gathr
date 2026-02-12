@@ -12,8 +12,7 @@ struct InviteQuickActionPill: View {
     var body: some View {
         Button(action: {
             action()
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
+            HapticService.buttonTap()
         }) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
@@ -96,7 +95,8 @@ struct GuestChip: View {
                     .frame(width: 18, height: 18)
                     .overlay {
                         Text(String(guest.name.prefix(1)).uppercased())
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2)
+                            .fontWeight(.bold)
                             .foregroundStyle(isSelected ? .white : Color.gatherSecondaryText)
                     }
 

@@ -106,7 +106,7 @@ final class BudgetCategory {
     }
 
     var isOverBudget: Bool {
-        spent > allocated
+        allocated > 0 && spent > allocated
     }
 }
 

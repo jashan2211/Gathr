@@ -10,9 +10,13 @@ struct PhotosTab: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var photos: [MediaItem]
 
-    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var selectedItem: MediaItem?
     @State private var showPhotoViewer = false
+    @State private var isLoadingPhoto = false
+    @State private var loadingProgress = ""
+    @State private var showPhotoError = false
+    @State private var photoErrorMessage = ""
 
     init(event: Event) {
         self.event = event
@@ -74,12 +78,78 @@ struct PhotosTab: View {
                 )
             }
         }
-        .onChange(of: selectedPhoto) { _, newValue in
+        .onChange(of: selectedPhotos) { _, newItems in
+            guard !newItems.isEmpty else { return }
+            isLoadingPhoto = true
+            let total = newItems.count
+            loadingProgress = "Processing 1/\(total) photos..."
             Task {
-                if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                    addPhoto(imageData: data)
-                    selectedPhoto = nil
+                defer {
+                    Task { @MainActor in
+                        isLoadingPhoto = false
+                        selectedPhotos = []
+                    }
                 }
+                var failedCount = 0
+                for (index, item) in newItems.enumerated() {
+                    await MainActor.run {
+                        loadingProgress = "Processing \(index + 1)/\(total) photos..."
+                    }
+                    do {
+                        guard let data = try await item.loadTransferable(type: Data.self) else {
+                            failedCount += 1
+                            continue
+                        }
+                        let compressed = await Task.detached {
+                            guard let uiImage = UIImage(data: data) else { return nil as Data? }
+                            let maxDimension: CGFloat = 2048
+                            let scale = min(maxDimension / max(uiImage.size.width, uiImage.size.height), 1.0)
+                            let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
+                            let renderer = UIGraphicsImageRenderer(size: newSize)
+                            let resized = renderer.image { _ in
+                                uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                            }
+                            return resized.jpegData(compressionQuality: 0.7)
+                        }.value
+
+                        if let compressed {
+                            await MainActor.run {
+                                addPhoto(imageData: compressed)
+                            }
+                        } else {
+                            failedCount += 1
+                        }
+                    } catch {
+                        failedCount += 1
+                    }
+                }
+                if failedCount > 0 {
+                    await MainActor.run {
+                        photoErrorMessage = "\(failedCount) of \(total) photos could not be processed."
+                        showPhotoError = true
+                    }
+                }
+            }
+        }
+        .alert("Photo Error", isPresented: $showPhotoError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(photoErrorMessage)
+        }
+        .overlay {
+            if isLoadingPhoto {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .overlay {
+                        VStack(spacing: Spacing.sm) {
+                            ProgressView()
+                            Text(loadingProgress)
+                                .font(GatherFont.callout)
+                        }
+                        .padding(Spacing.lg)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    }
             }
         }
     }
@@ -87,7 +157,7 @@ struct PhotosTab: View {
     // MARK: - Upload Bar
 
     private var uploadBar: some View {
-        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+        PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 20, matching: .images) {
             HStack(spacing: Spacing.sm) {
                 Image(systemName: "photo.badge.plus")
                     .font(.title3)
@@ -99,7 +169,7 @@ struct PhotosTab: View {
                         .fontWeight(.medium)
                         .foregroundStyle(Color.gatherPrimaryText)
 
-                    Text("Share your event memories")
+                    Text("Select up to 20 photos at once")
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
@@ -124,29 +194,50 @@ struct PhotosTab: View {
             selectedItem = item
             showPhotoViewer = true
         } label: {
-            Group {
-                if let imageData = item.imageData, let uiImage = UIImage(data: imageData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else if let url = item.url {
-                    AsyncImage(url: url) { image in
-                        image
+            ZStack(alignment: .bottom) {
+                Group {
+                    if let imageData = item.imageData, let uiImage = UIImage(data: imageData) {
+                        Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                    } placeholder: {
+                    } else if let url = item.url {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Color.gatherSecondaryBackground
+                        }
+                    } else {
                         Color.gatherSecondaryBackground
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .foregroundStyle(Color.gatherSecondaryText)
+                            )
                     }
-                } else {
-                    Color.gatherSecondaryBackground
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .frame(minHeight: 120)
+                .clipped()
+
+                // Caption overlay
+                if let caption = item.caption, !caption.isEmpty {
+                    Text(caption)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            LinearGradient(
+                                colors: [.clear, .black.opacity(0.6)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
                 }
             }
-            .frame(minHeight: 120)
-            .clipped()
         }
     }
 
@@ -182,8 +273,7 @@ struct PhotosTab: View {
         modelContext.insert(item)
         modelContext.safeSave()
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
     }
 
     private func deletePhoto(_ item: MediaItem) {
@@ -203,8 +293,11 @@ struct PhotoViewerView: View {
     let onDelete: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @State private var currentIndex: Int = 0
     @State private var showInfo = false
+    @State private var showDeleteConfirmation = false
+    @State private var editingCaption = ""
 
     var body: some View {
         NavigationStack {
@@ -241,7 +334,7 @@ struct PhotoViewerView: View {
 
                         if isHost {
                             Button(role: .destructive) {
-                                onDelete()
+                                showDeleteConfirmation = true
                             } label: {
                                 Image(systemName: "trash")
                                     .foregroundStyle(.red.opacity(0.8))
@@ -253,6 +346,14 @@ struct PhotoViewerView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .sheet(isPresented: $showInfo) {
                 photoInfoSheet
+            }
+            .confirmationDialog("Delete Photo?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) {
+                    onDelete()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This photo will be permanently removed.")
             }
         }
         .onAppear {
@@ -280,10 +381,14 @@ struct PhotoViewerView: View {
         }
     }
 
+    private var currentPhoto: MediaItem {
+        currentIndex < allPhotos.count ? allPhotos[currentIndex] : mediaItem
+    }
+
     private var photoInfoSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: Spacing.md) {
-                let photo = currentIndex < allPhotos.count ? allPhotos[currentIndex] : mediaItem
+                let photo = currentPhoto
 
                 HStack {
                     Circle()
@@ -304,9 +409,18 @@ struct PhotoViewerView: View {
                     }
                 }
 
-                if let caption = photo.caption, !caption.isEmpty {
-                    Text(caption)
+                // Editable caption
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text("Caption")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+
+                    TextField("Add a caption...", text: $editingCaption, axis: .vertical)
                         .font(GatherFont.body)
+                        .lineLimit(3)
+                        .padding(Spacing.sm)
+                        .background(Color.gatherSecondaryBackground.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                 }
 
                 Spacer()
@@ -316,10 +430,23 @@ struct PhotoViewerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { showInfo = false }
+                    Button("Done") {
+                        saveCaption()
+                        showInfo = false
+                    }
                 }
+            }
+            .onAppear {
+                editingCaption = currentPhoto.caption ?? ""
             }
         }
         .presentationDetents([.medium])
+    }
+
+    private func saveCaption() {
+        let photo = currentPhoto
+        let trimmed = editingCaption.trimmingCharacters(in: .whitespacesAndNewlines)
+        photo.caption = trimmed.isEmpty ? nil : trimmed
+        modelContext.safeSave()
     }
 }

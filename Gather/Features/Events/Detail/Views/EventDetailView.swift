@@ -93,37 +93,56 @@ struct EventDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button {
-                        showShareSheet = true
-                    } label: {
-                        Label("Share Event", systemImage: "square.and.arrow.up")
-                    }
-
-                    if isHost {
+            if isHost {
+                ToolbarItem(placement: .primaryAction) {
+                    HStack(spacing: Spacing.xs) {
                         Button {
                             showEditSheet = true
                         } label: {
-                            Label("Edit Event", systemImage: "pencil")
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.title3)
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(Color.accentPurpleFallback)
                         }
+                        .accessibilityLabel("Edit Event")
 
-                        Button {
-                            showAddGuest = true
-                        } label: {
-                            Label("Add Guest", systemImage: "person.badge.plus")
-                        }
+                        Menu {
+                            Button {
+                                showShareSheet = true
+                            } label: {
+                                Label("Share Event", systemImage: "square.and.arrow.up")
+                            }
 
-                        Button {
-                            showSeatingChart = true
+                            Button {
+                                showAddGuest = true
+                            } label: {
+                                Label("Add Guest", systemImage: "person.badge.plus")
+                            }
+
+                            Button {
+                                showSeatingChart = true
+                            } label: {
+                                Label("Seating Chart", systemImage: "tablecells")
+                            }
                         } label: {
-                            Label("Seating Chart", systemImage: "tablecells")
+                            Image(systemName: "ellipsis.circle")
                         }
+                        .accessibilityLabel("More options")
                     }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
-                .accessibilityLabel("More options")
+            } else {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            showShareSheet = true
+                        } label: {
+                            Label("Share Event", systemImage: "square.and.arrow.up")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .accessibilityLabel("More options")
+                }
             }
         }
         .sheet(isPresented: $showRSVPSheet) {
@@ -309,8 +328,7 @@ struct EventDetailView: View {
         HStack(spacing: 0) {
             ForEach(visibleTabs, id: \.self) { tab in
                 Button {
-                    let impact = UIImpactFeedbackGenerator(style: .light)
-                    impact.impactOccurred()
+                    HapticService.tabSwitch()
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                         selectedTab = tab
                     }
@@ -332,7 +350,8 @@ struct EventDetailView: View {
                         }
 
                         Text(tab.rawValue)
-                            .font(.system(size: 9, weight: selectedTab == tab ? .bold : .medium))
+                            .font(.caption2)
+                            .fontWeight(selectedTab == tab ? .bold : .medium)
                             .foregroundStyle(selectedTab == tab ? Color.accentPurpleFallback : Color.gatherSecondaryText)
                     }
                     .frame(maxWidth: .infinity)
@@ -391,19 +410,26 @@ struct EventDetailView: View {
     // MARK: - RSVP Button Bar
 
     private var shouldShowRSVPButton: Bool {
-        // Show RSVP bar when:
-        // 1. On overview tab
-        // 2. Not the host
-        // 3. No functions (function-based events handle RSVP per function)
-        // 4. OR event has ticketing enabled
-        selectedTab == .overview && !isHost && (event.functions.isEmpty || event.hasTicketing)
+        guard !isHost else { return false }
+        // Full bar on overview for new RSVPs or ticketed events
+        if selectedTab == .overview && (event.functions.isEmpty || event.hasTicketing) {
+            return true
+        }
+        // Compact pill on other tabs if user already RSVPed
+        if selectedTab != .overview && currentUserGuest != nil {
+            return true
+        }
+        return false
     }
 
     private var rsvpButtonBar: some View {
         VStack(spacing: 0) {
             Divider()
 
-            if let guest = currentUserGuest {
+            if selectedTab != .overview, let guest = currentUserGuest {
+                // Compact pill on non-overview tabs
+                compactRSVPPill(guest: guest)
+            } else if let guest = currentUserGuest {
                 // User has already RSVPed - show status with manage button
                 attendingStatusBar(guest: guest)
             } else if event.hasTicketing && !event.ticketTiers.isEmpty {
@@ -414,6 +440,31 @@ struct EventDetailView: View {
                 standardRSVPBar
             }
         }
+    }
+
+    // Compact RSVP pill for non-overview tabs
+    private func compactRSVPPill(guest: Guest) -> some View {
+        Button {
+            showManageRSVPSheet = true
+        } label: {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: guest.status.icon)
+                    .font(.caption)
+                Text(guest.status.displayName)
+                    .font(GatherFont.caption)
+                    .fontWeight(.semibold)
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundStyle(Color.forRSVPStatus(guest.status))
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.xs)
+            .background(Color.forRSVPStatus(guest.status).opacity(0.12))
+            .clipShape(Capsule())
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.xs)
+        .background(.ultraThinMaterial)
     }
 
     // Attending status bar for users who have already RSVPed
@@ -472,7 +523,14 @@ struct EventDetailView: View {
         HStack {
             // Price info
             VStack(alignment: .leading, spacing: 2) {
-                if isSoldOut {
+                if salesNotStarted, let saleDate = earliestSalesDate {
+                    Text("On sale \(GatherDateFormatter.monthDayTime.string(from: saleDate))")
+                        .font(GatherFont.headline)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                    Text("Tickets coming soon")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                } else if isSoldOut {
                     Text("Sold Out")
                         .font(GatherFont.headline)
                         .foregroundStyle(Color.rsvpNoFallback)
@@ -496,7 +554,18 @@ struct EventDetailView: View {
 
             Spacer()
 
-            if isSoldOut {
+            if salesNotStarted {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "clock.fill")
+                    Text("Not Yet Available")
+                }
+                .font(GatherFont.headline)
+                .foregroundStyle(.white.opacity(0.6))
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.sm)
+                .background(Color.gatherSecondaryText.opacity(0.4))
+                .clipShape(Capsule())
+            } else if isSoldOut {
                 Button {
                     showWaitlist = true
                 } label: {
@@ -530,6 +599,23 @@ struct EventDetailView: View {
         }
         .padding()
         .background(.ultraThinMaterial)
+    }
+
+    /// True when all visible tiers have a future salesStartDate
+    private var salesNotStarted: Bool {
+        guard event.hasTicketing && !event.ticketTiers.isEmpty else { return false }
+        let visibleTiers = event.ticketTiers.filter { !$0.isHidden }
+        guard !visibleTiers.isEmpty else { return false }
+        return visibleTiers.allSatisfy { $0.salesStatus == .upcoming }
+    }
+
+    /// Earliest future salesStartDate among visible tiers
+    private var earliestSalesDate: Date? {
+        event.ticketTiers
+            .filter { !$0.isHidden }
+            .compactMap { $0.salesStartDate }
+            .filter { $0 > Date() }
+            .min()
     }
 
     private var isSoldOut: Bool {
@@ -602,11 +688,7 @@ struct EventDetailView: View {
     }
 
     private func formatPrice(_ price: Decimal) -> String {
-        if price == 0 { return "Free" }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
+        GatherPriceFormatter.format(price)
     }
 }
 

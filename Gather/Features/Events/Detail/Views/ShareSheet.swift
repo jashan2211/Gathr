@@ -1,5 +1,18 @@
 import SwiftUI
 
+// MARK: - Deep Link Limitation
+// NOTE: The `gather://` custom URL scheme only works for users who have the Gather app installed.
+// Recipients without the app will see a non-functional link. The share text includes event details
+// (title, date, location) so it remains useful even without the app.
+//
+// TODO: Implement Universal Links (Apple App Site Association) with a web fallback page
+// hosted at e.g. https://gather.app/event/<id>. This requires:
+//   1. A web server hosting an `apple-app-site-association` file
+//   2. Associated Domains entitlement configured in Xcode
+//   3. A fallback web page that displays event info for non-app users
+// Once Universal Links are in place, replace the `gather://` scheme with `https://gather.app/event/`
+// URLs so links work for everyone.
+
 struct ShareSheet: View {
     let event: Event
     @Environment(\.dismiss) var dismiss
@@ -131,42 +144,82 @@ struct ShareSheet: View {
         GatherDateFormatter.fullEventDate.string(from: event.startDate)
     }
 
+    // MARK: - Share Text Builder
+
+    /// Builds a descriptive share message that is useful even for recipients who don't have the app.
+    /// Includes event title, date, and location so the invite is self-contained.
+    private var shareText: String {
+        var lines: [String] = []
+        lines.append("You're invited to \(event.title)!")
+        lines.append("")
+        lines.append("Date: \(formattedDate)")
+        if let location = event.location {
+            if let shortLoc = location.shortLocation {
+                lines.append("Location: \(location.name) (\(shortLoc))")
+            } else {
+                lines.append("Location: \(location.name)")
+            }
+        }
+        if let desc = event.eventDescription, !desc.isEmpty {
+            lines.append("")
+            lines.append(desc)
+        }
+        lines.append("")
+        lines.append("Open in Gather: \(shareURL)")
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: - Actions
 
     private func shareViaMessages() {
-        // Open Messages with prefilled content
-        let text = "You're invited to \(event.title)! \(shareURL)"
-        if let url = URL(string: "sms:&body=\(text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
-            UIApplication.shared.open(url)
+        let text = shareText
+        guard let encoded = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "sms:&body=\(encoded)") else {
+            // Fallback to system share
+            shareViaSystem()
+            return
+        }
+        UIApplication.shared.open(url) { success in
+            if !success { shareViaSystem() }
         }
     }
 
     private func shareViaEmail() {
         let subject = "You're invited: \(event.title)"
-        let body = """
-        Hi!
+        let body = shareText
 
-        You're invited to \(event.title).
-
-        RSVP here: \(shareURL)
-
-        Hope to see you there!
-        """
-
-        if let url = URL(string: "mailto:?subject=\(subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&body=\(body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
-            UIApplication.shared.open(url)
+        guard let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let encodedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "mailto:?subject=\(encodedSubject)&body=\(encodedBody)") else {
+            shareViaSystem()
+            return
+        }
+        UIApplication.shared.open(url) { success in
+            if !success { shareViaSystem() }
         }
     }
 
     private func shareViaSystem() {
-        let text = "You're invited to \(event.title)! RSVP here: \(shareURL)"
-        let activityVC = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        let items: [Any] = [shareText]
+        let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
 
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first,
-           let rootVC = window.rootViewController {
-            rootVC.present(activityVC, animated: true)
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = windowScene.windows.first?.rootViewController else { return }
+
+        // Find the topmost presented VC so we don't conflict with the SwiftUI sheet
+        var topVC = rootVC
+        while let presented = topVC.presentedViewController {
+            topVC = presented
         }
+
+        // iPad requires popover source or UIActivityViewController crashes
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = topVC.view
+            popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+
+        topVC.present(activityVC, animated: true)
     }
 
     private func copyLink() {
@@ -176,8 +229,7 @@ struct ShareSheet: View {
         }
 
         // Haptic feedback
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        HapticService.buttonTap()
 
         // Reset after delay
         Task {

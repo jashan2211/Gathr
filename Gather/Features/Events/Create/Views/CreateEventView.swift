@@ -17,6 +17,8 @@ struct CreateEventView: View {
     @State private var locationAddress = ""
     @State private var locationCity = ""
     @State private var locationState = ""
+    @State private var locationLatitude: Double?
+    @State private var locationLongitude: Double?
     @State private var isVirtual = false
     @State private var virtualURL = ""
     @State private var capacity: Int?
@@ -42,81 +44,80 @@ struct CreateEventView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Hero image picker with category tint
-                        EventHeroImagePicker(
-                            selectedPhoto: $selectedPhoto,
-                            heroImage: $heroImage,
-                            selectedCategory: selectedCategory
-                        )
-                        .bouncyAppear()
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Hero image picker with category tint
+                    EventHeroImagePicker(
+                        selectedPhoto: $selectedPhoto,
+                        heroImage: $heroImage,
+                        selectedCategory: selectedCategory
+                    )
+                    .bouncyAppear()
 
-                        VStack(spacing: Spacing.lg) {
-                            // Template selector
-                            if showTemplates && template == nil {
-                                templateSection
-                                    .bouncyAppear(delay: 0.05)
-                            }
-
-                            // Category pills
-                            EventCategorySelector(
-                                selectedCategory: $selectedCategory,
-                                enabledFeatures: $enabledFeatures,
-                                headerTitle: "What kind of event?"
-                            )
-                            .bouncyAppear(delay: 0.08)
-
-                            // Event details
-                            EventBasicsSection(
-                                title: $title,
-                                description: $description
-                            )
-                            .bouncyAppear(delay: 0.11)
-
-                            // Features as toggleable chips
-                            EventFeaturesSection(
-                                enabledFeatures: $enabledFeatures
-                            )
-                            .bouncyAppear(delay: 0.14)
-
-                            // When
-                            EventDateTimeSection(
-                                startDate: $startDate,
-                                endDate: $endDate,
-                                hasEndDate: $hasEndDate,
-                                allowPastDates: false
-                            )
-                            .bouncyAppear(delay: 0.17)
-
-                            // Where
-                            EventLocationSection(
-                                isVirtual: $isVirtual,
-                                virtualURL: $virtualURL,
-                                locationName: $locationName,
-                                locationAddress: $locationAddress,
-                                locationCity: $locationCity,
-                                locationState: $locationState
-                            )
-                            .bouncyAppear(delay: 0.20)
-
-                            // Settings
-                            EventSettingsSection(
-                                privacy: $privacy,
-                                guestListVisibility: $guestListVisibility,
-                                capacity: $capacity,
-                                hasCapacity: $hasCapacity
-                            )
-                            .bouncyAppear(delay: 0.23)
+                    VStack(spacing: Spacing.lg) {
+                        // Template selector
+                        if showTemplates && template == nil {
+                            templateSection
+                                .bouncyAppear(delay: 0.05)
                         }
-                        .padding(.horizontal, Spacing.md)
-                        .padding(.top, Spacing.lg)
-                        .padding(.bottom, Layout.scrollBottomInset) // Space for floating button
-                    }
-                }
 
-                // Floating create button
+                        // Category pills
+                        EventCategorySelector(
+                            selectedCategory: $selectedCategory,
+                            enabledFeatures: $enabledFeatures,
+                            headerTitle: "What kind of event?"
+                        )
+                        .bouncyAppear(delay: 0.08)
+
+                        // Event details
+                        EventBasicsSection(
+                            title: $title,
+                            description: $description
+                        )
+                        .bouncyAppear(delay: 0.11)
+
+                        // Features as toggleable chips
+                        EventFeaturesSection(
+                            enabledFeatures: $enabledFeatures
+                        )
+                        .bouncyAppear(delay: 0.14)
+
+                        // When
+                        EventDateTimeSection(
+                            startDate: $startDate,
+                            endDate: $endDate,
+                            hasEndDate: $hasEndDate,
+                            allowPastDates: false
+                        )
+                        .bouncyAppear(delay: 0.17)
+
+                        // Where
+                        EventLocationSection(
+                            isVirtual: $isVirtual,
+                            virtualURL: $virtualURL,
+                            locationName: $locationName,
+                            locationAddress: $locationAddress,
+                            locationCity: $locationCity,
+                            locationState: $locationState,
+                            locationLatitude: $locationLatitude,
+                            locationLongitude: $locationLongitude
+                        )
+                        .bouncyAppear(delay: 0.20)
+
+                        // Settings
+                        EventSettingsSection(
+                            privacy: $privacy,
+                            guestListVisibility: $guestListVisibility,
+                            capacity: $capacity,
+                            hasCapacity: $hasCapacity
+                        )
+                        .bouncyAppear(delay: 0.23)
+                    }
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.top, Spacing.lg)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
                 createButtonBar
             }
             .navigationTitle("New Event")
@@ -209,8 +210,7 @@ struct CreateEventView: View {
             privacy = tmpl.suggestedPrivacy
             showTemplates = false
         }
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+        HapticService.mediumImpact()
     }
 
     // MARK: - Floating Create Button
@@ -288,7 +288,7 @@ struct CreateEventView: View {
     private var isValid: Bool {
         let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
         guard !trimmedTitle.isEmpty && trimmedTitle.count <= 100 else { return false }
-        guard startDate > Date() else { return false }
+        guard startDate > Date().addingTimeInterval(-300) else { return false }
         if hasEndDate, let end = endDate, end <= startDate { return false }
         if hasCapacity, let cap = capacity, cap <= 0 { return false }
         if isVirtual && !virtualURL.isEmpty {
@@ -311,7 +311,9 @@ struct CreateEventView: View {
                 name: locationName,
                 address: locationAddress.isEmpty ? nil : locationAddress,
                 city: locationCity.isEmpty ? nil : locationCity,
-                state: locationState.isEmpty ? nil : locationState
+                state: locationState.isEmpty ? nil : locationState,
+                latitude: locationLatitude,
+                longitude: locationLongitude
             )
         }
 
@@ -334,9 +336,36 @@ struct CreateEventView: View {
         // Save to SwiftData
         modelContext.insert(event)
 
+        // Save hero image if selected
+        if let selectedPhoto {
+            Task {
+                if let data = try? await selectedPhoto.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    let maxWidth: CGFloat = 1200
+                    let scale = min(1.0, maxWidth / uiImage.size.width)
+                    let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
+                    let renderer = UIGraphicsImageRenderer(size: newSize)
+                    let resized = renderer.image { _ in
+                        uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                    }
+                    if let jpegData = resized.jpegData(compressionQuality: 0.8) {
+                        let filename = "\(event.id.uuidString)_hero.jpg"
+                        let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                        let fileURL = docsDir.appendingPathComponent(filename)
+                        try? jpegData.write(to: fileURL)
+                        await MainActor.run {
+                            event.heroMediaURL = fileURL
+                            modelContext.safeSave()
+                        }
+                    }
+                }
+            }
+        }
+
+        modelContext.safeSave()
+
         // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
 
         isSubmitting = false
         dismiss()

@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 import EventKit
+import PassKit
 
 struct TicketConfirmationView: View {
     let ticket: Ticket
@@ -11,6 +12,10 @@ struct TicketConfirmationView: View {
     @State private var calendarMessage = ""
     @State private var showConfetti = false
     @State private var cardAppeared = false
+    @State private var savedToPhotos = false
+    @State private var showingSaveError = false
+    @State private var saveErrorMessage = ""
+    @State private var photoSaver: PhotoSaver?
 
     var body: some View {
         ZStack {
@@ -23,6 +28,7 @@ struct TicketConfirmationView: View {
                         .scaleEffect(cardAppeared ? 1 : 0.8)
                         .opacity(cardAppeared ? 1 : 0)
                     actionButtons
+                    walletPassCard
                     eventSummary
                     doneButton
                 }
@@ -40,6 +46,11 @@ struct TicketConfirmationView: View {
             Button("OK") {}
         } message: {
             Text(calendarMessage)
+        }
+        .alert("Save Error", isPresented: $showingSaveError) {
+            Button("OK") {}
+        } message: {
+            Text(saveErrorMessage)
         }
         .sheet(isPresented: $showingShareSheet) {
             TicketShareSheet(items: [ticketShareText])
@@ -217,6 +228,75 @@ struct TicketConfirmationView: View {
         }
     }
 
+    // MARK: - Wallet Pass Card
+
+    private var walletPassCard: some View {
+        VStack(spacing: Spacing.md) {
+            // Section header
+            HStack {
+                Image(systemName: "wallet.pass.fill")
+                    .foregroundStyle(Color.accentPurpleFallback)
+                Text("Wallet Pass")
+                    .font(GatherFont.headline)
+                Spacer()
+                if !AppConfig.walletPassEnabled {
+                    Text("Demo")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .padding(.horizontal, Spacing.xs)
+                        .padding(.vertical, Spacing.xxs)
+                        .background(Color.gatherSecondaryBackground)
+                        .clipShape(Capsule())
+                }
+            }
+
+            // Wallet-style card preview
+            WalletStyleCard(
+                eventTitle: event.title,
+                ticketNumber: ticket.ticketNumber,
+                guestName: ticket.guestName,
+                date: event.startDate,
+                venue: event.location?.name,
+                qrCodeData: ticket.qrCodeData,
+                categoryEmoji: event.category.emoji
+            )
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Wallet pass for \(event.title), ticket \(ticket.ticketNumber)")
+
+            // Save to Photos button
+            Button {
+                saveWalletCardToPhotos()
+            } label: {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: savedToPhotos ? "checkmark.circle.fill" : "square.and.arrow.down")
+                        .font(.body.weight(.semibold))
+                    Text(savedToPhotos ? "Saved to Photos" : "Save to Photos")
+                        .font(GatherFont.headline)
+                }
+                .foregroundStyle(savedToPhotos ? Color.mintGreen : .white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Spacing.sm)
+                .background(
+                    savedToPhotos
+                        ? AnyShapeStyle(Color.mintGreen.opacity(0.15))
+                        : AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            }
+            .disabled(savedToPhotos)
+            .accessibilityHint(savedToPhotos ? "Card already saved" : "Saves a wallet-style card image to your photo library")
+
+            if !AppConfig.walletPassEnabled {
+                Text("Real Apple Wallet passes coming soon. Save this card to your Photos for now.")
+                    .font(GatherFont.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(Spacing.md)
+        .glassCard(cornerRadius: CornerRadius.card)
+    }
+
     // MARK: - Event Summary
 
     private var eventSummary: some View {
@@ -341,11 +421,7 @@ struct TicketConfirmationView: View {
     }
 
     private func formatPrice(_ price: Decimal) -> String {
-        if price == 0 { return "Free" }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = Locale.current.currency?.identifier ?? "USD"
-        return formatter.string(from: price as NSDecimalNumber) ?? "$\(price)"
+        GatherPriceFormatter.format(price)
     }
 
     private func generateQRCode(from string: String) -> UIImage? {
@@ -396,8 +472,76 @@ struct TicketConfirmationView: View {
     }
 
     private func addToWallet() {
-        calendarMessage = "Wallet pass feature coming soon! Your ticket is saved in the app."
-        showingCalendarAlert = true
+        if AppConfig.walletPassEnabled {
+            // Future: Add real PKPass via WalletPassService
+            calendarMessage = "Wallet pass added!"
+            showingCalendarAlert = true
+        } else {
+            saveWalletCardToPhotos()
+        }
+    }
+
+    private func saveWalletCardToPhotos() {
+        guard !savedToPhotos else { return }
+
+        let qrData = Data(ticket.qrCodeData.utf8)
+
+        Task { @MainActor in
+            guard let cardImage = WalletPassService.renderTicketCard(
+                eventTitle: event.title,
+                ticketNumber: ticket.ticketNumber,
+                guestName: ticket.guestName,
+                date: event.startDate,
+                venue: event.location?.name,
+                qrCodeData: qrData
+            ) else {
+                saveErrorMessage = "Could not generate wallet card image."
+                showingSaveError = true
+                HapticService.error()
+                return
+            }
+
+            let saver = PhotoSaver()
+            saver.onSuccess = { [self] in
+                DispatchQueue.main.async {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        savedToPhotos = true
+                    }
+                    HapticService.success()
+                    photoSaver = nil
+                }
+            }
+            saver.onError = { [self] error in
+                DispatchQueue.main.async {
+                    saveErrorMessage = error.localizedDescription
+                    showingSaveError = true
+                    HapticService.error()
+                    photoSaver = nil
+                }
+            }
+            // Retain saver so it isn't deallocated before the callback fires
+            photoSaver = saver
+            saver.saveToPhotos(image: cardImage)
+        }
+    }
+}
+
+// MARK: - Photo Saver Helper
+
+private class PhotoSaver: NSObject {
+    var onSuccess: (() -> Void)?
+    var onError: ((Error) -> Void)?
+
+    func saveToPhotos(image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(handleSaveResult(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    @objc private func handleSaveResult(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer?) {
+        if let error {
+            onError?(error)
+        } else {
+            onSuccess?()
+        }
     }
 }
 
@@ -426,6 +570,133 @@ struct ActionButton: View {
             }
             .frame(maxWidth: .infinity)
         }
+    }
+}
+
+// MARK: - Wallet Style Card (Apple Wallet-inspired SwiftUI preview)
+
+struct WalletStyleCard: View {
+    let eventTitle: String
+    let ticketNumber: String
+    let guestName: String
+    let date: Date
+    let venue: String?
+    let qrCodeData: String
+    let categoryEmoji: String
+
+    var body: some View {
+        ZStack {
+            // Background gradient
+            RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
+                .fill(LinearGradient.gatherAccentGradient)
+
+            // Content
+            HStack(alignment: .top, spacing: 0) {
+                // Left side: Event info
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    // Branding
+                    Text("GATHER")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .tracking(1.5)
+
+                    // Event emoji + title
+                    HStack(spacing: Spacing.xs) {
+                        Text(categoryEmoji)
+                            .font(.system(size: 20))
+                        Text(eventTitle)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                    }
+
+                    Spacer().frame(height: Spacing.xxs)
+
+                    // Guest name
+                    Label {
+                        Text(guestName)
+                            .font(.system(size: 12, weight: .medium))
+                    } icon: {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(.white.opacity(0.85))
+
+                    // Date
+                    Label {
+                        Text(formattedDate)
+                            .font(.system(size: 12, weight: .medium))
+                    } icon: {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(.white.opacity(0.85))
+
+                    // Venue
+                    if let venue {
+                        Label {
+                            Text(venue)
+                                .font(.system(size: 11, weight: .regular))
+                                .lineLimit(1)
+                        } icon: {
+                            Image(systemName: "mappin")
+                                .font(.system(size: 10))
+                        }
+                        .foregroundStyle(.white.opacity(0.7))
+                    }
+
+                    Spacer()
+
+                    // Ticket number at bottom
+                    Text(ticketNumber)
+                        .font(.system(size: 10, design: .monospaced).weight(.medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .padding(Spacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Right side: QR code
+                VStack {
+                    Spacer()
+                    if let qrImage = generateQRCode(from: qrCodeData) {
+                        Image(uiImage: qrImage)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 72, height: 72)
+                            .padding(Spacing.xxs)
+                            .background(Color.white)
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.xs))
+                    }
+                    Spacer()
+                }
+                .padding(.trailing, Spacing.md)
+            }
+        }
+        .frame(height: 180)
+        .shadow(color: .accentPurpleFallback.opacity(0.3), radius: 12, y: 6)
+    }
+
+    // MARK: - Helpers
+
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+
+    private func generateQRCode(from string: String) -> UIImage? {
+        let context = CIContext()
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(Data(string.utf8), forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+
+        guard let outputImage = filter.outputImage else { return nil }
+        let transform = CGAffineTransform(scaleX: 10, y: 10)
+        let scaledImage = outputImage.transformed(by: transform)
+        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
 

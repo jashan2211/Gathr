@@ -169,8 +169,7 @@ struct EventCategorySelector: View {
                                 selectedCategory = category
                                 enabledFeatures = category.defaultFeatures
                             }
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
+                            HapticService.buttonTap()
                         }
                     }
                 }
@@ -198,9 +197,10 @@ struct EventBasicsSection: View {
                     .foregroundStyle(Color.gatherSecondaryText)
                     .tracking(0.5)
 
-                TextField("Give your event a vibe...", text: $title)
+                TextField("Give your event a vibe...", text: $title, axis: .vertical)
                     .font(GatherFont.title3)
                     .fontWeight(.semibold)
+                    .lineLimit(1...2)
                     .padding(Spacing.md)
                     .background(Color.gatherSecondaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
@@ -217,6 +217,13 @@ struct EventBasicsSection: View {
                                 lineWidth: 1.5
                             )
                     )
+
+                HStack {
+                    Spacer()
+                    Text("\(title.count)/100")
+                        .font(.caption2)
+                        .foregroundStyle(title.count > 90 ? Color.warmCoral : Color.gatherSecondaryText)
+                }
             }
 
             // Description field
@@ -400,6 +407,10 @@ struct EventLocationSection: View {
     @Binding var locationAddress: String
     @Binding var locationCity: String
     @Binding var locationState: String
+    @Binding var locationLatitude: Double?
+    @Binding var locationLongitude: Double?
+
+    @State private var showLocationPicker = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -433,6 +444,31 @@ struct EventLocationSection: View {
                 )
             } else {
                 VStack(spacing: Spacing.xs) {
+                    // Search on Map button
+                    Button {
+                        showLocationPicker = true
+                    } label: {
+                        HStack(spacing: Spacing.xs) {
+                            Image(systemName: "map.fill")
+                                .foregroundStyle(Color.accentPinkFallback)
+                            Text("Search on Map")
+                                .font(GatherFont.callout)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.accentPinkFallback)
+                            Spacer()
+                            if locationLatitude != nil {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(Color.gatherSuccess)
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                                .foregroundStyle(Color.gatherSecondaryText)
+                        }
+                        .padding(Spacing.sm)
+                        .background(Color.accentPinkFallback.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    }
+
                     EventFormStyledTextField(
                         placeholder: "Venue name",
                         text: $locationName,
@@ -461,6 +497,16 @@ struct EventLocationSection: View {
         .padding(Spacing.md)
         .background(Color.gatherSecondaryBackground.opacity(0.3))
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .sheet(isPresented: $showLocationPicker) {
+            LocationPickerView { name, address, city, state, lat, lon in
+                locationName = name
+                if let address { locationAddress = address }
+                if let city { locationCity = city }
+                if let state { locationState = state }
+                locationLatitude = lat
+                locationLongitude = lon
+            }
+        }
     }
 }
 
@@ -514,7 +560,7 @@ struct EventSettingsSection: View {
                     .foregroundStyle(Color.gatherSecondaryText)
                     .tracking(0.5)
 
-                HStack(spacing: Spacing.xs) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.xs) {
                     ForEach(GuestListVisibility.allCases, id: \.self) { option in
                         Button {
                             withAnimation(.spring(response: 0.3)) { guestListVisibility = option }
@@ -522,6 +568,8 @@ struct EventSettingsSection: View {
                             Text(option.displayName)
                                 .font(.caption)
                                 .fontWeight(.semibold)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .foregroundStyle(guestListVisibility == option ? .white : Color.gatherPrimaryText)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, Spacing.xs)
@@ -532,6 +580,8 @@ struct EventSettingsSection: View {
                                 )
                                 .clipShape(Capsule())
                         }
+                        .accessibilityLabel("\(option.displayName) guest list visibility")
+                        .accessibilityAddTraits(guestListVisibility == option ? [.isSelected] : [])
                     }
                 }
             }
@@ -638,6 +688,10 @@ struct EventFormCategoryChip: View {
         .buttonStyle(.plain)
         .scaleEffect(isSelected ? 1.05 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+        .accessibilityLabel("\(category.displayName) category")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .fixedSize()
     }
 }
 
@@ -649,7 +703,7 @@ struct EventFormWrappingFeatureChips: View {
     var body: some View {
         // Using LazyVGrid as a simple wrapping layout
         LazyVGrid(columns: [
-            GridItem(.adaptive(minimum: 100), spacing: Spacing.xs)
+            GridItem(.adaptive(minimum: 120), spacing: Spacing.xs)
         ], spacing: Spacing.xs) {
             ForEach(EventFeature.allCases, id: \.self) { feature in
                 let isEnabled = enabledFeatures.contains(feature)
@@ -661,8 +715,7 @@ struct EventFormWrappingFeatureChips: View {
                             enabledFeatures.insert(feature)
                         }
                     }
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
+                    HapticService.buttonTap()
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: feature.icon)
@@ -687,6 +740,8 @@ struct EventFormWrappingFeatureChips: View {
                 .buttonStyle(.plain)
                 .scaleEffect(isEnabled ? 1.03 : 1.0)
                 .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isEnabled)
+                .accessibilityLabel("\(feature.displayName) feature")
+                .accessibilityAddTraits(isEnabled ? [.isSelected] : [])
             }
         }
     }
@@ -711,6 +766,8 @@ struct EventFormStyledTextField: View {
             }
             TextField(placeholder, text: $text)
                 .font(GatherFont.body)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .keyboardType(keyboardType)
                 .textInputAutocapitalization(autocapitalization)
         }
@@ -730,8 +787,7 @@ struct EventFormQuickDateChip: View {
     var body: some View {
         Button(action: {
             action()
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
+            HapticService.buttonTap()
         }) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
@@ -747,6 +803,7 @@ struct EventFormQuickDateChip: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Set date to \(label)")
     }
 }
 
@@ -778,6 +835,8 @@ struct EventFormLocationTypeButton: View {
             )
             .clipShape(Capsule())
         }
+        .accessibilityLabel("\(label) location")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 
@@ -807,6 +866,8 @@ struct EventFormPrivacyCard: View {
                 Text(option.displayName)
                     .font(.caption2)
                     .fontWeight(.semibold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .foregroundStyle(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryText)
             }
             .frame(maxWidth: .infinity)
@@ -827,5 +888,7 @@ struct EventFormPrivacyCard: View {
         }
         .scaleEffect(isSelected ? 1.02 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+        .accessibilityLabel("\(option.displayName) privacy")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

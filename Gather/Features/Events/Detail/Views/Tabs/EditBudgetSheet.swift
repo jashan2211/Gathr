@@ -18,7 +18,7 @@ struct EditBudgetSheet: View {
                             .foregroundStyle(Color.gatherSecondaryText)
 
                         TextField("Budget amount", value: $totalBudget, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .font(GatherFont.largeTitle)
                             .keyboardType(.decimalPad)
                             .submitLabel(.done)
                     }

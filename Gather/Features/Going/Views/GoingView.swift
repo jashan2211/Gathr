@@ -3,6 +3,8 @@ import SwiftData
 
 struct GoingView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var appState: AppState
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var selectedEvent: Event?
     @State private var filter: TimeFilter = .upcoming
@@ -30,26 +32,44 @@ struct GoingView: View {
                     // Filter Pills with counts
                     filterPills
 
-                    // Next Up Hero (only for upcoming)
-                    if filter == .upcoming, let next = filteredEvents.first {
-                        nextUpHero(event: next)
+                    // Next Up Hero (only for upcoming, swipeable top 3)
+                    if filter == .upcoming, !filteredEvents.isEmpty {
+                        let heroEvents = Array(filteredEvents.prefix(3))
+                        if heroEvents.count > 1 {
+                            TabView {
+                                ForEach(heroEvents, id: \.id) { event in
+                                    nextUpHero(event: event)
+                                }
+                            }
+                            .tabViewStyle(.page(indexDisplayMode: .automatic))
+                            .frame(height: Layout.heroHeight + 40)
                             .bouncyAppear()
+                        } else if let next = heroEvents.first {
+                            nextUpHero(event: next)
+                                .bouncyAppear()
+                        }
                     }
 
                     if filteredEvents.isEmpty {
                         emptyState
                     } else {
-                        // Events List
-                        LazyVStack(spacing: Spacing.sm) {
-                            let list = filter == .upcoming ? Array(filteredEvents.dropFirst()) : filteredEvents
-                            ForEach(Array(list.enumerated()), id: \.element.id) { index, event in
-                                Button {
-                                    selectedEvent = event
-                                } label: {
-                                    GoingEventCard(event: event)
-                                }
-                                .buttonStyle(CardPressStyle())
-                                .bouncyAppear(delay: Double(index) * 0.04)
+                        // Events List (2-column on iPad)
+                        let list = filter == .upcoming ? Array(filteredEvents.dropFirst()) : filteredEvents
+                        let eventCards = ForEach(list, id: \.id) { event in
+                            Button {
+                                selectedEvent = event
+                            } label: {
+                                GoingEventCard(event: event)
+                            }
+                            .buttonStyle(CardPressStyle())
+                        }
+                        if horizontalSizeClass == .regular {
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.sm) {
+                                eventCards
+                            }
+                        } else {
+                            LazyVStack(spacing: Spacing.sm) {
+                                eventCards
                             }
                         }
                     }
@@ -80,7 +100,7 @@ struct GoingView: View {
                 ForEach(TimeFilter.allCases, id: \.self) { timeFilter in
                     let count = countForFilter(timeFilter)
                     Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        HapticService.tabSwitch()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             filter = timeFilter
                         }
@@ -231,6 +251,33 @@ struct GoingView: View {
 
     // MARK: - Empty State
 
+    private var emptyStateIcon: String {
+        switch filter {
+        case .upcoming: return "calendar"
+        case .thisWeek: return "calendar.badge.clock"
+        case .thisMonth: return "calendar.circle"
+        case .past: return "clock.arrow.circlepath"
+        }
+    }
+
+    private var emptyStateTitle: String {
+        switch filter {
+        case .upcoming: return "No upcoming events"
+        case .thisWeek: return "Nothing this week"
+        case .thisMonth: return "Nothing this month"
+        case .past: return "No past events yet"
+        }
+    }
+
+    private var emptyStateSubtitle: String {
+        switch filter {
+        case .upcoming: return "Explore events to find something you love"
+        case .thisWeek: return "Check upcoming for your next event"
+        case .thisMonth: return "Your next event might be coming soon"
+        case .past: return "Your event history will appear here"
+        }
+    }
+
     private var emptyState: some View {
         VStack(spacing: Spacing.lg) {
             Spacer()
@@ -243,7 +290,7 @@ struct GoingView: View {
                 Circle()
                     .fill(Color.accentPinkFallback.opacity(0.06))
                     .frame(width: 80, height: 80)
-                Image(systemName: "ticket.fill")
+                Image(systemName: emptyStateIcon)
                     .font(.system(size: 36))
                     .foregroundStyle(
                         LinearGradient.gatherAccentGradient
@@ -251,15 +298,33 @@ struct GoingView: View {
             }
 
             VStack(spacing: Spacing.sm) {
-                Text("No Events Yet")
+                Text(emptyStateTitle)
                     .font(GatherFont.title3)
                     .foregroundStyle(Color.gatherPrimaryText)
 
-                Text("Events you RSVP to or purchase tickets for will appear here")
+                Text(emptyStateSubtitle)
                     .font(GatherFont.body)
                     .foregroundStyle(Color.gatherSecondaryText)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Spacing.xl)
+            }
+
+            if filter == .upcoming {
+                Button {
+                    appState.selectedTab = .explore
+                } label: {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "magnifyingglass")
+                        Text("Explore Events")
+                    }
+                    .font(GatherFont.callout)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.sm)
+                    .background(LinearGradient.gatherAccentGradient)
+                    .clipShape(Capsule())
+                }
             }
 
             Spacer()
@@ -268,15 +333,14 @@ struct GoingView: View {
 
     // MARK: - Helpers
 
-    private var filteredEvents: [Event] {
-        let userId = authManager.currentUser?.id
-
-        let attendingEvents = allEvents.filter { event in
-            event.guests.contains { guest in
-                guest.userId == userId && guest.status == .attending
-            }
+    private var attendingEvents: [Event] {
+        guard let userId = authManager.currentUser?.id else { return [] }
+        return allEvents.filter { event in
+            event.guests.contains { $0.userId == userId && $0.status == .attending }
         }
+    }
 
+    private var filteredEvents: [Event] {
         let now = Date()
         let calendar = Calendar.current
 
@@ -295,12 +359,6 @@ struct GoingView: View {
     }
 
     private func countForFilter(_ f: TimeFilter) -> Int {
-        let userId = authManager.currentUser?.id
-        let attendingEvents = allEvents.filter { event in
-            event.guests.contains { guest in
-                guest.userId == userId && guest.status == .attending
-            }
-        }
         let now = Date()
         let calendar = Calendar.current
         switch f {
@@ -333,6 +391,11 @@ struct GoingView: View {
 
 struct GoingEventCard: View {
     let event: Event
+    @State private var todayPulse: Bool = false
+
+    private var isHappeningToday: Bool {
+        daysUntilCount == 0
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -346,13 +409,14 @@ struct GoingEventCard: View {
                 // Date badge with category tint
                 VStack(spacing: 1) {
                     Text(event.category.emoji)
-                        .font(.system(size: 16))
+                        .font(.callout)
                     Text(dayNumber)
                         .font(.title3)
                         .fontWeight(.bold)
                         .foregroundStyle(Color.gatherPrimaryText)
                     Text(monthAbbrev)
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2)
+                        .fontWeight(.bold)
                         .foregroundStyle(Color.forCategory(event.category))
                 }
                 .frame(width: 48, height: 56)
@@ -395,7 +459,7 @@ struct GoingEventCard: View {
                         .foregroundStyle(daysLeftColor)
                         .contentTransition(.numericText())
                     Text(daysLeftLabel)
-                        .font(.system(size: 8))
+                        .font(.caption2)
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
                 .frame(width: 44)
@@ -403,9 +467,31 @@ struct GoingEventCard: View {
             .padding(.horizontal, Spacing.sm)
             .padding(.vertical, Spacing.sm)
         }
-        .glassCard()
+        .glassCardLite()
+        .overlay(
+            Group {
+                if isHappeningToday {
+                    RoundedRectangle(cornerRadius: CornerRadius.card)
+                        .strokeBorder(
+                            Color.warmCoral.opacity(todayPulse ? 0.8 : 0.4),
+                            lineWidth: todayPulse ? 2 : 1.5
+                        )
+                        .shadow(color: Color.warmCoral.opacity(todayPulse ? 0.35 : 0.15), radius: todayPulse ? 8 : 4, y: 0)
+                }
+            }
+        )
+        .onAppear {
+            if isHappeningToday {
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    todayPulse = true
+                }
+            }
+        }
+        .drawingGroup()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(event.title). \(event.location?.name ?? ""). \(formattedTime). \(daysUntilCount <= 0 ? "Happening now" : daysUntilCount == 1 ? "Tomorrow" : "In \(daysUntilCount) days")")
+        .accessibilityLabel("\(event.title). \(daysUntilCount <= 0 ? "Happening now" : daysUntilCount == 1 ? "Tomorrow" : "In \(daysUntilCount) days")")
+        .accessibilityValue("\(event.location?.name ?? ""). \(formattedTime)")
+        .accessibilityHint("Double tap to view event details")
     }
 
     private var monthAbbrev: String {
@@ -426,20 +512,23 @@ struct GoingEventCard: View {
 
     private var daysLeft: String {
         let d = daysUntilCount
-        if d <= 0 { return "Now" }
+        if d < 0 { return "\(abs(d))" }
+        if d == 0 { return "Now" }
         if d == 1 { return "1" }
         return "\(d)"
     }
 
     private var daysLeftLabel: String {
         let d = daysUntilCount
-        if d <= 0 { return "today" }
+        if d < 0 { return abs(d) == 1 ? "day ago" : "days ago" }
+        if d == 0 { return "today" }
         if d == 1 { return "day" }
         return "days"
     }
 
     private var daysLeftColor: Color {
         let d = daysUntilCount
+        if d < 0 { return Color.gatherSecondaryText }
         if d <= 1 { return Color.rsvpNoFallback }
         if d <= 7 { return Color.rsvpMaybeFallback }
         return Color.accentPurpleFallback

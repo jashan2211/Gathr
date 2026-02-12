@@ -250,8 +250,7 @@ struct SendInvitesSheet: View {
                             withAnimation(.spring(response: 0.25)) {
                                 selectedChannel = channel
                             }
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
+                            HapticService.buttonTap()
                         }
                     )
                 }
@@ -442,7 +441,7 @@ struct SendInvitesSheet: View {
 
                 VStack(spacing: Spacing.sm) {
                     Text("Invites Prepared!")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(GatherFont.title)
                         .foregroundStyle(Color.gatherPrimaryText)
                         .bouncyAppear(delay: 0.15)
 
@@ -618,8 +617,7 @@ struct SendInvitesSheet: View {
                 withAnimation(.spring(response: 0.4)) {
                     showComplete = true
                 }
-                let generator = UINotificationFeedbackGenerator()
-                generator.notificationOccurred(.success)
+                HapticService.success()
             }
         }
     }

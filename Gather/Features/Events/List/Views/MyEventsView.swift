@@ -3,6 +3,7 @@ import SwiftData
 
 struct MyEventsView: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Event.startDate) private var events: [Event]
     @State private var selectedTab: EventTab = .active
     @State private var selectedEvent: Event?
@@ -43,14 +44,21 @@ struct MyEventsView: View {
                                 .bouncyAppear(delay: 0.03)
                         }
 
-                        ForEach(Array(filteredEvents.enumerated()), id: \.element.id) { index, event in
+                        // 2-column grid on iPad
+                        let cards = ForEach(filteredEvents, id: \.id) { event in
                             Button {
                                 selectedEvent = event
                             } label: {
                                 MyEventCard(event: event)
                             }
                             .buttonStyle(CardPressStyle())
-                            .bouncyAppear(delay: Double(index) * 0.04)
+                        }
+                        if horizontalSizeClass == .regular {
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.sm) {
+                                cards
+                            }
+                        } else {
+                            cards
                         }
 
                         if filteredEvents.isEmpty && selectedTab != .active {
@@ -87,7 +95,7 @@ struct MyEventsView: View {
             ForEach(EventTab.allCases, id: \.self) { tab in
                 let count = countForTab(tab)
                 Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    HapticService.tabSwitch()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         selectedTab = tab
                     }
@@ -248,16 +256,36 @@ struct MyEventsView: View {
                     .multilineTextAlignment(.center)
             }
 
+            if selectedTab == .drafts {
+                Button {
+                    showCreateEvent = true
+                } label: {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Create Event")
+                    }
+                    .font(GatherFont.callout)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.sm)
+                    .background(LinearGradient.gatherAccentGradient)
+                    .clipShape(Capsule())
+                }
+            }
+
             Spacer()
         }
     }
 
     // MARK: - Filtered Events
 
-    private var filteredEvents: [Event] {
-        let userId = authManager.currentUser?.id
-        let hostedEvents = events.filter { $0.hostId == userId }
+    private var hostedEvents: [Event] {
+        guard let userId = authManager.currentUser?.id else { return [] }
+        return events.filter { $0.hostId == userId }
+    }
 
+    private var filteredEvents: [Event] {
         switch selectedTab {
         case .active:
             return hostedEvents.filter { $0.isUpcoming && !$0.isDraft }
@@ -269,8 +297,6 @@ struct MyEventsView: View {
     }
 
     private func countForTab(_ tab: EventTab) -> Int {
-        let userId = authManager.currentUser?.id
-        let hostedEvents = events.filter { $0.hostId == userId }
         switch tab {
         case .active: return hostedEvents.filter { $0.isUpcoming && !$0.isDraft }.count
         case .drafts: return hostedEvents.filter { $0.isDraft }.count
@@ -355,13 +381,14 @@ struct MyEventCard: View {
                     // Date badge
                     VStack(spacing: 1) {
                         Text(event.category.emoji)
-                            .font(.system(size: 14))
+                            .font(.footnote)
                         Text(dayNumber)
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundStyle(Color.gatherPrimaryText)
                         Text(monthAbbrev)
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.caption2)
+                            .fontWeight(.bold)
                             .foregroundStyle(Color.forCategory(event.category))
                     }
                     .frame(width: 48, height: 54)
@@ -455,9 +482,12 @@ struct MyEventCard: View {
             }
             .padding(Spacing.sm)
         }
-        .glassCard()
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(event.title). \(formattedTime). \(event.guests.count) guests, \(event.totalAttendingHeadcount) attending\(event.isDraft ? ". Draft" : event.privacy == .publicEvent ? ". Public" : "")")
+        .glassCardLite()
+        .drawingGroup()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(event.title)\(event.isDraft ? ", Draft" : "")")
+        .accessibilityValue("\(formattedTime). \(event.guests.count) guests, \(event.totalAttendingHeadcount) attending")
+        .accessibilityHint("Double tap to view event details")
     }
 
     private var monthAbbrev: String {

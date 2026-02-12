@@ -6,7 +6,7 @@ struct GatherApp: App {
     // MARK: - SwiftData Container
 
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema(versionedSchema: GatherSchemaV1.self)
+        let schema = Schema(versionedSchema: GatherSchemaV2.self)
         let modelConfiguration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
@@ -73,6 +73,35 @@ struct GatherApp: App {
                 }
         }
         .modelContainer(sharedModelContainer)
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("New Event") {
+                    appState.isShowingCreateEvent = true
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
+            CommandMenu("Navigate") {
+                Button("Going") {
+                    appState.selectedTab = .going
+                }
+                .keyboardShortcut("1", modifiers: .command)
+
+                Button("My Events") {
+                    appState.selectedTab = .myEvents
+                }
+                .keyboardShortcut("2", modifiers: .command)
+
+                Button("Explore") {
+                    appState.selectedTab = .explore
+                }
+                .keyboardShortcut("3", modifiers: .command)
+
+                Button("Profile") {
+                    appState.selectedTab = .profile
+                }
+                .keyboardShortcut("4", modifiers: .command)
+            }
+        }
     }
 
     // MARK: - Deep Link Handling

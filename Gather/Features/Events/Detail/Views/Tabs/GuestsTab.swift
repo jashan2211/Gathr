@@ -15,6 +15,32 @@ struct GuestsTab: View {
         event.hostId == authManager.currentUser?.id
     }
 
+    /// Pre-computed set of guest IDs who have at least one "sent" invite across all functions.
+    /// Avoids O(g*f*i) nested loops in filter/count logic.
+    private var sentGuestIds: Set<UUID> {
+        var ids = Set<UUID>()
+        for function in event.functions {
+            for invite in function.invites where invite.inviteStatus == .sent {
+                ids.insert(invite.guestId)
+            }
+        }
+        return ids
+    }
+
+    /// Lookup dictionary: [functionId: [guestId: FunctionInvite]]
+    /// Avoids O(i) scans per guest per function in FunctionStatusChip.
+    private var inviteLookup: [UUID: [UUID: FunctionInvite]] {
+        var lookup: [UUID: [UUID: FunctionInvite]] = [:]
+        for function in event.functions {
+            var guestMap: [UUID: FunctionInvite] = [:]
+            for invite in function.invites {
+                guestMap[invite.guestId] = invite
+            }
+            lookup[function.id] = guestMap
+        }
+        return lookup
+    }
+
     /// Privacy: non-hosts on public events see first names only
     private var isPrivacyMode: Bool {
         !isHost && event.privacy == .publicEvent &&
@@ -160,6 +186,7 @@ struct GuestsTab: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(event.guests.count) Guests")
                         .font(GatherFont.headline)
+                        .accessibilityAddTraits(.isHeader)
                     if event.attendingCount > 0 {
                         Text("\(event.attendingCount) confirmed")
                             .font(GatherFont.caption)
@@ -227,6 +254,8 @@ struct GuestsTab: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(Color.gatherSecondaryText)
                         .font(.callout)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Clear search")
             }
@@ -263,6 +292,7 @@ struct GuestsTab: View {
                 Text(event.guests.isEmpty ? "No Guests Yet" : "No Matching Guests")
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.gatherPrimaryText)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text(event.guests.isEmpty
                      ? "Add guests to start managing your event"
@@ -300,6 +330,7 @@ struct GuestsTab: View {
                     ImprovedGuestCard(
                         guest: guest,
                         event: event,
+                        inviteLookup: inviteLookup,
                         isSelected: selectedGuests.contains(guest.id),
                         isSelectionMode: isSelectionMode,
                         onTap: {
@@ -327,11 +358,8 @@ struct GuestsTab: View {
             return event.guests.filter { $0.status == .pending }.count
         case .sent:
             // Guests who have been sent invites but not responded
-            return event.guests.filter { guest in
-                event.functions.contains { function in
-                    function.invites.contains { $0.guestId == guest.id && $0.inviteStatus == .sent }
-                }
-            }.count
+            let ids = sentGuestIds
+            return event.guests.filter { ids.contains($0.id) }.count
         case .confirmed:
             return event.guests.filter { $0.status == .attending }.count
         case .declined:
@@ -358,11 +386,8 @@ struct GuestsTab: View {
         case .pending:
             guests = guests.filter { $0.status == .pending }
         case .sent:
-            guests = guests.filter { guest in
-                event.functions.contains { function in
-                    function.invites.contains { $0.guestId == guest.id && $0.inviteStatus == .sent }
-                }
-            }
+            let ids = sentGuestIds
+            guests = guests.filter { ids.contains($0.id) }
         case .confirmed:
             guests = guests.filter { $0.status == .attending }
         case .declined:
@@ -396,6 +421,7 @@ struct GuestsTab: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(event.attendingCount) Going")
                         .font(GatherFont.headline)
+                        .accessibilityAddTraits(.isHeader)
                     if event.maybeCount > 0 {
                         Text("\(event.maybeCount) maybe")
                             .font(GatherFont.caption)
@@ -433,6 +459,7 @@ struct GuestsTab: View {
             Text("\(event.attendingCount) attending")
                 .font(GatherFont.title2)
                 .foregroundStyle(Color.gatherPrimaryText)
+                .accessibilityAddTraits(.isHeader)
 
             if event.maybeCount > 0 {
                 Text("\(event.maybeCount) maybe")
@@ -457,6 +484,7 @@ struct GuestsTab: View {
             Text("Guest list is private")
                 .font(GatherFont.headline)
                 .foregroundStyle(Color.gatherPrimaryText)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Only the host can see who's attending")
                 .font(GatherFont.callout)
@@ -489,7 +517,8 @@ struct FirstNameGuestCard: View {
                 .frame(width: 36, height: 36)
                 .overlay {
                     Text(String(firstName.prefix(1)).uppercased())
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.callout)
+                        .fontWeight(.semibold)
                         .foregroundStyle(.white)
                 }
 
@@ -501,6 +530,8 @@ struct FirstNameGuestCard: View {
         }
         .padding(.vertical, Spacing.xs)
         .padding(.horizontal, Spacing.sm)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(firstName)
     }
 }
 
@@ -545,7 +576,8 @@ struct StatusPill: View {
                     )
             )
         }
-        .accessibilityLabel("\(filter.rawValue), \(count)")
+        .accessibilityLabel("\(filter.rawValue) filter, \(count) guests")
+        .accessibilityHint("Double tap to filter by \(filter.rawValue.lowercased())")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
@@ -555,6 +587,7 @@ struct StatusPill: View {
 struct ImprovedGuestCard: View {
     let guest: Guest
     let event: Event
+    var inviteLookup: [UUID: [UUID: FunctionInvite]] = [:]
     let isSelected: Bool
     let isSelectionMode: Bool
     let onTap: () -> Void
@@ -672,7 +705,11 @@ struct ImprovedGuestCard: View {
     private var functionStatusRow: some View {
         HStack(spacing: Spacing.xs) {
             ForEach(event.functions.prefix(3).sorted { $0.date < $1.date }) { function in
-                FunctionStatusChip(function: function, guest: guest)
+                FunctionStatusChip(
+                    function: function,
+                    guest: guest,
+                    invite: inviteLookup[function.id]?[guest.id]
+                )
             }
             if event.functions.count > 3 {
                 Text("+\(event.functions.count - 3)")
@@ -703,17 +740,23 @@ struct ImprovedGuestCard: View {
 struct FunctionStatusChip: View {
     let function: EventFunction
     let guest: Guest
+    var invite: FunctionInvite?
 
-    private var invite: FunctionInvite? {
-        function.invites.first { $0.guestId == guest.id }
+    init(function: EventFunction, guest: Guest, invite: FunctionInvite? = nil) {
+        self.function = function
+        self.guest = guest
+        // Use pre-computed invite if provided, otherwise fall back to lookup
+        self.invite = invite ?? function.invites.first { $0.guestId == guest.id }
     }
 
     private var abbreviation: String {
-        let words = function.name.split(separator: " ")
+        let trimmed = function.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "?" }
+        let words = trimmed.split(separator: " ")
         if words.count >= 2 {
             return String(words[0].prefix(1) + words[1].prefix(1)).uppercased()
         }
-        return String(function.name.prefix(2)).uppercased()
+        return String(trimmed.prefix(2)).uppercased()
     }
 
     private var chipColor: Color {
@@ -756,6 +799,26 @@ struct FunctionStatusChip: View {
         .padding(.vertical, 3)
         .background(chipColor)
         .clipShape(RoundedRectangle(cornerRadius: 4))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel({
+            let status: String
+            if let invite = invite {
+                switch invite.inviteStatus {
+                case .notSent: status = "not invited"
+                case .sent: status = "invite sent"
+                case .responded:
+                    switch invite.response {
+                    case .yes: status = "attending"
+                    case .no: status = "declined"
+                    case .maybe: status = "maybe"
+                    case .none: status = "responded"
+                    }
+                }
+            } else {
+                status = "not invited"
+            }
+            return "\(function.name): \(status)"
+        }())
     }
 }
 

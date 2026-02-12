@@ -269,7 +269,8 @@ struct EmailSignInSheet: View {
                         }
 
                         Text("Sign in with Email")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .font(GatherFont.title2)
+                            .fontWeight(.bold)
                             .foregroundStyle(Color.gatherPrimaryText)
 
                         Text("Enter your email to create or access your account")

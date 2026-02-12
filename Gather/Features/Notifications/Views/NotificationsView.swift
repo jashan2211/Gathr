@@ -230,7 +230,8 @@ struct NotificationBellButton: View {
 
                 if !unreadNotifications.isEmpty {
                     Text("\(min(unreadNotifications.count, 99))")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.caption2)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
                         .padding(.horizontal, Spacing.xxs)
                         .padding(.vertical, 1)

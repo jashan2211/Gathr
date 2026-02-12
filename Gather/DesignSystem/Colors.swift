@@ -61,6 +61,9 @@ extension Color {
     /// Sunshine yellow - highlights, badges
     static let sunshineYellow = Color(red: 251/255, green: 191/255, blue: 36/255)   // #FBBF24
 
+    /// High-contrast yellow for text (WCAG AA on white backgrounds)
+    static let sunshineYellowText = Color(red: 180/255, green: 130/255, blue: 0/255) // Darker amber
+
     /// Mint green - success states, free tickets
     static let mintGreen = Color(red: 52/255, green: 211/255, blue: 153/255)        // #34D399
 
@@ -89,6 +92,16 @@ extension Color {
 
     /// Glass border shadow
     static let glassBorderBottom = Color.white.opacity(0.1)
+
+    /// Color-scheme-aware glass border (top) — use in views with @Environment(\.colorScheme)
+    static func glassBorderTopAdaptive(for colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? Color.white.opacity(0.15) : Color.white.opacity(0.3)
+    }
+
+    /// Color-scheme-aware glass border (bottom)
+    static func glassBorderBottomAdaptive(for colorScheme: ColorScheme) -> Color {
+        colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.1)
+    }
 
     // MARK: - Semantic Fallbacks
 

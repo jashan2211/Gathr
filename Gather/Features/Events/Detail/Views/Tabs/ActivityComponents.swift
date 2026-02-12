@@ -299,7 +299,7 @@ struct ActivityPostCard: View {
 
                     if reply.isHostPost {
                         Text("Host")
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .fontWeight(.medium)
                             .foregroundStyle(.white)
                             .padding(.horizontal, Spacing.xxs)
@@ -577,7 +577,6 @@ struct ComposePostSheet: View {
         )
         onPost(post)
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
     }
 }

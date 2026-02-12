@@ -18,7 +18,8 @@ struct ExpenseDetailSheet: View {
                 Section {
                     VStack(spacing: Spacing.sm) {
                         Text(expense.amount.asCurrency)
-                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
                             .foregroundStyle(Color.gatherPrimaryText)
 
                         HStack(spacing: Spacing.xs) {

@@ -24,6 +24,19 @@ struct OverviewTab: View {
                 // RSVP Summary Card
                 rsvpSummaryCard
 
+                // Function RSVP guidance banner (for non-host users on function-based events)
+                if !event.functions.isEmpty && !isHost {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundStyle(Color.accentPurpleFallback)
+                        Text("RSVP to individual functions on the Functions tab")
+                            .font(GatherFont.caption)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                    }
+                    .padding(Spacing.sm)
+                    .glassCardLite()
+                }
+
                 // Date & Time
                 dateTimeSection
 
@@ -307,7 +320,10 @@ struct OverviewTab: View {
                 }
                 .frame(height: 140)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                .disabled(true)
+                .allowsHitTesting(true)
+                .onTapGesture {
+                    openInMaps(location)
+                }
             }
         }
         .padding()
@@ -403,6 +419,7 @@ struct OverviewTab: View {
 
             let recentGuests = event.guests
                 .filter { $0.status == .attending }
+                .sorted { ($0.respondedAt ?? .distantPast) > ($1.respondedAt ?? .distantPast) }
                 .prefix(5)
 
             if recentGuests.isEmpty {
@@ -562,6 +579,16 @@ struct RSVPProgressRow: View {
         .accessibilityValue("\(Int(percentage * 100)) percent")
         .onAppear {
             withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
+                animatedProgress = percentage
+            }
+        }
+        .onChange(of: count) { _, _ in
+            withAnimation(.easeOut(duration: 0.5)) {
+                animatedProgress = percentage
+            }
+        }
+        .onChange(of: total) { _, _ in
+            withAnimation(.easeOut(duration: 0.5)) {
                 animatedProgress = percentage
             }
         }

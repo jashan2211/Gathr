@@ -8,7 +8,7 @@ struct HappeningSoonCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Gradient hero with date overlay
-            ZStack(alignment: .topLeading) {
+            ZStack {
                 CategoryMeshBackground(category: event.category)
                     .frame(width: 200, height: 110)
                     .overlay(alignment: .bottomTrailing) {
@@ -18,20 +18,42 @@ struct HappeningSoonCard: View {
                             .offset(x: -8, y: -8)
                     }
 
-                // Date chip
-                VStack(spacing: 0) {
-                    Text(dayOfMonth)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                    Text(monthAbbrev)
-                        .font(.system(size: 10, weight: .semibold))
-                        .textCase(.uppercase)
+                // Date chip - top left
+                VStack {
+                    HStack {
+                        VStack(spacing: 0) {
+                            Text(dayOfMonth)
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                            Text(monthAbbrev)
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .textCase(.uppercase)
+                        }
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(.ultraThinMaterial.opacity(0.7))
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                        .padding(Spacing.xs)
+
+                        Spacer()
+
+                        // Sample badge for demo events
+                        if event.isDemo {
+                            Text("SAMPLE")
+                                .font(.caption2)
+                                .fontWeight(.heavy)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.85))
+                                .clipShape(Capsule())
+                                .padding(Spacing.xs)
+                        }
+                    }
+                    Spacer()
                 }
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial.opacity(0.7))
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-                .padding(Spacing.xs)
             }
+            .frame(width: 200, height: 110)
             .clipped()
 
             // Info
@@ -83,7 +105,8 @@ struct HappeningSoonCard: View {
             .padding(Spacing.sm)
         }
         .frame(width: 200)
-        .glassCard()
+        .glassCardLite()
+        .drawingGroup()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(event.title), \(relativeDay). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending")
     }
@@ -126,20 +149,34 @@ struct ExploreGridCard: View {
                     .frame(height: 100)
                     .overlay(alignment: .bottomLeading) {
                         Text(event.category.emoji)
-                            .font(.system(size: 28))
+                            .font(.title)
                             .padding(Spacing.xs)
                     }
 
-                // Price tag
-                Text(priceLabel)
-                    .font(.caption2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.xs)
-                    .padding(.vertical, 3)
-                    .background(priceColor)
-                    .clipShape(Capsule())
-                    .padding(Spacing.xs)
+                VStack(alignment: .trailing, spacing: 4) {
+                    // Price tag
+                    Text(priceLabel)
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.xs)
+                        .padding(.vertical, 3)
+                        .background(priceColor)
+                        .clipShape(Capsule())
+
+                    // Sample badge for demo events
+                    if event.isDemo {
+                        Text("SAMPLE")
+                            .font(.caption2)
+                            .fontWeight(.heavy)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.85))
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(Spacing.xs)
             }
             .clipped()
 
@@ -217,20 +254,23 @@ struct ExploreGridCard: View {
             }
             .padding(Spacing.sm)
         }
-        .glassCard()
+        .glassCardLite()
+        .drawingGroup()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(event.title). \(priceLabel). \(smartDate). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending")
     }
 
     private var priceLabel: String {
+        guard event.hasTicketing else { return "RSVP" }
         let tiers = event.ticketTiers
         if let cheapest = tiers.min(by: { $0.price < $1.price }) {
-            return cheapest.price == 0 ? "FREE" : "$\(NSDecimalNumber(decimal: cheapest.price).intValue)"
+            return cheapest.price == 0 ? "FREE" : GatherPriceFormatter.formatShort(cheapest.price)
         }
         return "FREE"
     }
 
     private var priceColor: Color {
+        guard event.hasTicketing else { return Color.softLavender }
         let tiers = event.ticketTiers
         if let cheapest = tiers.min(by: { $0.price < $1.price }),
            cheapest.price > 0 {

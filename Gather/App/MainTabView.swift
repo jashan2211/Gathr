@@ -4,26 +4,18 @@ import SwiftData
 struct MainTabView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var showCreateSheet = false
     @State private var deepLinkEvent: Event?
     @State private var showDeepLinkRSVP = false
 
     var body: some View {
         Group {
-            switch appState.selectedTab {
-            case .going:
-                GoingView()
-            case .myEvents:
-                MyEventsView()
-            case .explore:
-                ExploreView()
-            case .profile:
-                ProfileView()
+            if horizontalSizeClass == .regular {
+                iPadLayout
+            } else {
+                iPhoneLayout
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .safeAreaInset(edge: .bottom) {
-            floatingTabBar
         }
         .sheet(isPresented: $showCreateSheet) {
             CreateEventView()
@@ -67,6 +59,53 @@ struct MainTabView: View {
         }
     }
 
+    // MARK: - iPhone Layout
+
+    private var iPhoneLayout: some View {
+        Group {
+            switch appState.selectedTab {
+            case .going:
+                GoingView()
+            case .myEvents:
+                MyEventsView()
+            case .explore:
+                ExploreView()
+            case .profile:
+                ProfileView()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .bottom) {
+            floatingTabBar
+        }
+    }
+
+    // MARK: - iPad Layout
+
+    private var iPadLayout: some View {
+        NavigationSplitView {
+            List(AppState.Tab.allCases, id: \.self, selection: Binding(
+                get: { appState.selectedTab },
+                set: { if let tab = $0 { appState.selectedTab = tab } }
+            )) { tab in
+                Label(tab.title, systemImage: tab.icon)
+            }
+            .navigationTitle("Gather")
+        } detail: {
+            switch appState.selectedTab {
+            case .going:
+                GoingView()
+            case .myEvents:
+                MyEventsView()
+            case .explore:
+                ExploreView()
+            case .profile:
+                ProfileView()
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+
     // MARK: - Floating Tab Bar
 
     private var floatingTabBar: some View {
@@ -76,8 +115,7 @@ struct MainTabView: View {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         appState.selectedTab = tab
                     }
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
+                    HapticService.tabSwitch()
                 } label: {
                     VStack(spacing: 4) {
                         ZStack {
@@ -100,7 +138,8 @@ struct MainTabView: View {
                         .frame(height: 36)
 
                         Text(tab.title)
-                            .font(.system(size: 10, weight: appState.selectedTab == tab ? .bold : .medium))
+                            .font(.caption2)
+                            .fontWeight(appState.selectedTab == tab ? .bold : .medium)
                             .foregroundStyle(
                                 appState.selectedTab == tab
                                     ? Color.accentPurpleFallback

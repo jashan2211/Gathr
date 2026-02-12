@@ -262,8 +262,7 @@ struct BudgetView: View {
 
         modelContext.insert(newBudget)
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
     }
 }
 

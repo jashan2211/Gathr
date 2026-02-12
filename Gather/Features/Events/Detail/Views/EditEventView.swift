@@ -17,6 +17,8 @@ struct EditEventView: View {
     @State private var locationAddress: String
     @State private var locationCity: String
     @State private var locationState: String
+    @State private var locationLatitude: Double?
+    @State private var locationLongitude: Double?
     @State private var isVirtual: Bool
     @State private var virtualURL: String
     @State private var capacity: Int?
@@ -33,7 +35,7 @@ struct EditEventView: View {
     // UI state
     @State private var isSubmitting = false
     @State private var showDeleteConfirmation = false
-    @State private var hasChanges = false
+    @State private var showDiscardAlert = false
 
     init(event: Event) {
         self.event = event
@@ -46,6 +48,8 @@ struct EditEventView: View {
         _locationAddress = State(initialValue: event.location?.address ?? "")
         _locationCity = State(initialValue: event.location?.city ?? "")
         _locationState = State(initialValue: event.location?.state ?? "")
+        _locationLatitude = State(initialValue: event.location?.latitude)
+        _locationLongitude = State(initialValue: event.location?.longitude)
         _isVirtual = State(initialValue: event.location?.isVirtual ?? false)
         _virtualURL = State(initialValue: event.location?.virtualURL?.absoluteString ?? "")
         _capacity = State(initialValue: event.capacity)
@@ -56,90 +60,109 @@ struct EditEventView: View {
         _enabledFeatures = State(initialValue: event.enabledFeatures)
     }
 
+    /// Whether user has made edits compared to original event values
+    private var hasUnsavedChanges: Bool {
+        title.trimmingCharacters(in: .whitespaces) != event.title ||
+        description != (event.eventDescription ?? "") ||
+        startDate != event.startDate ||
+        endDate != event.endDate ||
+        selectedCategory != event.category ||
+        privacy != event.privacy ||
+        guestListVisibility != event.guestListVisibility ||
+        enabledFeatures != event.enabledFeatures ||
+        locationName != (event.location?.name ?? "") ||
+        isVirtual != (event.location?.isVirtual ?? false) ||
+        heroImage != nil
+    }
+
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Hero image with category tint
-                        EventHeroImagePicker(
-                            selectedPhoto: $selectedPhoto,
-                            heroImage: $heroImage,
-                            selectedCategory: selectedCategory,
-                            existingImageURL: event.heroMediaURL
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Hero image with category tint
+                    EventHeroImagePicker(
+                        selectedPhoto: $selectedPhoto,
+                        heroImage: $heroImage,
+                        selectedCategory: selectedCategory,
+                        existingImageURL: event.heroMediaURL
+                    )
+                    .bouncyAppear()
+
+                    VStack(spacing: Spacing.lg) {
+                        // Category pills
+                        EventCategorySelector(
+                            selectedCategory: $selectedCategory,
+                            enabledFeatures: $enabledFeatures,
+                            headerTitle: "Event Type"
                         )
-                        .bouncyAppear()
+                        .bouncyAppear(delay: 0.05)
 
-                        VStack(spacing: Spacing.lg) {
-                            // Category pills
-                            EventCategorySelector(
-                                selectedCategory: $selectedCategory,
-                                enabledFeatures: $enabledFeatures,
-                                headerTitle: "Event Type"
-                            )
-                            .bouncyAppear(delay: 0.05)
+                        // Event details
+                        EventBasicsSection(
+                            title: $title,
+                            description: $description
+                        )
+                        .bouncyAppear(delay: 0.08)
 
-                            // Event details
-                            EventBasicsSection(
-                                title: $title,
-                                description: $description
-                            )
-                            .bouncyAppear(delay: 0.08)
+                        // Features
+                        EventFeaturesSection(
+                            enabledFeatures: $enabledFeatures
+                        )
+                        .bouncyAppear(delay: 0.11)
 
-                            // Features
-                            EventFeaturesSection(
-                                enabledFeatures: $enabledFeatures
-                            )
-                            .bouncyAppear(delay: 0.11)
+                        // When
+                        EventDateTimeSection(
+                            startDate: $startDate,
+                            endDate: $endDate,
+                            hasEndDate: $hasEndDate,
+                            allowPastDates: true
+                        )
+                        .bouncyAppear(delay: 0.14)
 
-                            // When
-                            EventDateTimeSection(
-                                startDate: $startDate,
-                                endDate: $endDate,
-                                hasEndDate: $hasEndDate,
-                                allowPastDates: true
-                            )
-                            .bouncyAppear(delay: 0.14)
+                        // Where
+                        EventLocationSection(
+                            isVirtual: $isVirtual,
+                            virtualURL: $virtualURL,
+                            locationName: $locationName,
+                            locationAddress: $locationAddress,
+                            locationCity: $locationCity,
+                            locationState: $locationState,
+                            locationLatitude: $locationLatitude,
+                            locationLongitude: $locationLongitude
+                        )
+                        .bouncyAppear(delay: 0.17)
 
-                            // Where
-                            EventLocationSection(
-                                isVirtual: $isVirtual,
-                                virtualURL: $virtualURL,
-                                locationName: $locationName,
-                                locationAddress: $locationAddress,
-                                locationCity: $locationCity,
-                                locationState: $locationState
-                            )
-                            .bouncyAppear(delay: 0.17)
+                        // Settings
+                        EventSettingsSection(
+                            privacy: $privacy,
+                            guestListVisibility: $guestListVisibility,
+                            capacity: $capacity,
+                            hasCapacity: $hasCapacity
+                        )
+                        .bouncyAppear(delay: 0.20)
 
-                            // Settings
-                            EventSettingsSection(
-                                privacy: $privacy,
-                                guestListVisibility: $guestListVisibility,
-                                capacity: $capacity,
-                                hasCapacity: $hasCapacity
-                            )
-                            .bouncyAppear(delay: 0.20)
-
-                            // Danger zone
-                            dangerZone
-                                .bouncyAppear(delay: 0.23)
-                        }
-                        .padding(.horizontal, Spacing.md)
-                        .padding(.top, Spacing.lg)
-                        .padding(.bottom, Layout.scrollBottomInset)
+                        // Danger zone
+                        dangerZone
+                            .bouncyAppear(delay: 0.23)
                     }
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.top, Spacing.lg)
                 }
-
-                // Floating save button
+            }
+            .safeAreaInset(edge: .bottom) {
                 saveButtonBar
             }
+            .interactiveDismissDisabled(hasUnsavedChanges)
             .navigationTitle("Edit Event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
-                        dismiss()
+                        if hasUnsavedChanges {
+                            showDiscardAlert = true
+                        } else {
+                            dismiss()
+                        }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title3)
@@ -155,6 +178,12 @@ struct EditEventView: View {
                 }
             } message: {
                 Text("This action cannot be undone. All guest RSVPs and event data will be permanently deleted.")
+            }
+            .confirmationDialog("Discard Changes?", isPresented: $showDiscardAlert) {
+                Button("Discard", role: .destructive) { dismiss() }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("You have unsaved changes. Are you sure you want to discard them?")
             }
         }
     }
@@ -282,10 +311,19 @@ struct EditEventView: View {
         }
     }
 
-    // MARK: - Validation
+    // Validation is defined after saveChanges
+
+    // MARK: - Validation (Enhanced)
 
     private var isValid: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty
+        let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
+        guard !trimmedTitle.isEmpty && trimmedTitle.count <= 100 else { return false }
+        if hasEndDate, let end = endDate, end <= startDate { return false }
+        if hasCapacity, let cap = capacity, cap <= 0 { return false }
+        if isVirtual && !virtualURL.isEmpty {
+            guard URL(string: virtualURL) != nil else { return false }
+        }
+        return true
     }
 
     // MARK: - Save Changes
@@ -305,6 +343,33 @@ struct EditEventView: View {
         event.enabledFeatures = enabledFeatures
         event.updatedAt = Date()
 
+        // Save hero image if changed
+        if heroImage != nil, let selectedPhoto {
+            Task {
+                if let data = try? await selectedPhoto.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    // Compress and save to documents
+                    let maxWidth: CGFloat = 1200
+                    let scale = min(1.0, maxWidth / uiImage.size.width)
+                    let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
+                    let renderer = UIGraphicsImageRenderer(size: newSize)
+                    let resized = renderer.image { _ in
+                        uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                    }
+                    if let jpegData = resized.jpegData(compressionQuality: 0.8) {
+                        let filename = "\(event.id.uuidString)_hero.jpg"
+                        let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                        let fileURL = docsDir.appendingPathComponent(filename)
+                        try? jpegData.write(to: fileURL)
+                        await MainActor.run {
+                            event.heroMediaURL = fileURL
+                            modelContext.safeSave()
+                        }
+                    }
+                }
+            }
+        }
+
         // Build location
         if isVirtual, !virtualURL.isEmpty {
             event.location = EventLocation(name: "Virtual Event", virtualURL: URL(string: virtualURL))
@@ -313,15 +378,18 @@ struct EditEventView: View {
                 name: locationName,
                 address: locationAddress.isEmpty ? nil : locationAddress,
                 city: locationCity.isEmpty ? nil : locationCity,
-                state: locationState.isEmpty ? nil : locationState
+                state: locationState.isEmpty ? nil : locationState,
+                latitude: locationLatitude,
+                longitude: locationLongitude
             )
         } else {
             event.location = nil
         }
 
+        modelContext.safeSave()
+
         // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
 
         isSubmitting = false
         dismiss()
@@ -333,8 +401,7 @@ struct EditEventView: View {
         modelContext.delete(event)
         modelContext.safeSave()
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
+        HapticService.warning()
 
         dismiss()
     }

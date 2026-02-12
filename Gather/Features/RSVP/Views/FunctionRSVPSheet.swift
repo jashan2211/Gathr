@@ -384,8 +384,7 @@ struct FunctionRSVPSheet: View {
         // Haptic success feedback
         Task {
             try? await Task.sleep(for: .seconds(0.5))
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
+            HapticService.success()
 
             withAnimation(.spring(response: 0.4)) {
                 step = .confirmation
@@ -395,8 +394,7 @@ struct FunctionRSVPSheet: View {
     }
 
     private func hapticFeedback() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        HapticService.buttonTap()
     }
 }
 

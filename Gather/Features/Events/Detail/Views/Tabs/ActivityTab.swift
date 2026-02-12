@@ -190,8 +190,7 @@ struct ActivityTab: View {
             post.likedByUserIds.append(userId)
             post.likes += 1
         }
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        HapticService.buttonTap()
     }
 
     private func togglePin(_ post: ActivityPost) {
@@ -236,7 +235,6 @@ struct ActivityTab: View {
             }
             post.pollOptions = options
         }
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        HapticService.buttonTap()
     }
 }

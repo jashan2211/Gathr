@@ -18,4 +18,9 @@ enum AppConfig {
 
     /// App Store URL (placeholder until live)
     static let appStoreURL = URL(string: "https://apps.apple.com/app/gathr/id0000000000")!
+
+    /// Whether real Apple Wallet pass generation is enabled.
+    /// Requires an Apple Developer signing certificate + server-side .pkpass creation.
+    /// When `false`, the app shows a demo wallet-style card with a "Save to Photos" option.
+    static let walletPassEnabled = false
 }

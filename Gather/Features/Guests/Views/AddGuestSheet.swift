@@ -203,8 +203,7 @@ struct AddGuestSheet: View {
                             ForEach(GuestRole.allCases, id: \.self) { guestRole in
                                 Button {
                                     withAnimation(.spring(response: 0.25)) { role = guestRole }
-                                    let generator = UIImpactFeedbackGenerator(style: .light)
-                                    generator.impactOccurred()
+                                    HapticService.buttonTap()
                                 } label: {
                                     HStack(spacing: 4) {
                                         Image(systemName: guestRole.icon)
@@ -428,8 +427,7 @@ struct AddGuestSheet: View {
 
         event.guests.append(guest)
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
 
         // Show success briefly
         withAnimation(.spring(response: 0.3)) { showSuccess = true }
@@ -462,8 +460,7 @@ struct AddGuestSheet: View {
             event.guests.append(guest)
         }
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        HapticService.success()
 
         isImporting = false
         dismiss()

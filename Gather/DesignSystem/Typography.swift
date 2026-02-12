@@ -5,17 +5,17 @@ import SwiftUI
 enum GatherFont {
     // MARK: - Display Styles
 
-    /// 34pt Bold - Screen titles, hero text
-    static let largeTitle = Font.largeTitle.weight(.bold)
+    /// 34pt Bold Rounded - Screen titles, hero text
+    static let largeTitle = Font.system(.largeTitle, design: .rounded).weight(.bold)
 
-    /// 28pt Bold - Section headers
-    static let title = Font.title.weight(.bold)
+    /// 28pt Bold Rounded - Section headers
+    static let title = Font.system(.title, design: .rounded).weight(.bold)
 
-    /// 22pt Semibold - Card titles, prominent labels
-    static let title2 = Font.title2.weight(.semibold)
+    /// 22pt Semibold Rounded - Card titles, prominent labels
+    static let title2 = Font.system(.title2, design: .rounded).weight(.semibold)
 
-    /// 20pt Semibold - Subsection headers
-    static let title3 = Font.title3.weight(.semibold)
+    /// 20pt Semibold Rounded - Subsection headers
+    static let title3 = Font.system(.title3, design: .rounded).weight(.semibold)
 
     // MARK: - Body Styles
 

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA11BB22CC33DD44EE55FF01 /* PriceFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF02 /* PriceFormatter.swift */; };
+		AA11BB22CC33DD44EE55FF03 /* MyTicketsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF04 /* MyTicketsView.swift */; };
 		004095CF12912AF0E2EB9A5A /* GatherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACD33DF71781DE0D67D6CDD9 /* GatherApp.swift */; };
 		069F553B4D9E49FB3120BE09 /* TicketConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EA5250786947CF2523F2F7D /* TicketConfirmationView.swift */; };
 		0823EA36A1AE6751B76BFA04 /* ManageRSVPSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F750B3A2DE04B0D0BC2193 /* ManageRSVPSheet.swift */; };
@@ -97,6 +99,12 @@
 		F92E600CDA51A4C6946493F8 /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE74AADD5AD3F9B3044FA601 /* ExploreView.swift */; };
 		FA5E9260ECE62BA69D40ECD0 /* CalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90AEF265B59F8F189CB8FE4C /* CalendarService.swift */; };
 		FDDB2D112CB26EE8D86BA5D1 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CE43924F82D8F86FA687A36 /* DateFormatters.swift */; };
+		1A2B3C4D5E6F7A8B9C0D1E2F /* HapticService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* HapticService.swift */; };
+		3C4D5E6F7A8B9C0D1E2F3A4B /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B8C9D0E1F2A3B4 /* ImageCacheService.swift */; };
+		5E6F7A8B9C0D1E2F3A4B5C6D /* LocationPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F6A7B8C9D0E1F2A3B4C5D6 /* LocationPickerView.swift */; };
+		6F7A8B9C0D1E2F3A4B5C6D7E /* LocationSearchManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A7B8C9D0E1F2A3B4C5D6E7 /* LocationSearchManager.swift */; };
+		2B3C4D5E6F7A8B9C0D1E2F3A /* SeatingTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* SeatingTable.swift */; };
+		4D5E6F7A8B9C0D1E2F3A4B5C /* WalletPassService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6A7B8C9D0E1F2A3B4C5 /* WalletPassService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -117,6 +125,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AA11BB22CC33DD44EE55FF02 /* PriceFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriceFormatter.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF04 /* MyTicketsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyTicketsView.swift; sourceTree = "<group>"; };
 		01AEB78447E826A0186CEBF1 /* RSVPSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSVPSheet.swift; sourceTree = "<group>"; };
 		04278371F501F302319BC5D8 /* ContactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsView.swift; sourceTree = "<group>"; };
 		046498E046B15E6AA44A70FB /* EventFunction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventFunction.swift; sourceTree = "<group>"; };
@@ -212,6 +222,12 @@
 		FA40E0DDEF7662119DC7C7D8 /* TicketPurchaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketPurchaseSheet.swift; sourceTree = "<group>"; };
 		FAB76E5F1C9138217E35E45A /* Gather.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Gather.entitlements; sourceTree = "<group>"; };
 		FCAE62276B8B92364A410AE6 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* HapticService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticService.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* SeatingTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeatingTable.swift; sourceTree = "<group>"; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
+		D4E5F6A7B8C9D0E1F2A3B4C5 /* WalletPassService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletPassService.swift; sourceTree = "<group>"; };
+		E5F6A7B8C9D0E1F2A3B4C5D6 /* LocationPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPickerView.swift; sourceTree = "<group>"; };
+		F6A7B8C9D0E1F2A3B4C5D6E7 /* LocationSearchManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSearchManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -247,6 +263,7 @@
 				49DAE393DBBF7A22A1001861 /* PartyMember.swift */,
 				B9451685D426DC81E57050B6 /* PaymentSplit.swift */,
 				F9936A27AE711C0DDFBA01BC /* PaymentTransaction.swift */,
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* SeatingTable.swift */,
 				B8DE1A98670B421389C52E22 /* Ticket.swift */,
 				C33CC6FA1044086B3BE28BCC /* User.swift */,
 			);
@@ -323,6 +340,8 @@
 				150520D585D2B79EB7128836 /* DemoGuestFactory.swift */,
 				15B7111D0C1B3786D3D10BC4 /* EventService.swift */,
 				312E4412118C0C8C055B4EC0 /* GatherSchema.swift */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* HapticService.swift */,
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* ImageCacheService.swift */,
 				AB97DB43D833C4D336D65B36 /* InviteService.swift */,
 				F116767086C5E5E3C7F676A4 /* KeychainService.swift */,
 				F0399447FECD256274E38B1A /* NotificationService.swift */,
@@ -405,6 +424,7 @@
 			children = (
 				D5C5C7D27688B1E11FA8F435 /* Components */,
 				4960FF7082E7D45919E01496 /* Colors.swift */,
+				AA11BB22CC33DD44EE55FF02 /* PriceFormatter.swift */,
 				A6F3E9B87212A7094C98EB58 /* Spacing.swift */,
 				DC3541CAD43936EAC9F1E5CC /* Typography.swift */,
 			);
@@ -489,6 +509,8 @@
 			isa = PBXGroup;
 			children = (
 				115B66B914A4A5BAECE7FB76 /* EventFormComponents.swift */,
+				E5F6A7B8C9D0E1F2A3B4C5D6 /* LocationPickerView.swift */,
+				F6A7B8C9D0E1F2A3B4C5D6E7 /* LocationSearchManager.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -552,9 +574,18 @@
 		9B5FCDA72F4695D1073A0BCF /* Tickets */ = {
 			isa = PBXGroup;
 			children = (
+				7A8B9C0D1E2F3A4B5C6D7E8F /* Services */,
 				FD0C2C71EAC4092581BFCFEF /* Views */,
 			);
 			path = Tickets;
+			sourceTree = "<group>";
+		};
+		7A8B9C0D1E2F3A4B5C6D7E8F /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				D4E5F6A7B8C9D0E1F2A3B4C5 /* WalletPassService.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		A2FA7D1B68A8E1198F492E0D /* Going */ = {
@@ -733,6 +764,7 @@
 		FD0C2C71EAC4092581BFCFEF /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				AA11BB22CC33DD44EE55FF04 /* MyTicketsView.swift */,
 				7EA5250786947CF2523F2F7D /* TicketConfirmationView.swift */,
 				FA40E0DDEF7662119DC7C7D8 /* TicketPurchaseSheet.swift */,
 				3DB709D71F9E2EE7A6A25AD8 /* WaitlistSheet.swift */,
@@ -949,10 +981,14 @@
 				285A2E1B8C86210DB14F257C /* GuestListSheet.swift in Sources */,
 				8145F36DB2DE186382561D20 /* GuestRowWithFunctions.swift in Sources */,
 				639E78F4363B51E81CA2A7B9 /* GuestsTab.swift in Sources */,
+				1A2B3C4D5E6F7A8B9C0D1E2F /* HapticService.swift in Sources */,
+				3C4D5E6F7A8B9C0D1E2F3A4B /* ImageCacheService.swift in Sources */,
 				20012B85C4E0327270C22962 /* InviteComponents.swift in Sources */,
 				4FDE5A886F91C43A0DE7DCBB /* InviteService.swift in Sources */,
 				B934F25D56FC02C5055C3264 /* KeychainService.swift in Sources */,
 				A8A5DE4EBAAB54CD42455E1D /* LocationFilterSheet.swift in Sources */,
+				5E6F7A8B9C0D1E2F3A4B5C6D /* LocationPickerView.swift in Sources */,
+				6F7A8B9C0D1E2F3A4B5C6D7E /* LocationSearchManager.swift in Sources */,
 				883B056491F89FB7D6F2E8AD /* MainTabView.swift in Sources */,
 				0823EA36A1AE6751B76BFA04 /* ManageRSVPSheet.swift in Sources */,
 				87BA07BC12726D4675312130 /* ModelContext+SafeSave.swift in Sources */,
@@ -969,14 +1005,18 @@
 				F7D9E0F13D6632F360E55BA1 /* QuickAddExpenseSheet.swift in Sources */,
 				29B0A030FECDA1A27F824498 /* RSVPSheet.swift in Sources */,
 				B0B922CEB274680817B56B3D /* SeatingChartView.swift in Sources */,
+				2B3C4D5E6F7A8B9C0D1E2F3A /* SeatingTable.swift in Sources */,
 				A8D758C5634735B6695EF8A2 /* SendInvitesSheet.swift in Sources */,
 				CC85624D49900BB76C50D475 /* ShareSheet.swift in Sources */,
 				7224667672A7A5842744FC26 /* Spacing.swift in Sources */,
+				AA11BB22CC33DD44EE55FF01 /* PriceFormatter.swift in Sources */,
+				AA11BB22CC33DD44EE55FF03 /* MyTicketsView.swift in Sources */,
 				14AA73C8AC6E2D0085B92BA6 /* Ticket.swift in Sources */,
 				069F553B4D9E49FB3120BE09 /* TicketConfirmationView.swift in Sources */,
 				465D1391A3CCC3A6293CAC08 /* TicketPurchaseSheet.swift in Sources */,
 				A646751E33D1136EB9160936 /* Typography.swift in Sources */,
 				C8FAC43990D8E64FC01BA450 /* User.swift in Sources */,
+				4D5E6F7A8B9C0D1E2F3A4B5C /* WalletPassService.swift in Sources */,
 				68FE049324D787DD67327C2F /* WaitlistSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

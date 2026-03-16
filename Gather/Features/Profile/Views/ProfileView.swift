@@ -288,8 +288,10 @@ struct ProfileView: View {
                 ProfileMenuItem(icon: "questionmark.circle", title: "Help", color: Color.mintGreen) {
                     HelpCenterView()
                 }
-                ProfileMenuItem(icon: "envelope", title: "Send Feedback", color: Color.accentPurpleFallback) {
-                    Text("Feedback")
+                ProfileMenuLink(icon: "envelope", title: "Send Feedback", color: Color.accentPurpleFallback) {
+                    if let url = URL(string: "mailto:\(AppConfig.contactEmail)?subject=Gather%20Feedback") {
+                        UIApplication.shared.open(url)
+                    }
                 }
                 ProfileMenuItem(icon: "info.circle", title: "About Gather", color: Color.neonBlue) {
                     AboutGatherView()
@@ -423,10 +425,17 @@ struct ProfileView: View {
 
     // MARK: - Version Badge
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
     private var versionBadge: some View {
         HStack {
             Spacer()
-            Text("Gather v1.0.0")
+            Text("Gather v\(appVersion) (\(buildNumber))")
                 .font(.caption2)
                 .foregroundStyle(Color.gatherSecondaryText)
             Spacer()
@@ -554,6 +563,42 @@ struct ProfileMenuItem: View {
                 Spacer()
 
                 Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.sm)
+        }
+    }
+}
+
+// MARK: - Profile Menu Link (action-based, no navigation)
+
+struct ProfileMenuLink: View {
+    let icon: String
+    let title: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            action()
+        } label: {
+            HStack(spacing: Spacing.md) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(color)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                Text(title)
+                    .font(GatherFont.callout)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
                     .font(.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
@@ -1396,7 +1441,7 @@ struct HelpCenterView: View {
                     .padding(.vertical, Spacing.sm)
 
                 Button {
-                    if let url = URL(string: "mailto:support@gatherapp.com") {
+                    if let url = URL(string: "mailto:\(AppConfig.contactEmail)") {
                         #if !targetEnvironment(macCatalyst)
                         UIApplication.shared.open(url)
                         #endif
@@ -1487,13 +1532,14 @@ struct AboutGatherView: View {
 
                 // Links
                 VStack(spacing: 1) {
-                    linkRow(icon: "doc.text", title: "Privacy Policy")
-                    linkRow(icon: "doc.plaintext", title: "Terms of Service")
-                    linkRow(icon: "star.fill", title: "Rate on App Store")
+                    linkButton(icon: "doc.text", title: "Privacy Policy", url: AppConfig.privacyPolicyURL)
+                    linkButton(icon: "doc.plaintext", title: "Terms of Service", url: AppConfig.termsOfServiceURL)
+                    linkButton(icon: "questionmark.circle", title: "Support", url: AppConfig.supportURL)
+                    linkButton(icon: "star.fill", title: "Rate on App Store", url: AppConfig.appStoreURL)
                 }
                 .glassCard(cornerRadius: CornerRadius.md)
 
-                Text("\u{00A9} 2026 Gather App. All rights reserved.")
+                Text("\u{00A9} 2026 thebighead. All rights reserved.")
                     .font(.caption2)
                     .foregroundStyle(Color.gatherSecondaryText)
                     .padding(.top, Spacing.lg)
@@ -1522,21 +1568,27 @@ struct AboutGatherView: View {
         }
     }
 
-    private func linkRow(icon: String, title: String) -> some View {
-        HStack(spacing: Spacing.sm) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(Color.accentPurpleFallback)
-                .frame(width: 30)
-            Text(title)
-                .font(GatherFont.callout)
-                .foregroundStyle(Color.gatherPrimaryText)
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(Color.gatherSecondaryText)
+    private func linkButton(icon: String, title: String, url: URL) -> some View {
+        Button {
+            #if !targetEnvironment(macCatalyst)
+            UIApplication.shared.open(url)
+            #endif
+        } label: {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(Color.accentPurpleFallback)
+                    .frame(width: 30)
+                Text(title)
+                    .font(GatherFont.callout)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .padding(Spacing.sm)
         }
-        .padding(Spacing.sm)
     }
 }
 

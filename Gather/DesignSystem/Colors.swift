@@ -315,3 +315,18 @@ extension LinearGradient {
         }
     }
 }
+
+// MARK: - Stable Hashing
+
+extension String {
+    /// A launch-stable hash. `String.hashValue` is seeded per process, so it
+    /// produces different values each run — unusable for deterministic things
+    /// like picking an avatar color. This djb2 hash is stable across launches.
+    var stableHash: Int {
+        var hash = 5381
+        for byte in utf8 {
+            hash = (hash &* 33) &+ Int(byte)
+        }
+        return abs(hash)
+    }
+}

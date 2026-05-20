@@ -196,17 +196,19 @@ struct FunctionDetailSheet: View {
         .background(.ultraThinMaterial)
     }
 
-    private var currentUserInvite: FunctionInvite? {
+    /// The current user's Guest record on this event, if one exists.
+    private var currentGuest: Guest? {
         guard let currentUser = authManager.currentUser else { return nil }
-        return function.invites.first(where: { $0.guestId == currentUser.id })
+        return event.guests.first(where: { $0.userId == currentUser.id })
+    }
+
+    private var currentUserInvite: FunctionInvite? {
+        guard let guest = currentGuest else { return nil }
+        return function.invites.first(where: { $0.guestId == guest.id })
     }
 
     private var currentRSVPStatus: String {
-        guard let currentUser = authManager.currentUser else {
-            return "Not invited"
-        }
-
-        if let invite = function.invites.first(where: { $0.guestId == currentUser.id }) {
+        if let invite = currentUserInvite {
             switch invite.response {
             case .yes: return "Attending"
             case .no: return "Declined"

@@ -16,6 +16,10 @@ final class Guest {
     var invitedAt: Date
     var respondedAt: Date?
 
+    // Invite delivery tracking — works for events with or without functions.
+    var inviteSentAt: Date?
+    var inviteSentVia: InviteChannel?
+
     // Store user ID for reference
     var userId: UUID?
 
@@ -136,6 +140,10 @@ extension Guest {
 
     var hasResponded: Bool {
         respondedAt != nil
+    }
+
+    var inviteWasSent: Bool {
+        inviteSentAt != nil
     }
 
     var displayContact: String? {

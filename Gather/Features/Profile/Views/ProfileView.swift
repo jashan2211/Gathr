@@ -1276,7 +1276,7 @@ struct EditProfileSheet: View {
         guard !trimmed.isEmpty else { return }
         isSaving = true
 
-        authManager.currentUser?.name = trimmed
+        authManager.updateDisplayName(trimmed)
 
         HapticService.success()
 

@@ -149,6 +149,7 @@ struct EditEventView: View {
                     .padding(.top, Spacing.lg)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom) {
                 saveButtonBar
             }
@@ -258,7 +259,11 @@ struct EditEventView: View {
             HStack(spacing: Spacing.sm) {
                 // Discard changes
                 Button {
-                    dismiss()
+                    if hasUnsavedChanges {
+                        showDiscardAlert = true
+                    } else {
+                        dismiss()
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "xmark")

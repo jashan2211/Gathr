@@ -15,16 +15,10 @@ struct GuestsTab: View {
         event.hostId == authManager.currentUser?.id
     }
 
-    /// Pre-computed set of guest IDs who have at least one "sent" invite across all functions.
-    /// Avoids O(g*f*i) nested loops in filter/count logic.
+    /// Guest IDs that have been sent an invite. Tracked on the Guest itself so
+    /// this works for events with or without functions.
     private var sentGuestIds: Set<UUID> {
-        var ids = Set<UUID>()
-        for function in event.functions {
-            for invite in function.invites where invite.inviteStatus == .sent {
-                ids.insert(invite.guestId)
-            }
-        }
-        return ids
+        Set(event.guests.filter { $0.inviteWasSent }.map { $0.id })
     }
 
     /// Lookup dictionary: [functionId: [guestId: FunctionInvite]]
@@ -506,7 +500,7 @@ struct FirstNameGuestCard: View {
 
     private var avatarColor: Color {
         let colors: [Color] = [.accentPurpleFallback, .accentPinkFallback, .warmCoral, .mintGreen, .neonBlue]
-        let index = abs(guest.name.hashValue) % colors.count
+        let index = guest.name.stableHash % colors.count
         return colors[index]
     }
 
@@ -730,7 +724,7 @@ struct ImprovedGuestCard: View {
 
     private var avatarColor: Color {
         let colors: [Color] = [.accentPurpleFallback, .neonBlue, .mintGreen, .warmCoral, .accentPinkFallback, .softLavender]
-        let index = abs(guest.name.hashValue) % colors.count
+        let index = guest.name.stableHash % colors.count
         return colors[index]
     }
 }

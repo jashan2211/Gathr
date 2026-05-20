@@ -42,6 +42,8 @@ targets:
           - CFBundleURLName: "ca.thebighead.gathr"
             CFBundleURLSchemes:
               - gather
+        LSApplicationQueriesSchemes:
+          - whatsapp
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

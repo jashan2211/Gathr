@@ -6,7 +6,7 @@ struct GatherApp: App {
     // MARK: - SwiftData Container
 
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema(versionedSchema: GatherSchemaV2.self)
+        let schema = Schema(versionedSchema: GatherSchemaV3.self)
         let modelConfiguration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,

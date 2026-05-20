@@ -38,6 +38,16 @@ struct CreateEventView: View {
     @State private var isSubmitting = false
     @State private var showTemplates = true
     @State private var currentStep = 0
+    @State private var showDiscardAlert = false
+
+    /// Whether the user has entered anything worth confirming before discard.
+    private var hasInput: Bool {
+        !title.trimmingCharacters(in: .whitespaces).isEmpty ||
+        !description.isEmpty ||
+        !locationName.isEmpty ||
+        heroImage != nil ||
+        selectedCategory != .custom
+    }
 
     // Optional: pre-fill from template
     var template: EventTemplate? = nil
@@ -117,22 +127,35 @@ struct CreateEventView: View {
                     .padding(.top, Spacing.lg)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom) {
                 createButtonBar
             }
             .navigationTitle("New Event")
             .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(hasInput)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
-                        dismiss()
+                        if hasInput {
+                            showDiscardAlert = true
+                        } else {
+                            dismiss()
+                        }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title3)
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
+                    .accessibilityLabel("Close")
                 }
+            }
+            .confirmationDialog("Discard Event?", isPresented: $showDiscardAlert) {
+                Button("Discard", role: .destructive) { dismiss() }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("You've started creating an event. Your changes won't be saved.")
             }
         }
     }
@@ -225,76 +248,100 @@ struct CreateEventView: View {
             )
             .frame(height: 20)
 
-            HStack(spacing: Spacing.sm) {
-                // Save as Draft
-                Button {
-                    createEvent(asDraft: true)
-                } label: {
+            VStack(spacing: Spacing.xs) {
+                // Hint explaining why the Create button is disabled
+                if let hint = validationHint {
                     HStack(spacing: 6) {
-                        Image(systemName: "doc.fill")
-                            .font(.caption)
-                        Text("Draft")
-                            .font(GatherFont.callout)
-                            .fontWeight(.semibold)
+                        Image(systemName: "info.circle.fill")
+                            .font(.caption2)
+                        Text(hint)
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                        Spacer()
                     }
-                    .foregroundStyle(Color.accentPurpleFallback)
-                    .padding(.horizontal, Spacing.lg)
-                    .padding(.vertical, Spacing.sm)
-                    .background(Color.accentPurpleFallback.opacity(0.1))
-                    .clipShape(Capsule())
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .transition(.opacity)
                 }
-                .disabled(!isValid || isSubmitting)
-                .opacity(!isValid ? 0.4 : 1)
 
-                // Create Event
-                Button {
-                    createEvent(asDraft: false)
-                } label: {
-                    HStack(spacing: 6) {
-                        if isSubmitting {
-                            ProgressView()
-                                .tint(.white)
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.callout)
+                HStack(spacing: Spacing.sm) {
+                    // Save as Draft
+                    Button {
+                        createEvent(asDraft: true)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.fill")
+                                .font(.caption)
+                            Text("Draft")
+                                .font(GatherFont.callout)
+                                .fontWeight(.semibold)
                         }
-                        Text("Create Event")
-                            .font(GatherFont.callout)
-                            .fontWeight(.bold)
+                        .foregroundStyle(Color.accentPurpleFallback)
+                        .padding(.horizontal, Spacing.lg)
+                        .padding(.vertical, Spacing.sm)
+                        .background(Color.accentPurpleFallback.opacity(0.1))
+                        .clipShape(Capsule())
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.sm)
-                    .background(
-                        isValid
-                            ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                            : AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
-                    )
-                    .clipShape(Capsule())
+                    .disabled(!isValid || isSubmitting)
+                    .opacity(!isValid ? 0.4 : 1)
+
+                    // Create Event
+                    Button {
+                        createEvent(asDraft: false)
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isSubmitting {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.callout)
+                            }
+                            Text("Create Event")
+                                .font(GatherFont.callout)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.sm)
+                        .background(
+                            isValid
+                                ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                                : AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
+                        )
+                        .clipShape(Capsule())
+                    }
+                    .disabled(!isValid || isSubmitting)
+                    .scaleEffect(isValid ? 1.0 : 0.97)
+                    .animation(.spring(response: 0.3), value: isValid)
                 }
-                .disabled(!isValid || isSubmitting)
-                .scaleEffect(isValid ? 1.0 : 0.97)
-                .animation(.spring(response: 0.3), value: isValid)
             }
             .padding(.horizontal, Spacing.md)
             .padding(.bottom, Spacing.md)
             .background(Color.gatherBackground)
+            .animation(.easeInOut(duration: 0.2), value: validationHint)
         }
     }
 
     // MARK: - Validation
 
     private var isValid: Bool {
+        validationHint == nil
+    }
+
+    /// The first thing blocking event creation, phrased as a fix-it hint.
+    /// `nil` means the form is valid.
+    private var validationHint: String? {
         let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
-        guard !trimmedTitle.isEmpty && trimmedTitle.count <= 100 else { return false }
-        guard startDate > Date().addingTimeInterval(-300) else { return false }
-        if hasEndDate, let end = endDate, end <= startDate { return false }
-        if hasCapacity, let cap = capacity, cap <= 0 { return false }
-        if isVirtual && !virtualURL.isEmpty {
-            guard URL(string: virtualURL) != nil else { return false }
+        if trimmedTitle.isEmpty { return "Add a title to create your event" }
+        if trimmedTitle.count > 100 { return "Title is too long (100 characters max)" }
+        if startDate <= Date().addingTimeInterval(-300) { return "Choose a start date in the future" }
+        if hasEndDate, let end = endDate, end <= startDate { return "End time must be after the start time" }
+        if hasCapacity, let cap = capacity, cap <= 0 { return "Capacity must be at least 1 guest" }
+        if isVirtual, !virtualURL.isEmpty, URL(string: virtualURL) == nil {
+            return "Enter a valid event link"
         }
-        return true
+        return nil
     }
 
     // MARK: - Create Event

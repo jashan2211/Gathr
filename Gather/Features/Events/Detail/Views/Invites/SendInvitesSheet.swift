@@ -18,6 +18,11 @@ struct SendInvitesSheet: View {
     @State private var failedCount = 0
     @State private var showComplete = false
 
+    // Sequential send queue — external apps can only be opened one at a time.
+    @State private var sendQueue: [Guest] = []
+    @State private var currentSendIndex = 0
+    @State private var totalToSend = 0
+
     var body: some View {
         NavigationStack {
             if showComplete {
@@ -31,41 +36,59 @@ struct SendInvitesSheet: View {
                 selectedGuestIds = Set(preselectedGuests)
             }
             selectedFunctions = Set(event.functions.map { $0.id })
+            // Default to the first channel that can actually reach the guests,
+            // so the send button isn't dead when WhatsApp isn't installed.
+            if let best = [InviteChannel.whatsapp, .sms, .email, .copied]
+                .first(where: { channel in
+                    if channel == .whatsapp && !inviteService.isWhatsAppInstalled { return false }
+                    return !guestsForChannel(channel).isEmpty
+                }) {
+                selectedChannel = best
+            }
         }
     }
 
     // MARK: - Main Content
 
     private var mainContent: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(spacing: Spacing.lg) {
-                    // Quick Actions Header
-                    quickActionsSection
-                        .bouncyAppear()
+        ZStack {
+            ZStack(alignment: .bottom) {
+                ScrollView {
+                    VStack(spacing: Spacing.lg) {
+                        // Quick Actions Header
+                        quickActionsSection
+                            .bouncyAppear()
 
-                    // Guest Selection Summary
-                    guestSelectionSection
-                        .bouncyAppear(delay: 0.05)
+                        // Guest Selection Summary
+                        guestSelectionSection
+                            .bouncyAppear(delay: 0.05)
 
-                    // Function Selection (if applicable)
-                    if !event.functions.isEmpty {
-                        functionSelectionSection
-                            .bouncyAppear(delay: 0.1)
+                        // Function Selection (if applicable)
+                        if !event.functions.isEmpty {
+                            functionSelectionSection
+                                .bouncyAppear(delay: 0.1)
+                        }
+
+                        // Channel Selection
+                        channelSelectionSection
+                            .bouncyAppear(delay: 0.15)
+
+                        // Spacer for floating button
+                        Color.clear.frame(height: 80)
                     }
-
-                    // Channel Selection
-                    channelSelectionSection
-                        .bouncyAppear(delay: 0.15)
-
-                    // Spacer for floating button
-                    Color.clear.frame(height: 80)
+                    .padding()
                 }
-                .padding()
-            }
 
-            // Floating send bar
-            sendButtonBar
+                // Floating send bar
+                sendButtonBar
+            }
+            .disabled(isSending)
+
+            // Sequential send stepper — kept outside the disabled scope so its
+            // own buttons stay tappable.
+            if isSending {
+                sendingOverlay
+            }
         }
         .navigationTitle("Send Invites")
         .navigationBarTitleDisplayMode(.inline)
@@ -80,12 +103,7 @@ struct SendInvitesSheet: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
                 .accessibilityLabel("Close")
-            }
-        }
-        .disabled(isSending)
-        .overlay {
-            if isSending {
-                sendingOverlay
+                .disabled(isSending)
             }
         }
     }
@@ -256,22 +274,19 @@ struct SendInvitesSheet: View {
                 }
             }
 
-            if selectedChannel != .copied {
-                let available = guestsForChannel(selectedChannel).count
-                if available < selectedGuestIds.count {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption2)
-                        Text("\(selectedGuestIds.count - available) guests missing \(selectedChannel == .email ? "email" : "phone")")
-                    }
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.sm)
-                    .padding(.vertical, 6)
-                    .background(Color.rsvpMaybeFallback.opacity(0.9))
-                    .clipShape(Capsule())
+            if let warning = channelWarning {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                    Text(warning)
                 }
+                .font(.caption2)
+                .fontWeight(.medium)
+                .foregroundStyle(.white)
+                .padding(.horizontal, Spacing.sm)
+                .padding(.vertical, 6)
+                .background(Color.rsvpMaybeFallback.opacity(0.9))
+                .clipShape(Capsule())
             }
         }
         .padding(Spacing.md)
@@ -338,49 +353,74 @@ struct SendInvitesSheet: View {
         }
     }
 
-    // MARK: - Sending Overlay
+    // MARK: - Sending Stepper
 
+    /// External apps (WhatsApp, Messages, Mail) can only be opened one at a
+    /// time, so invites are sent guest-by-guest with an explicit tap each.
     private var sendingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.5)
+            Color.black.opacity(0.55)
                 .ignoresSafeArea()
 
             VStack(spacing: Spacing.lg) {
-                // Animated ring
-                ZStack {
-                    Circle()
-                        .stroke(Color.white.opacity(0.1), lineWidth: 6)
-                        .frame(width: 80, height: 80)
+                Text("Guest \(min(currentSendIndex + 1, totalToSend)) of \(totalToSend)")
+                    .font(GatherFont.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white.opacity(0.7))
 
-                    let total = guestsForChannel(selectedChannel).count
-                    let progress = total > 0 ? CGFloat(sentCount + failedCount) / CGFloat(total) : 0
+                ProgressView(
+                    value: Double(currentSendIndex),
+                    total: Double(max(totalToSend, 1))
+                )
+                .tint(.white)
+                .frame(width: 200)
 
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(
-                            LinearGradient.gatherAccentGradient,
-                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                        )
-                        .frame(width: 80, height: 80)
-                        .rotationEffect(.degrees(-90))
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: sentCount + failedCount)
+                if let guest = currentSendGuest {
+                    VStack(spacing: Spacing.xxs) {
+                        Text(guest.name)
+                            .font(GatherFont.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                        if let contact = guest.displayContact {
+                            Text(contact)
+                                .font(GatherFont.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
 
-                    Image(systemName: "paperplane.fill")
-                        .font(.title2)
+                    Button {
+                        sendToCurrentGuest()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: selectedChannel.icon)
+                            Text("Send via \(selectedChannel.shortName)")
+                                .fontWeight(.bold)
+                        }
+                        .font(GatherFont.callout)
                         .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.sm)
+                        .background(LinearGradient.gatherAccentGradient)
+                        .clipShape(Capsule())
+                    }
+
+                    Button("Skip this guest") {
+                        skipCurrentGuest()
+                    }
+                    .font(GatherFont.caption)
+                    .foregroundStyle(.white.opacity(0.7))
                 }
 
-                Text("Sending invites...")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(.white)
-
-                Text("\(sentCount + failedCount) of \(guestsForChannel(selectedChannel).count)")
-                    .font(GatherFont.callout)
-                    .foregroundStyle(.white.opacity(0.7))
+                Text("Opens \(selectedChannel.shortName) for one guest. Send the message, then come back here for the next.")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
             }
             .padding(Spacing.xl)
+            .frame(maxWidth: 320)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .padding(Spacing.xl)
         }
     }
 
@@ -515,18 +555,34 @@ struct SendInvitesSheet: View {
     // MARK: - Helpers
 
     private var guestsNotSent: [Guest] {
-        event.guests.filter { guest in
-            if event.functions.isEmpty { return true }
-            return event.functions.contains { function in
-                !function.invites.contains { $0.guestId == guest.id && $0.inviteStatus != .notSent }
-            }
-        }
+        event.guests.filter { $0.inviteSentAt == nil }
+    }
+
+    private var currentSendGuest: Guest? {
+        guard currentSendIndex < sendQueue.count else { return nil }
+        return sendQueue[currentSendIndex]
     }
 
     private var canSend: Bool {
-        !selectedGuestIds.isEmpty &&
-        (event.functions.isEmpty || !selectedFunctions.isEmpty) &&
-        !guestsForChannel(selectedChannel).isEmpty
+        guard !selectedGuestIds.isEmpty,
+              event.functions.isEmpty || !selectedFunctions.isEmpty,
+              !guestsForChannel(selectedChannel).isEmpty else { return false }
+        if selectedChannel == .whatsapp && !inviteService.isWhatsAppInstalled { return false }
+        return true
+    }
+
+    /// Accurate, non-misleading warning for the selected channel. Distinguishes
+    /// "WhatsApp not installed" from "guest has no phone number".
+    private var channelWarning: String? {
+        if selectedChannel == .whatsapp && !inviteService.isWhatsAppInstalled {
+            return "WhatsApp isn't installed — choose SMS or Email instead"
+        }
+        guard selectedChannel != .copied else { return nil }
+        let missing = selectedGuestIds.count - guestsForChannel(selectedChannel).count
+        guard missing > 0 else { return nil }
+        let contact = selectedChannel == .email ? "an email address" : "a phone number"
+        let guestWord = missing == 1 ? "guest has" : "guests have"
+        return "\(missing) selected \(guestWord) no \(contact)"
     }
 
     private func toggleGuest(_ id: UUID) {
@@ -563,61 +619,98 @@ struct SendInvitesSheet: View {
         }
     }
 
+    private var selectedFunctionsList: [EventFunction] {
+        event.functions.filter { selectedFunctions.contains($0.id) }
+    }
+
     private func sendInvites() {
-        isSending = true
+        let guestsToSend = guestsForChannel(selectedChannel)
+        guard !guestsToSend.isEmpty else { return }
+
         sentCount = 0
         failedCount = 0
 
-        let guestsToSend = guestsForChannel(selectedChannel)
-        let selectedFunctionsList = event.functions.filter { selectedFunctions.contains($0.id) }
+        // Pre-create invite records so per-function status can be tracked.
+        _ = inviteService.createFunctionInvites(
+            for: guestsToSend,
+            functions: selectedFunctionsList,
+            modelContext: modelContext
+        )
 
-        Task {
+        // "Copy" is the only channel that can genuinely be done in one action:
+        // build a single block of links for all selected guests.
+        if selectedChannel == .copied {
+            let block = guestsToSend.compactMap { guest -> String? in
+                guard let link = inviteService.generateInviteLink(guest: guest, event: event) else { return nil }
+                return "\(guest.name): \(link.absoluteString)"
+            }.joined(separator: "\n")
+            UIPasteboard.general.string = block
+
+            let functions = selectedFunctionsList
             for guest in guestsToSend {
-                _ = inviteService.createFunctionInvites(
-                    for: [guest],
-                    functions: selectedFunctionsList,
-                    modelContext: modelContext
-                )
-
-                var success = false
-                switch selectedChannel {
-                case .whatsapp:
-                    success = inviteService.sendViaWhatsApp(guest: guest, event: event, functions: selectedFunctionsList)
-                case .sms:
-                    success = inviteService.sendViaSMS(guest: guest, event: event, functions: selectedFunctionsList)
-                case .email:
-                    success = inviteService.sendViaEmail(guest: guest, event: event, functions: selectedFunctionsList)
-                case .copied:
-                    inviteService.copyInviteLink(guest: guest, event: event)
-                    success = true
-                case .inAppLink:
-                    success = true
-                }
-
-                if success {
-                    for function in selectedFunctionsList {
-                        if let invite = function.invites.first(where: { $0.guestId == guest.id }) {
-                            inviteService.markInviteSent(invite: invite, channel: selectedChannel, modelContext: modelContext)
-                        }
-                    }
-                    sentCount += 1
-                } else {
-                    failedCount += 1
-                }
-
-                if selectedChannel != .copied {
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                }
+                markGuestSent(guest, functions: functions)
+                sentCount += 1
             }
-
             modelContext.safeSave()
+            HapticService.success()
+            withAnimation(.spring(response: 0.4)) { showComplete = true }
+            return
+        }
 
-            await MainActor.run {
-                isSending = false
-                withAnimation(.spring(response: 0.4)) {
-                    showComplete = true
-                }
-                HapticService.success()
+        // WhatsApp / SMS / Email each open an external app. iOS only honors one
+        // open() at a time, so guests are processed sequentially via the stepper.
+        sendQueue = guestsToSend
+        totalToSend = guestsToSend.count
+        currentSendIndex = 0
+        isSending = true
+    }
+
+    private func sendToCurrentGuest() {
+        guard let guest = currentSendGuest else { return }
+        let functions = selectedFunctionsList
+
+        var success = false
+        switch selectedChannel {
+        case .whatsapp:
+            success = inviteService.sendViaWhatsApp(guest: guest, event: event, functions: functions)
+        case .sms:
+            success = inviteService.sendViaSMS(guest: guest, event: event, functions: functions)
+        case .email:
+            success = inviteService.sendViaEmail(guest: guest, event: event, functions: functions)
+        case .copied, .inAppLink:
+            success = true
+        }
+
+        if success {
+            markGuestSent(guest, functions: functions)
+            sentCount += 1
+        } else {
+            failedCount += 1
+        }
+        advanceSendQueue()
+    }
+
+    private func skipCurrentGuest() {
+        failedCount += 1
+        advanceSendQueue()
+    }
+
+    private func advanceSendQueue() {
+        currentSendIndex += 1
+        guard currentSendIndex >= totalToSend else { return }
+
+        modelContext.safeSave()
+        isSending = false
+        HapticService.success()
+        withAnimation(.spring(response: 0.4)) { showComplete = true }
+    }
+
+    private func markGuestSent(_ guest: Guest, functions: [EventFunction]) {
+        guest.inviteSentAt = Date()
+        guest.inviteSentVia = selectedChannel
+        for function in functions {
+            if let invite = function.invites.first(where: { $0.guestId == guest.id }) {
+                inviteService.markInviteSent(invite: invite, channel: selectedChannel, modelContext: modelContext)
             }
         }
     }

@@ -29,6 +29,10 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Gather needs calendar access to add events to your calendar.</string>
 	<key>NSContactsUsageDescription</key>

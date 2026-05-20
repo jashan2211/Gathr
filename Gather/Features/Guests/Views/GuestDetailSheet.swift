@@ -23,7 +23,10 @@ struct GuestDetailSheet: View {
 
     // UI state
     @State private var showRemoveConfirmation = false
-    @State private var hasChanges = false
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespaces)
+    }
 
     init(guest: Guest, event: Event) {
         self.guest = guest
@@ -58,6 +61,7 @@ struct GuestDetailSheet: View {
                 .padding(.bottom, 40)
             }
             .background(Color.gatherBackground)
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Guest Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -68,6 +72,7 @@ struct GuestDetailSheet: View {
                     Button("Save") { saveChanges() }
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.accentPurpleFallback)
+                        .disabled(trimmedName.isEmpty)
                 }
             }
             .alert("Remove Guest", isPresented: $showRemoveConfirmation) {
@@ -429,7 +434,8 @@ struct GuestDetailSheet: View {
     }
 
     private func saveChanges() {
-        guest.name = name
+        guard !trimmedName.isEmpty else { return }
+        guest.name = trimmedName
         guest.email = email.isEmpty ? nil : email
         guest.phone = phone.isEmpty ? nil : phone
         guest.role = role
@@ -507,7 +513,7 @@ struct GuestDetailSheet: View {
 
     private var avatarColor: Color {
         let colors: [Color] = [.accentPurpleFallback, .neonBlue, .rsvpYesFallback, .rsvpMaybeFallback, .accentPinkFallback, .mintGreen]
-        let index = abs(name.hashValue) % colors.count
+        let index = name.stableHash % colors.count
         return colors[index]
     }
 }

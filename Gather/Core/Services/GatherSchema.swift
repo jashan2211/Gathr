@@ -40,20 +40,36 @@ enum GatherSchemaV2: VersionedSchema {
     }
 }
 
+/// V3 adds invite-delivery tracking fields to Guest (`inviteSentAt`,
+/// `inviteSentVia`) so invites can be tracked on events without functions.
+enum GatherSchemaV3: VersionedSchema {
+    static var versionIdentifier: Schema.Version = Schema.Version(3, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        GatherSchemaV2.models
+    }
+}
+
 // MARK: - Migration Plan
 
 enum GatherMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [GatherSchemaV1.self, GatherSchemaV2.self]
+        [GatherSchemaV1.self, GatherSchemaV2.self, GatherSchemaV3.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2]
+        [migrateV1toV2, migrateV2toV3]
     }
 
     /// Lightweight migration: SeatingTable is a new model with no data to transform.
     static let migrateV1toV2 = MigrationStage.lightweight(
         fromVersion: GatherSchemaV1.self,
         toVersion: GatherSchemaV2.self
+    )
+
+    /// Lightweight migration: the new Guest fields are optional, no data to transform.
+    static let migrateV2toV3 = MigrationStage.lightweight(
+        fromVersion: GatherSchemaV2.self,
+        toVersion: GatherSchemaV3.self
     )
 }

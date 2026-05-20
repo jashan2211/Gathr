@@ -19,10 +19,16 @@ struct FunctionRSVPSheet: View {
         case confirmation
     }
 
+    /// The current user's Guest record on this event, if one exists.
+    private var currentGuest: Guest? {
+        guard let currentUser = authManager.currentUser else { return nil }
+        return event.guests.first(where: { $0.userId == currentUser.id })
+    }
+
     // Check for existing invite on init
     private var existingInvite: FunctionInvite? {
-        guard let currentUser = authManager.currentUser else { return nil }
-        return function.invites.first(where: { $0.guestId == currentUser.id })
+        guard let guest = currentGuest else { return nil }
+        return function.invites.first(where: { $0.guestId == guest.id })
     }
 
     var body: some View {
@@ -350,8 +356,24 @@ struct FunctionRSVPSheet: View {
             return
         }
 
+        // Ensure the current user has a Guest record on this event. A
+        // FunctionInvite's guestId must reference a Guest.id — keying it on a
+        // User.id leaves the response invisible to the host's guest list.
+        let guest: Guest
+        if let existing = event.guests.first(where: { $0.userId == currentUser.id }) {
+            guest = existing
+        } else {
+            let newGuest = Guest(
+                name: currentUser.name,
+                email: currentUser.email,
+                userId: currentUser.id
+            )
+            event.guests.append(newGuest)
+            guest = newGuest
+        }
+
         // Find existing invite or create new one
-        if let existingInvite = function.invites.first(where: { $0.guestId == currentUser.id }) {
+        if let existingInvite = function.invites.first(where: { $0.guestId == guest.id }) {
             existingInvite.response = selectedResponse
             existingInvite.partySize = partySize
             existingInvite.notes = notes.isEmpty ? nil : notes
@@ -360,7 +382,7 @@ struct FunctionRSVPSheet: View {
         } else {
             // Create new invite (self-RSVP)
             let newInvite = FunctionInvite(
-                guestId: currentUser.id,
+                guestId: guest.id,
                 functionId: function.id
             )
             newInvite.response = selectedResponse
@@ -370,6 +392,11 @@ struct FunctionRSVPSheet: View {
             newInvite.inviteStatus = .responded
             function.invites.append(newInvite)
         }
+
+        // Reflect the response on the Guest so the host's status filters and
+        // RSVP counts stay accurate.
+        guest.respondedAt = Date()
+        guest.status = aggregatedStatus(for: guest)
 
         modelContext.safeSave()
 
@@ -395,6 +422,18 @@ struct FunctionRSVPSheet: View {
 
     private func hapticFeedback() {
         HapticService.buttonTap()
+    }
+
+    /// Derives the guest's overall event status from all of their function responses.
+    private func aggregatedStatus(for guest: Guest) -> RSVPStatus {
+        let responses = event.functions
+            .flatMap { $0.invites }
+            .filter { $0.guestId == guest.id }
+            .compactMap { $0.response }
+        if responses.contains(.yes) { return .attending }
+        if responses.contains(.maybe) { return .maybe }
+        if !responses.isEmpty { return .declined }
+        return .pending
     }
 }
 

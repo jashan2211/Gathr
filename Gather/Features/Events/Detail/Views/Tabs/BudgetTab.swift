@@ -1202,7 +1202,7 @@ struct BudgetTab: View {
 
     private func avatarColor(for name: String) -> Color {
         let colors: [Color] = [.purple, .blue, .green, .orange, .pink, .teal]
-        let index = abs(name.hashValue) % colors.count
+        let index = name.stableHash % colors.count
         return colors[index]
     }
 

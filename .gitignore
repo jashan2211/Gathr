@@ -44,6 +44,9 @@ iOSInjectionProject/
 # AppCode
 .idea/
 
+# Claude Code local settings
+.claude/
+
 # Playgrounds
 timeline.xctimeline
 playground.xcworkspace

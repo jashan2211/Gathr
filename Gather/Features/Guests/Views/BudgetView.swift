@@ -261,6 +261,7 @@ struct BudgetView: View {
         }
 
         modelContext.insert(newBudget)
+        modelContext.safeSave()
 
         HapticService.success()
     }

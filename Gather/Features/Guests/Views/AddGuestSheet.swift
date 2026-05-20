@@ -4,6 +4,7 @@ import ContactsUI
 
 struct AddGuestSheet: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Bindable var event: Event
 
     @State private var selectedTab = 0
@@ -426,6 +427,7 @@ struct AddGuestSheet: View {
         )
 
         event.guests.append(guest)
+        modelContext.safeSave()
 
         HapticService.success()
 
@@ -459,6 +461,7 @@ struct AddGuestSheet: View {
 
             event.guests.append(guest)
         }
+        modelContext.safeSave()
 
         HapticService.success()
 

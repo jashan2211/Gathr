@@ -686,7 +686,7 @@ struct RecentRSVPRow: View {
 
     private var avatarColor: Color {
         let colors: [Color] = [.accentPurpleFallback, .neonBlue, .mintGreen, .warmCoral, .accentPinkFallback, .softLavender]
-        let index = abs(guest.name.hashValue) % colors.count
+        let index = guest.name.stableHash % colors.count
         return colors[index]
     }
 }

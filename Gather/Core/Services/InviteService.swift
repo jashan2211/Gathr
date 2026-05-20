@@ -12,6 +12,26 @@ class InviteService: ObservableObject {
 
     private init() {}
 
+    // MARK: - WhatsApp Availability
+
+    /// Whether WhatsApp is installed. Requires `whatsapp` in the Info.plist
+    /// `LSApplicationQueriesSchemes` array — without it `canOpenURL` always
+    /// returns `false`, which is the root cause of guests with valid phone
+    /// numbers being wrongly flagged as unreachable.
+    var isWhatsAppInstalled: Bool {
+        guard let url = URL(string: "whatsapp://") else { return false }
+        return UIApplication.shared.canOpenURL(url)
+    }
+
+    /// Reduces a phone number to digits plus an optional leading `+`.
+    /// Formatting characters (spaces, parentheses, dashes) make `URL(string:)`
+    /// fail outright for `sms:` and `whatsapp:` URLs.
+    func sanitizedPhone(_ phone: String) -> String {
+        let digits = phone.filter { $0.isNumber }
+        let trimmed = phone.trimmingCharacters(in: .whitespaces)
+        return trimmed.hasPrefix("+") ? "+" + digits : digits
+    }
+
     // MARK: - Generate Invite Link
 
     func generateInviteLink(guest: Guest, event: Event) -> URL? {
@@ -70,12 +90,10 @@ class InviteService: ObservableObject {
     // MARK: - Send via WhatsApp
 
     func sendViaWhatsApp(guest: Guest, event: Event, functions: [EventFunction]) -> Bool {
-        guard let phone = guest.phone?.replacingOccurrences(of: " ", with: "")
-                                      .replacingOccurrences(of: "-", with: "")
-                                      .replacingOccurrences(of: "(", with: "")
-                                      .replacingOccurrences(of: ")", with: "") else {
-            return false
-        }
+        guard let rawPhone = guest.phone, !rawPhone.isEmpty else { return false }
+        // WhatsApp's phone parameter expects digits only — no `+`, no spaces.
+        let phone = sanitizedPhone(rawPhone).replacingOccurrences(of: "+", with: "")
+        guard !phone.isEmpty else { return false }
 
         let message = generateInviteMessage(guest: guest, event: event, functions: functions)
         let encodedMessage = message.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
@@ -93,7 +111,10 @@ class InviteService: ObservableObject {
     // MARK: - Send via SMS
 
     func sendViaSMS(guest: Guest, event: Event, functions: [EventFunction]) -> Bool {
-        guard let phone = guest.phone else { return false }
+        guard let rawPhone = guest.phone, !rawPhone.isEmpty else { return false }
+        // Strip formatting — spaces/parens/dashes make URL(string:) return nil.
+        let phone = sanitizedPhone(rawPhone)
+        guard !phone.isEmpty else { return false }
 
         let message = generateInviteMessage(guest: guest, event: event, functions: functions)
         let encodedMessage = message.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
@@ -178,10 +199,12 @@ class InviteService: ObservableObject {
 
     // MARK: - Batch Send Helpers
 
+    /// Per-guest reachability: does the guest have a phone number? Whether
+    /// WhatsApp itself is installed is a device-level check (`isWhatsAppInstalled`)
+    /// — conflating the two made phone-less and WhatsApp-less indistinguishable.
     func canSendViaWhatsApp(guest: Guest) -> Bool {
         guard let phone = guest.phone, !phone.isEmpty else { return false }
-        guard let whatsappURL = URL(string: "whatsapp://") else { return false }
-        return UIApplication.shared.canOpenURL(whatsappURL)
+        return true
     }
 
     func canSendViaSMS(guest: Guest) -> Bool {

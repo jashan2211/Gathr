@@ -6,7 +6,7 @@ struct GatherApp: App {
     // MARK: - SwiftData Container
 
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema(versionedSchema: GatherSchemaV3.self)
+        let schema = Schema(versionedSchema: GatherSchemaV2.self)
         let modelConfiguration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
@@ -41,7 +41,22 @@ struct GatherApp: App {
                     configurations: [modelConfiguration]
                 )
             } catch {
-                fatalError("Could not create ModelContainer after store reset: \(error)")
+                // The persistent store is unrecoverable even after a reset.
+                // Fall back to an in-memory store so the app still launches
+                // instead of crash-looping — data won't persist this session.
+                do {
+                    let inMemoryConfiguration = ModelConfiguration(
+                        schema: schema,
+                        isStoredInMemoryOnly: true,
+                        cloudKitDatabase: .none
+                    )
+                    return try ModelContainer(
+                        for: schema,
+                        configurations: [inMemoryConfiguration]
+                    )
+                } catch {
+                    fatalError("Could not create in-memory ModelContainer: \(error)")
+                }
             }
         }
     }()

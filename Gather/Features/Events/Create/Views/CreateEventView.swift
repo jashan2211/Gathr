@@ -395,9 +395,9 @@ struct CreateEventView: View {
                     let resized = renderer.image { _ in
                         uiImage.draw(in: CGRect(origin: .zero, size: newSize))
                     }
-                    if let jpegData = resized.jpegData(compressionQuality: 0.8) {
+                    if let jpegData = resized.jpegData(compressionQuality: 0.8),
+                       let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
                         let filename = "\(event.id.uuidString)_hero.jpg"
-                        let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
                         let fileURL = docsDir.appendingPathComponent(filename)
                         try? jpegData.write(to: fileURL)
                         await MainActor.run {

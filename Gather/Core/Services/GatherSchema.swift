@@ -32,6 +32,14 @@ enum GatherSchemaV1: VersionedSchema {
 }
 
 /// V2 adds SeatingTable model for persistent seating charts.
+///
+/// IMPORTANT: do not add a new `VersionedSchema` (e.g. a "V3") just to register
+/// added *fields* on an existing model. These schemas share the live model
+/// classes, so a new version with the same model list is checksum-identical to
+/// V2 — and `MigrationStage.lightweight` between two identical schemas makes
+/// SwiftData throw an Objective-C exception at launch (uncatchable, instant
+/// crash). Additive *optional* properties (e.g. `Guest.inviteSentAt`) are
+/// migrated automatically by SwiftData and need no schema version at all.
 enum GatherSchemaV2: VersionedSchema {
     static var versionIdentifier: Schema.Version = Schema.Version(2, 0, 0)
 
@@ -40,36 +48,20 @@ enum GatherSchemaV2: VersionedSchema {
     }
 }
 
-/// V3 adds invite-delivery tracking fields to Guest (`inviteSentAt`,
-/// `inviteSentVia`) so invites can be tracked on events without functions.
-enum GatherSchemaV3: VersionedSchema {
-    static var versionIdentifier: Schema.Version = Schema.Version(3, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        GatherSchemaV2.models
-    }
-}
-
 // MARK: - Migration Plan
 
 enum GatherMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [GatherSchemaV1.self, GatherSchemaV2.self, GatherSchemaV3.self]
+        [GatherSchemaV1.self, GatherSchemaV2.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2, migrateV2toV3]
+        [migrateV1toV2]
     }
 
     /// Lightweight migration: SeatingTable is a new model with no data to transform.
     static let migrateV1toV2 = MigrationStage.lightweight(
         fromVersion: GatherSchemaV1.self,
         toVersion: GatherSchemaV2.self
-    )
-
-    /// Lightweight migration: the new Guest fields are optional, no data to transform.
-    static let migrateV2toV3 = MigrationStage.lightweight(
-        fromVersion: GatherSchemaV2.self,
-        toVersion: GatherSchemaV3.self
     )
 }

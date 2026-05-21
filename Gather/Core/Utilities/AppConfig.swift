@@ -11,13 +11,13 @@ enum AppConfig {
     }
 
     /// Privacy Policy URL
-    static let privacyPolicyURL = URL(string: "https://thebighead.ca/privacy")!
+    static let privacyPolicyURL = URL(string: "https://thebighead.ca/gathr/privacy")!
 
     /// Terms of Service URL
-    static let termsOfServiceURL = URL(string: "https://thebighead.ca/terms")!
+    static let termsOfServiceURL = URL(string: "https://thebighead.ca/gathr/terms")!
 
     /// Support URL
-    static let supportURL = URL(string: "https://thebighead.ca/support")!
+    static let supportURL = URL(string: "https://thebighead.ca/gathr/support")!
 
     /// Contact Email
     static let contactEmail = "info@thebighead.ca"

@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// Cloud Firestore security rules for Gather.
+// Paste this into Firebase Console -> Firestore Database -> Rules -> Publish.
+//
+// Phase 2 migrates data to Firestore one stage at a time. These rules are
+// expanded as each feature lands. Anything not explicitly matched below is
+// denied by default — so collections that haven't been migrated yet stay
+// locked, which is intentional.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // User profiles: any signed-in user can read a profile (a guest needs to
+    // see a host's name), but you can only write your own.
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Events: any signed-in user can read (needed for shared events and
+    // discovery); only the owner can create, change, or delete their event.
+    match /events/{eventId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if request.auth != null
+                            && resource.data.ownerUid == request.auth.uid;
+    }
+  }
+}

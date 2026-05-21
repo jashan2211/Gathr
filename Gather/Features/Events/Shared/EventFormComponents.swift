@@ -263,14 +263,27 @@ struct EventFeaturesSection: View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             EventFormSectionHeader(title: "Features", icon: "slider.horizontal.3")
 
-            Text("Tap to toggle what you need")
+            Text("Choose what this event needs — you can change this anytime")
                 .font(.caption2)
                 .foregroundStyle(Color.gatherSecondaryText)
 
-            // Feature chips in a wrapping flow layout
-            EventFormWrappingFeatureChips(
-                enabledFeatures: $enabledFeatures
-            )
+            VStack(spacing: Spacing.xs) {
+                ForEach(EventFeature.allCases, id: \.self) { feature in
+                    EventFeatureCard(
+                        feature: feature,
+                        isEnabled: enabledFeatures.contains(feature)
+                    ) {
+                        withAnimation(.spring(response: 0.25)) {
+                            if enabledFeatures.contains(feature) {
+                                enabledFeatures.remove(feature)
+                            } else {
+                                enabledFeatures.insert(feature)
+                            }
+                        }
+                        HapticService.buttonTap()
+                    }
+                }
+            }
         }
         .padding(Spacing.md)
         .background(Color.gatherSecondaryBackground.opacity(0.5))
@@ -407,6 +420,7 @@ struct EventLocationSection: View {
     @Binding var locationAddress: String
     @Binding var locationCity: String
     @Binding var locationState: String
+    @Binding var locationCountry: String
     @Binding var locationLatitude: Double?
     @Binding var locationLongitude: Double?
 
@@ -486,11 +500,16 @@ struct EventLocationSection: View {
                             icon: "building.2"
                         )
                         EventFormStyledTextField(
-                            placeholder: "State",
+                            placeholder: "State / Region",
                             text: $locationState,
-                            icon: "globe.americas"
+                            icon: "map"
                         )
                     }
+                    EventFormStyledTextField(
+                        placeholder: "Country",
+                        text: $locationCountry,
+                        icon: "globe"
+                    )
                 }
             }
         }
@@ -498,11 +517,12 @@ struct EventLocationSection: View {
         .background(Color.gatherSecondaryBackground.opacity(0.3))
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
         .sheet(isPresented: $showLocationPicker) {
-            LocationPickerView { name, address, city, state, lat, lon in
+            LocationPickerView { name, address, city, state, country, lat, lon in
                 locationName = name
                 if let address { locationAddress = address }
                 if let city { locationCity = city }
                 if let state { locationState = state }
+                if let country { locationCountry = country }
                 locationLatitude = lat
                 locationLongitude = lon
             }
@@ -535,8 +555,9 @@ struct EventSettingsSection: View {
                     EventFormPrivacyCard(
                         option: .publicEvent,
                         icon: "globe",
-                        isSelected: privacy == .publicEvent
-                    ) { withAnimation(.spring(response: 0.3)) { privacy = .publicEvent } }
+                        isSelected: privacy == .publicEvent,
+                        isAvailable: false
+                    ) { }
 
                     EventFormPrivacyCard(
                         option: .unlisted,
@@ -695,55 +716,87 @@ struct EventFormCategoryChip: View {
     }
 }
 
-// MARK: Event Form Wrapping Feature Chips
+// MARK: Event Feature Card
 
-struct EventFormWrappingFeatureChips: View {
-    @Binding var enabledFeatures: Set<EventFeature>
+/// A large, tappable feature card with an icon, name and one-line explanation.
+/// Coming-soon features are shown greyed out with a "Soon" badge and can't be
+/// toggled on.
+struct EventFeatureCard: View {
+    let feature: EventFeature
+    let isEnabled: Bool
+    let onToggle: () -> Void
+
+    private var available: Bool { feature.isAvailable }
+    private var active: Bool { isEnabled && available }
 
     var body: some View {
-        // Using LazyVGrid as a simple wrapping layout
-        LazyVGrid(columns: [
-            GridItem(.adaptive(minimum: 120), spacing: Spacing.xs)
-        ], spacing: Spacing.xs) {
-            ForEach(EventFeature.allCases, id: \.self) { feature in
-                let isEnabled = enabledFeatures.contains(feature)
-                Button {
-                    withAnimation(.spring(response: 0.25)) {
-                        if isEnabled {
-                            enabledFeatures.remove(feature)
-                        } else {
-                            enabledFeatures.insert(feature)
-                        }
-                    }
-                    HapticService.buttonTap()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: feature.icon)
-                            .font(.system(size: 10))
-                            .fontWeight(.semibold)
-                        Text(feature.displayName)
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .lineLimit(1)
-                    }
-                    .foregroundStyle(isEnabled ? .white : Color.gatherPrimaryText)
-                    .padding(.horizontal, Spacing.sm)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity)
+        Button(action: onToggle) {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: feature.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(active ? .white : Color.gatherSecondaryText)
+                    .frame(width: 46, height: 46)
                     .background(
-                        isEnabled
+                        active
                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
                             : AnyShapeStyle(Color.gatherTertiaryBackground)
                     )
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(feature.displayName)
+                            .font(GatherFont.callout)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(available ? Color.gatherPrimaryText : Color.gatherSecondaryText)
+                        if !available {
+                            Text("SOON")
+                                .font(.system(size: 9, weight: .heavy))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.gatherSecondaryText.opacity(0.55))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Text(feature.description)
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(.plain)
-                .scaleEffect(isEnabled ? 1.03 : 1.0)
-                .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isEnabled)
-                .accessibilityLabel("\(feature.displayName) feature")
-                .accessibilityAddTraits(isEnabled ? [.isSelected] : [])
+
+                Spacer(minLength: Spacing.xs)
+
+                if available {
+                    Image(systemName: active ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(active ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.35))
+                }
             }
+            .padding(Spacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: CornerRadius.md)
+                    .fill(active ? Color.accentPurpleFallback.opacity(0.07) : Color.gatherSecondaryBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: CornerRadius.md)
+                    .strokeBorder(
+                        active ? Color.accentPurpleFallback.opacity(0.35) : Color.clear,
+                        lineWidth: 1.5
+                    )
+            )
+            .opacity(available ? 1 : 0.55)
         }
+        .buttonStyle(.plain)
+        .disabled(!available)
+        .scaleEffect(active ? 1.01 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: active)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(feature.displayName). \(feature.description)\(available ? "" : ". Coming soon")")
+        .accessibilityValue(available ? (isEnabled ? "On" : "Off") : "")
+        .accessibilityAddTraits(active ? [.isSelected] : [])
+        .accessibilityHint(available ? "Double tap to toggle" : "")
     }
 }
 
@@ -846,6 +899,7 @@ struct EventFormPrivacyCard: View {
     let option: EventPrivacy
     let icon: String
     let isSelected: Bool
+    var isAvailable: Bool = true
     let action: () -> Void
 
     var body: some View {
@@ -885,10 +939,24 @@ struct EventFormPrivacyCard: View {
                         lineWidth: 1.5
                     )
             )
+            .overlay(alignment: .topTrailing) {
+                if !isAvailable {
+                    Text("SOON")
+                        .font(.system(size: 8, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.gatherSecondaryText.opacity(0.65))
+                        .clipShape(Capsule())
+                        .padding(4)
+                }
+            }
+            .opacity(isAvailable ? 1 : 0.5)
         }
+        .disabled(!isAvailable)
         .scaleEffect(isSelected ? 1.02 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
-        .accessibilityLabel("\(option.displayName) privacy")
+        .accessibilityLabel("\(option.displayName) privacy\(isAvailable ? "" : ", coming soon")")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

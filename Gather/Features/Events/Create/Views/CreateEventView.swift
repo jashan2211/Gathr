@@ -17,6 +17,7 @@ struct CreateEventView: View {
     @State private var locationAddress = ""
     @State private var locationCity = ""
     @State private var locationState = ""
+    @State private var locationCountry = ""
     @State private var locationLatitude: Double?
     @State private var locationLongitude: Double?
     @State private var isVirtual = false
@@ -37,8 +38,26 @@ struct CreateEventView: View {
     // UI state
     @State private var isSubmitting = false
     @State private var showTemplates = true
-    @State private var currentStep = 0
+    @State private var step: CreateStep = .typeAndTitle
     @State private var showDiscardAlert = false
+
+    // Optional: pre-fill from template
+    var template: EventTemplate? = nil
+
+    // MARK: - Steps
+
+    enum CreateStep: Int, CaseIterable {
+        case typeAndTitle, whenAndWhere, features, settings
+
+        var title: String {
+            switch self {
+            case .typeAndTitle: return "Type & Title"
+            case .whenAndWhere: return "When & Where"
+            case .features: return "Features"
+            case .settings: return "Privacy & Settings"
+            }
+        }
+    }
 
     /// Whether the user has entered anything worth confirming before discard.
     private var hasInput: Bool {
@@ -49,89 +68,21 @@ struct CreateEventView: View {
         selectedCategory != .custom
     }
 
-    // Optional: pre-fill from template
-    var template: EventTemplate? = nil
-
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Hero image picker with category tint
-                    EventHeroImagePicker(
-                        selectedPhoto: $selectedPhoto,
-                        heroImage: $heroImage,
-                        selectedCategory: selectedCategory
-                    )
-                    .bouncyAppear()
+            VStack(spacing: 0) {
+                stepProgressBar
 
-                    VStack(spacing: Spacing.lg) {
-                        // Template selector
-                        if showTemplates && template == nil {
-                            templateSection
-                                .bouncyAppear(delay: 0.05)
-                        }
-
-                        // Category pills
-                        EventCategorySelector(
-                            selectedCategory: $selectedCategory,
-                            enabledFeatures: $enabledFeatures,
-                            headerTitle: "What kind of event?"
-                        )
-                        .bouncyAppear(delay: 0.08)
-
-                        // Event details
-                        EventBasicsSection(
-                            title: $title,
-                            description: $description
-                        )
-                        .bouncyAppear(delay: 0.11)
-
-                        // Features as toggleable chips
-                        EventFeaturesSection(
-                            enabledFeatures: $enabledFeatures
-                        )
-                        .bouncyAppear(delay: 0.14)
-
-                        // When
-                        EventDateTimeSection(
-                            startDate: $startDate,
-                            endDate: $endDate,
-                            hasEndDate: $hasEndDate,
-                            allowPastDates: false
-                        )
-                        .bouncyAppear(delay: 0.17)
-
-                        // Where
-                        EventLocationSection(
-                            isVirtual: $isVirtual,
-                            virtualURL: $virtualURL,
-                            locationName: $locationName,
-                            locationAddress: $locationAddress,
-                            locationCity: $locationCity,
-                            locationState: $locationState,
-                            locationLatitude: $locationLatitude,
-                            locationLongitude: $locationLongitude
-                        )
-                        .bouncyAppear(delay: 0.20)
-
-                        // Settings
-                        EventSettingsSection(
-                            privacy: $privacy,
-                            guestListVisibility: $guestListVisibility,
-                            capacity: $capacity,
-                            hasCapacity: $hasCapacity
-                        )
-                        .bouncyAppear(delay: 0.23)
-                    }
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.top, Spacing.lg)
+                ScrollView {
+                    stepContent
+                        .id(step)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
-            .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom) {
-                createButtonBar
+                navigationBar
             }
-            .navigationTitle("New Event")
+            .navigationTitle(step.title)
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(hasInput)
             .toolbar {
@@ -157,6 +108,116 @@ struct CreateEventView: View {
             } message: {
                 Text("You've started creating an event. Your changes won't be saved.")
             }
+        }
+    }
+
+    // MARK: - Step Progress Bar
+
+    private var stepProgressBar: some View {
+        VStack(spacing: Spacing.xs) {
+            HStack(spacing: Spacing.xs) {
+                ForEach(CreateStep.allCases, id: \.self) { item in
+                    Capsule()
+                        .fill(
+                            item.rawValue <= step.rawValue
+                                ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                                : AnyShapeStyle(Color.gatherSecondaryBackground)
+                        )
+                        .frame(height: 4)
+                }
+            }
+
+            HStack {
+                Text("Step \(step.rawValue + 1) of \(CreateStep.allCases.count)")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                Spacer()
+            }
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.top, Spacing.sm)
+        .padding(.bottom, Spacing.xs)
+    }
+
+    // MARK: - Step Content
+
+    @ViewBuilder
+    private var stepContent: some View {
+        switch step {
+        case .typeAndTitle:
+            VStack(spacing: 0) {
+                EventHeroImagePicker(
+                    selectedPhoto: $selectedPhoto,
+                    heroImage: $heroImage,
+                    selectedCategory: selectedCategory
+                )
+
+                VStack(spacing: Spacing.lg) {
+                    if showTemplates && template == nil {
+                        templateSection
+                    }
+
+                    EventCategorySelector(
+                        selectedCategory: $selectedCategory,
+                        enabledFeatures: $enabledFeatures,
+                        headerTitle: "What kind of event?"
+                    )
+
+                    EventBasicsSection(
+                        title: $title,
+                        description: $description
+                    )
+                }
+                .padding(.horizontal, Spacing.md)
+                .padding(.top, Spacing.lg)
+                .padding(.bottom, 100)
+            }
+
+        case .whenAndWhere:
+            VStack(spacing: Spacing.lg) {
+                EventDateTimeSection(
+                    startDate: $startDate,
+                    endDate: $endDate,
+                    hasEndDate: $hasEndDate,
+                    allowPastDates: false
+                )
+                EventLocationSection(
+                    isVirtual: $isVirtual,
+                    virtualURL: $virtualURL,
+                    locationName: $locationName,
+                    locationAddress: $locationAddress,
+                    locationCity: $locationCity,
+                    locationState: $locationState,
+                    locationCountry: $locationCountry,
+                    locationLatitude: $locationLatitude,
+                    locationLongitude: $locationLongitude
+                )
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, 100)
+
+        case .features:
+            VStack(spacing: Spacing.lg) {
+                EventFeaturesSection(enabledFeatures: $enabledFeatures)
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, 100)
+
+        case .settings:
+            VStack(spacing: Spacing.lg) {
+                EventSettingsSection(
+                    privacy: $privacy,
+                    guestListVisibility: $guestListVisibility,
+                    capacity: $capacity,
+                    hasCapacity: $hasCapacity
+                )
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, 100)
         }
     }
 
@@ -236,11 +297,10 @@ struct CreateEventView: View {
         HapticService.mediumImpact()
     }
 
-    // MARK: - Floating Create Button
+    // MARK: - Navigation Bar
 
-    private var createButtonBar: some View {
+    private var navigationBar: some View {
         VStack(spacing: 0) {
-            // Top fade
             LinearGradient(
                 colors: [Color.gatherBackground.opacity(0), Color.gatherBackground],
                 startPoint: .top,
@@ -249,8 +309,7 @@ struct CreateEventView: View {
             .frame(height: 20)
 
             VStack(spacing: Spacing.xs) {
-                // Hint explaining why the Create button is disabled
-                if let hint = validationHint {
+                if let hint = stepHint {
                     HStack(spacing: 6) {
                         Image(systemName: "info.circle.fill")
                             .font(.caption2)
@@ -264,84 +323,140 @@ struct CreateEventView: View {
                 }
 
                 HStack(spacing: Spacing.sm) {
-                    // Save as Draft
-                    Button {
-                        createEvent(asDraft: true)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "doc.fill")
-                                .font(.caption)
-                            Text("Draft")
-                                .font(GatherFont.callout)
-                                .fontWeight(.semibold)
+                    if step != .typeAndTitle {
+                        Button {
+                            goBack()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "chevron.left")
+                                    .font(.caption)
+                                Text("Back")
+                                    .font(GatherFont.callout)
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .padding(.horizontal, Spacing.lg)
+                            .padding(.vertical, Spacing.sm)
+                            .background(Color.gatherSecondaryBackground)
+                            .clipShape(Capsule())
                         }
-                        .foregroundStyle(Color.accentPurpleFallback)
-                        .padding(.horizontal, Spacing.lg)
-                        .padding(.vertical, Spacing.sm)
-                        .background(Color.accentPurpleFallback.opacity(0.1))
-                        .clipShape(Capsule())
+                        .disabled(isSubmitting)
                     }
-                    .disabled(!isValid || isSubmitting)
-                    .opacity(!isValid ? 0.4 : 1)
 
-                    // Create Event
                     Button {
-                        createEvent(asDraft: false)
+                        primaryAction()
                     } label: {
                         HStack(spacing: 6) {
                             if isSubmitting {
                                 ProgressView()
                                     .tint(.white)
                                     .scaleEffect(0.8)
-                            } else {
+                            } else if step == .settings {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.callout)
                             }
-                            Text("Create Event")
+                            Text(step == .settings ? "Create Event" : "Continue")
                                 .font(GatherFont.callout)
                                 .fontWeight(.bold)
+                            if step != .settings && !isSubmitting {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                            }
                         }
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Spacing.sm)
                         .background(
-                            isValid
+                            canProceed
                                 ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
                                 : AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
                         )
                         .clipShape(Capsule())
                     }
+                    .disabled(!canProceed || isSubmitting)
+                }
+
+                if step == .settings {
+                    Button {
+                        createEvent(asDraft: true)
+                    } label: {
+                        Text("Save as draft instead")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                    }
                     .disabled(!isValid || isSubmitting)
-                    .scaleEffect(isValid ? 1.0 : 0.97)
-                    .animation(.spring(response: 0.3), value: isValid)
+                    .padding(.top, 2)
                 }
             }
             .padding(.horizontal, Spacing.md)
             .padding(.bottom, Spacing.md)
             .background(Color.gatherBackground)
-            .animation(.easeInOut(duration: 0.2), value: validationHint)
+            .animation(.easeInOut(duration: 0.2), value: stepHint)
+        }
+    }
+
+    // MARK: - Step Navigation
+
+    private func primaryAction() {
+        if step == .settings {
+            createEvent(asDraft: false)
+        } else {
+            goNext()
+        }
+    }
+
+    private func goNext() {
+        guard canProceed, let next = CreateStep(rawValue: step.rawValue + 1) else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            step = next
+        }
+        HapticService.buttonTap()
+    }
+
+    private func goBack() {
+        guard let previous = CreateStep(rawValue: step.rawValue - 1) else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            step = previous
         }
     }
 
     // MARK: - Validation
 
-    private var isValid: Bool {
-        validationHint == nil
+    /// The reason the current step can't be completed yet, or `nil` if it's valid.
+    private var stepHint: String? {
+        hint(for: step)
     }
 
-    /// The first thing blocking event creation, phrased as a fix-it hint.
-    /// `nil` means the form is valid.
-    private var validationHint: String? {
-        let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
-        if trimmedTitle.isEmpty { return "Add a title to create your event" }
-        if trimmedTitle.count > 100 { return "Title is too long (100 characters max)" }
-        if startDate <= Date().addingTimeInterval(-300) { return "Choose a start date in the future" }
-        if hasEndDate, let end = endDate, end <= startDate { return "End time must be after the start time" }
-        if hasCapacity, let cap = capacity, cap <= 0 { return "Capacity must be at least 1 guest" }
-        if isVirtual, !virtualURL.isEmpty, URL(string: virtualURL) == nil {
-            return "Enter a valid event link"
+    private func hint(for step: CreateStep) -> String? {
+        switch step {
+        case .typeAndTitle:
+            let trimmed = title.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { return "Add an event name to continue" }
+            if trimmed.count > 100 { return "Event name is too long (100 characters max)" }
+            return nil
+        case .whenAndWhere:
+            if startDate <= Date().addingTimeInterval(-300) { return "Choose a start date in the future" }
+            if hasEndDate, let end = endDate, end <= startDate { return "End time must be after the start time" }
+            if isVirtual, !virtualURL.isEmpty, URL(string: virtualURL) == nil { return "Enter a valid meeting link" }
+            return nil
+        case .features:
+            return nil
+        case .settings:
+            if hasCapacity, let cap = capacity, cap <= 0 { return "Capacity must be at least 1 guest" }
+            return nil
         }
-        return nil
+    }
+
+    /// Whether every step is valid — required before the event can be created.
+    private var isValid: Bool {
+        CreateStep.allCases.allSatisfy { hint(for: $0) == nil }
+    }
+
+    /// Whether the primary button is enabled: the current step for Continue,
+    /// or all steps for the final Create.
+    private var canProceed: Bool {
+        step == .settings ? isValid : (hint(for: step) == nil)
     }
 
     // MARK: - Create Event
@@ -359,6 +474,7 @@ struct CreateEventView: View {
                 address: locationAddress.isEmpty ? nil : locationAddress,
                 city: locationCity.isEmpty ? nil : locationCity,
                 state: locationState.isEmpty ? nil : locationState,
+                country: locationCountry.isEmpty ? nil : locationCountry,
                 latitude: locationLatitude,
                 longitude: locationLongitude
             )
@@ -410,6 +526,7 @@ struct CreateEventView: View {
         }
 
         modelContext.safeSave()
+        FirestoreService.shared.pushEvent(event)
 
         // Haptic feedback
         HapticService.success()

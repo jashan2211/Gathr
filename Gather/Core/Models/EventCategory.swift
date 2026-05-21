@@ -36,22 +36,25 @@ enum EventCategory: String, Codable, CaseIterable {
     }
 
     var defaultFeatures: Set<EventFeature> {
+        let defaults: Set<EventFeature>
         switch self {
         case .wedding:
-            return [.functions, .guestManagement, .budget, .seating, .activity, .photos]
+            defaults = [.functions, .guestManagement, .budget, .seating, .activity, .photos]
         case .party:
-            return [.guestManagement, .budget, .activity, .photos]
+            defaults = [.guestManagement, .budget, .activity, .photos]
         case .office:
-            return [.guestManagement, .budget, .schedule, .activity]
+            defaults = [.guestManagement, .budget, .schedule, .activity]
         case .conference:
-            return [.ticketing, .schedule, .activity]
+            defaults = [.ticketing, .schedule, .activity]
         case .concert:
-            return [.ticketing, .activity]
+            defaults = [.ticketing, .activity]
         case .meetup:
-            return [.guestManagement, .activity]
+            defaults = [.guestManagement, .activity]
         case .custom:
-            return [.guestManagement, .activity]
+            defaults = [.guestManagement, .activity]
         }
+        // Coming-soon features are never auto-enabled.
+        return defaults.filter { $0.isAvailable }
     }
 
     var color: String {
@@ -115,6 +118,14 @@ enum EventFeature: String, Codable, CaseIterable, Hashable {
         case .schedule: return "list.bullet.rectangle"
         case .activity: return "bubble.left.and.bubble.right"
         case .photos: return "photo.on.rectangle.angled"
+        }
+    }
+
+    /// Coming-soon features are shown greyed out and can't be enabled yet.
+    var isAvailable: Bool {
+        switch self {
+        case .photos, .seating, .schedule: return false
+        default: return true
         }
     }
 }

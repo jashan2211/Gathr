@@ -4,7 +4,6 @@ import AuthenticationServices
 struct AuthView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var showEmailSheet = false
-    @State private var email = ""
     @State private var logoVisible = false
     @State private var buttonsVisible = false
 
@@ -49,7 +48,6 @@ struct AuthView: View {
                 // Logo & Title
                 VStack(spacing: Spacing.md) {
                     ZStack {
-                        // Glow ring
                         Circle()
                             .fill(Color.accentPurpleFallback.opacity(0.08))
                             .frame(width: 130, height: 130)
@@ -87,7 +85,7 @@ struct AuthView: View {
                 VStack(spacing: Spacing.sm) {
                     // Sign in with Apple
                     SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [.fullName, .email]
+                        authManager.configureAppleRequest(request)
                     } onCompletion: { result in
                         handleAppleSignIn(result)
                     }
@@ -97,7 +95,29 @@ struct AuthView: View {
                     .offset(y: buttonsVisible ? 0 : 30)
                     .opacity(buttonsVisible ? 1 : 0)
 
-                    // Email sign in
+                    // Sign in with Google
+                    Button {
+                        authManager.signInWithGoogle()
+                    } label: {
+                        HStack(spacing: Spacing.sm) {
+                            Image("GoogleLogo")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 20, height: 20)
+                            Text("Continue with Google")
+                                .font(GatherFont.callout)
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Color.gatherSecondaryBackground)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .clipShape(Capsule())
+                    }
+                    .offset(y: buttonsVisible ? 0 : 30)
+                    .opacity(buttonsVisible ? 1 : 0)
+
+                    // Email — sign in or create an account
                     Button {
                         showEmailSheet = true
                     } label: {
@@ -119,7 +139,6 @@ struct AuthView: View {
 
                     // Demo Sign In (DEBUG only)
                     if AppConfig.isDemoMode {
-                        // Divider
                         HStack {
                             Rectangle()
                                 .fill(Color.gatherSecondaryText.opacity(0.2))
@@ -134,7 +153,6 @@ struct AuthView: View {
                         .padding(.vertical, Spacing.xxs)
                         .opacity(buttonsVisible ? 1 : 0)
 
-                        // Demo Sign In
                         Button {
                             authManager.signInAsDemo()
                         } label: {
@@ -210,12 +228,11 @@ struct AuthView: View {
             }
         }
         .sheet(isPresented: $showEmailSheet) {
-            EmailSignInSheet(email: $email)
+            EmailAuthSheet()
         }
-        .alert("Error", isPresented: .constant(authManager.authError != nil)) {
-            Button("OK") {
-                authManager.authError = nil
-            }
+        // Apple sign-in errors surface here; email errors show inside the sheet.
+        .alert("Sign In Error", isPresented: .constant(authManager.authError != nil && !showEmailSheet)) {
+            Button("OK") { authManager.authError = nil }
         } message: {
             if let error = authManager.authError {
                 Text(error.localizedDescription)
@@ -226,10 +243,8 @@ struct AuthView: View {
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
         switch result {
         case .success(let authorization):
-            if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                Task {
-                    await authManager.signInWithApple(credential: credential)
-                }
+            Task {
+                await authManager.signInWithApple(authorization: authorization)
             }
         case .failure(let error):
             if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
@@ -239,109 +254,122 @@ struct AuthView: View {
     }
 }
 
-// MARK: - Email Sign In Sheet
+// MARK: - Email Auth Sheet (Sign In / Create Account / Forgot Password)
 
-struct EmailSignInSheet: View {
+struct EmailAuthSheet: View {
+    enum Mode { case signIn, createAccount, forgotPassword }
+
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.dismiss) var dismiss
-    @Binding var email: String
-    @State private var emailError: String?
-    @FocusState private var isEmailFocused: Bool
+
+    @State private var mode: Mode = .signIn
+    @State private var name = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var showPassword = false
+    @State private var infoMessage: String?
+    @FocusState private var focusedField: Field?
+
+    enum Field: Hashable { case name, email, password }
+
+    // MARK: - Validation
+
+    private var trimmedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
 
     private var isValidEmail: Bool {
-        let emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
-        return email.wholeMatch(of: emailRegex) != nil
+        let regex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+        return trimmedEmail.wholeMatch(of: regex) != nil
+    }
+
+    private var isValidName: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var canSubmit: Bool {
+        switch mode {
+        case .signIn: return isValidEmail && !password.isEmpty
+        case .createAccount: return isValidName && isValidEmail && password.count >= 6
+        case .forgotPassword: return isValidEmail
+        }
+    }
+
+    private var title: String {
+        switch mode {
+        case .signIn: return "Welcome back"
+        case .createAccount: return "Create your account"
+        case .forgotPassword: return "Reset password"
+        }
+    }
+
+    private var subtitle: String {
+        switch mode {
+        case .signIn: return "Sign in to continue to Gather"
+        case .createAccount: return "Join Gather to host and attend events"
+        case .forgotPassword: return "We'll email you a link to set a new password"
+        }
+    }
+
+    private var primaryButtonTitle: String {
+        switch mode {
+        case .signIn: return "Sign In"
+        case .createAccount: return "Create Account"
+        case .forgotPassword: return "Send Reset Link"
+        }
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Spacing.lg) {
-                // Email input
+            ScrollView {
                 VStack(spacing: Spacing.lg) {
+                    header
+
                     VStack(spacing: Spacing.md) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.accentPurpleFallback.opacity(0.08))
-                                .frame(width: 80, height: 80)
-                            Image(systemName: "envelope.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(LinearGradient.gatherAccentGradient)
+                        if mode == .createAccount {
+                            field(
+                                label: "NAME",
+                                icon: "person",
+                                placeholder: "Your name",
+                                text: $name,
+                                field: .name,
+                                contentType: .name
+                            )
                         }
 
-                        Text("Sign in with Email")
-                            .font(GatherFont.title2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.gatherPrimaryText)
-
-                        Text("Enter your email to create or access your account")
-                            .font(GatherFont.caption)
-                            .foregroundStyle(Color.gatherSecondaryText)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, Spacing.sm)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("EMAIL")
-                            .font(.caption2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.gatherSecondaryText)
-                            .tracking(0.5)
-
-                        HStack(spacing: Spacing.xs) {
-                            Image(systemName: "envelope")
-                                .font(.caption)
-                                .foregroundStyle(Color.accentPurpleFallback.opacity(0.7))
-                                .frame(width: 20)
-                            TextField("email@example.com", text: $email)
-                                .font(GatherFont.body)
-                                .keyboardType(.emailAddress)
-                                .textContentType(.emailAddress)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .submitLabel(.done)
-                                .focused($isEmailFocused)
-                                .onSubmit {
-                                    signIn()
-                                }
-                        }
-                        .padding(Spacing.sm)
-                        .background(Color.gatherSecondaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-
-                        if let error = emailError {
-                            Text(error)
-                                .font(GatherFont.caption)
-                                .foregroundStyle(Color.rsvpNoFallback)
-                        }
-                    }
-
-                    Button {
-                        signIn()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.callout)
-                            Text("Continue")
-                                .font(GatherFont.callout)
-                                .fontWeight(.bold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(
-                            email.isEmpty
-                                ? AnyShapeStyle(Color.gatherSecondaryBackground)
-                                : AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                        field(
+                            label: "EMAIL",
+                            icon: "envelope",
+                            placeholder: "email@example.com",
+                            text: $email,
+                            field: .email,
+                            contentType: .emailAddress,
+                            keyboard: .emailAddress
                         )
-                        .foregroundStyle(email.isEmpty ? Color.gatherSecondaryText : .white)
-                        .clipShape(Capsule())
-                    }
-                    .disabled(email.isEmpty)
-                }
 
-                Spacer()
+                        if mode != .forgotPassword {
+                            passwordField
+                        }
+                    }
+
+                    if let infoMessage {
+                        banner(infoMessage, icon: "checkmark.circle.fill", color: Color.rsvpYesFallback)
+                    }
+
+                    if let error = authManager.authError?.errorDescription {
+                        banner(error, icon: "exclamationmark.triangle.fill", color: Color.rsvpNoFallback)
+                    }
+
+                    primaryButton
+
+                    modeSwitcher
+
+                    Spacer(minLength: Spacing.lg)
+                }
+                .padding(Spacing.md)
             }
-            .padding(.horizontal, Spacing.md)
-            .navigationTitle("Sign in with Email")
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -353,24 +381,243 @@ struct EmailSignInSheet: View {
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
+                    .accessibilityLabel("Close")
                 }
             }
-            .onAppear {
-                isEmailFocused = true
+            .onChange(of: mode) { _, _ in
+                authManager.authError = nil
+                infoMessage = nil
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .onAppear { authManager.authError = nil }
     }
 
-    private func signIn() {
-        emailError = nil
-        guard isValidEmail else {
-            emailError = "Please enter a valid email address"
-            return
+    // MARK: - Header
+
+    private var header: some View {
+        VStack(spacing: Spacing.md) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentPurpleFallback.opacity(0.08))
+                    .frame(width: 80, height: 80)
+                Image(systemName: mode == .forgotPassword ? "lock.rotation" : "envelope.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(LinearGradient.gatherAccentGradient)
+            }
+
+            Text(title)
+                .font(GatherFont.title2)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.gatherPrimaryText)
+
+            Text(subtitle)
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
+                .multilineTextAlignment(.center)
         }
-        authManager.signInWithEmail(email: email)
-        dismiss()
+        .padding(.top, Spacing.sm)
+    }
+
+    // MARK: - Fields
+
+    private func field(
+        label: String,
+        icon: String,
+        placeholder: String,
+        text: Binding<String>,
+        field: Field,
+        contentType: UITextContentType,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.gatherSecondaryText)
+                .tracking(0.5)
+
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(Color.accentPurpleFallback.opacity(0.7))
+                    .frame(width: 20)
+                TextField(placeholder, text: text)
+                    .font(GatherFont.body)
+                    .keyboardType(keyboard)
+                    .textContentType(contentType)
+                    .textInputAutocapitalization(keyboard == .emailAddress ? .never : .words)
+                    .autocorrectionDisabled(keyboard == .emailAddress)
+                    .focused($focusedField, equals: field)
+                    .submitLabel(.next)
+            }
+            .padding(Spacing.sm)
+            .background(Color.gatherSecondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        }
+    }
+
+    private var passwordField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("PASSWORD")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.gatherSecondaryText)
+                .tracking(0.5)
+
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "lock")
+                    .font(.caption)
+                    .foregroundStyle(Color.accentPurpleFallback.opacity(0.7))
+                    .frame(width: 20)
+
+                Group {
+                    if showPassword {
+                        TextField("Password", text: $password)
+                    } else {
+                        SecureField("Password", text: $password)
+                    }
+                }
+                .font(GatherFont.body)
+                .textContentType(mode == .createAccount ? .newPassword : .password)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($focusedField, equals: .password)
+                .submitLabel(.go)
+                .onSubmit { submit() }
+
+                Button {
+                    showPassword.toggle()
+                } label: {
+                    Image(systemName: showPassword ? "eye.slash" : "eye")
+                        .font(.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .accessibilityLabel(showPassword ? "Hide password" : "Show password")
+            }
+            .padding(Spacing.sm)
+            .background(Color.gatherSecondaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+
+            if mode == .createAccount {
+                Text("At least 6 characters")
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherTertiaryText)
+            }
+        }
+    }
+
+    private func banner(_ text: String, icon: String, color: Color) -> some View {
+        HStack(spacing: Spacing.xs) {
+            Image(systemName: icon)
+                .font(.caption)
+            Text(text)
+                .font(GatherFont.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(color)
+        .padding(Spacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+    }
+
+    private var primaryButton: some View {
+        Button {
+            submit()
+        } label: {
+            ZStack {
+                if authManager.isLoading {
+                    ProgressView().tint(.white)
+                } else {
+                    Text(primaryButtonTitle)
+                        .font(GatherFont.callout)
+                        .fontWeight(.bold)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(
+                canSubmit
+                    ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                    : AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
+            )
+            .foregroundStyle(.white)
+            .clipShape(Capsule())
+        }
+        .disabled(!canSubmit || authManager.isLoading)
+    }
+
+    private var modeSwitcher: some View {
+        VStack(spacing: Spacing.sm) {
+            switch mode {
+            case .signIn:
+                Button("Forgot password?") {
+                    withAnimation(.spring(response: 0.3)) { mode = .forgotPassword }
+                }
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.accentPurpleFallback)
+
+                HStack(spacing: 4) {
+                    Text("New to Gather?")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                    Button("Create an account") {
+                        withAnimation(.spring(response: 0.3)) { mode = .createAccount }
+                    }
+                    .font(GatherFont.caption.weight(.bold))
+                    .foregroundStyle(Color.accentPurpleFallback)
+                }
+
+            case .createAccount:
+                HStack(spacing: 4) {
+                    Text("Already have an account?")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                    Button("Sign in") {
+                        withAnimation(.spring(response: 0.3)) { mode = .signIn }
+                    }
+                    .font(GatherFont.caption.weight(.bold))
+                    .foregroundStyle(Color.accentPurpleFallback)
+                }
+
+            case .forgotPassword:
+                Button("Back to sign in") {
+                    withAnimation(.spring(response: 0.3)) { mode = .signIn }
+                }
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.accentPurpleFallback)
+            }
+        }
+        .padding(.top, Spacing.xs)
+    }
+
+    // MARK: - Submit
+
+    private func submit() {
+        guard canSubmit, !authManager.isLoading else { return }
+        authManager.authError = nil
+        infoMessage = nil
+        focusedField = nil
+
+        Task {
+            switch mode {
+            case .signIn:
+                await authManager.signIn(email: email, password: password)
+            case .createAccount:
+                await authManager.register(name: name, email: email, password: password)
+                if authManager.authError == nil {
+                    HapticService.success()
+                }
+            case .forgotPassword:
+                let sent = await authManager.sendPasswordReset(email: email)
+                if sent {
+                    infoMessage = "Password reset link sent to \(trimmedEmail). Check your inbox."
+                }
+            }
+        }
     }
 }
 

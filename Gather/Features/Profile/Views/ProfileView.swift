@@ -112,11 +112,7 @@ struct ProfileView: View {
                 Text("This will permanently delete your account and all associated data. This action cannot be undone.")
             }
             .sheet(isPresented: $showReauthSheet) {
-                ReauthenticateSheet {
-                    Task {
-                        await authManager.deleteAccount(modelContext: modelContext)
-                    }
-                }
+                ReauthenticateSheet()
             }
             .sheet(isPresented: $showEditProfile) {
                 EditProfileSheet()
@@ -1276,12 +1272,9 @@ struct EditProfileSheet: View {
         guard !trimmed.isEmpty else { return }
         isSaving = true
 
-        authManager.updateDisplayName(trimmed)
-
-        HapticService.success()
-
         Task {
-            try? await Task.sleep(for: .seconds(0.3))
+            await authManager.updateDisplayName(trimmed)
+            HapticService.success()
             isSaving = false
             dismiss()
         }
@@ -1292,11 +1285,11 @@ struct EditProfileSheet: View {
 
 struct ReauthenticateSheet: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) var dismiss
-    @State private var email = ""
+    @State private var password = ""
     @State private var errorMessage: String?
-    @State private var appleSignInCompleted = false
-    let onConfirm: () -> Void
+    @State private var isDeleting = false
 
     private var isAppleUser: Bool {
         authManager.currentAuthProvider == "apple"
@@ -1319,7 +1312,7 @@ struct ReauthenticateSheet: View {
                         .font(.system(.title2, design: .rounded, weight: .bold))
                         .foregroundStyle(Color.gatherPrimaryText)
 
-                    Text("To delete your account, please verify your identity.")
+                    Text("Deleting your account is permanent. Verify your identity to continue.")
                         .font(GatherFont.body)
                         .foregroundStyle(Color.gatherSecondaryText)
                         .multilineTextAlignment(.center)
@@ -1328,31 +1321,23 @@ struct ReauthenticateSheet: View {
 
                 if isAppleUser {
                     SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [.email]
+                        authManager.configureAppleRequest(request)
                     } onCompletion: { result in
-                        switch result {
-                        case .success:
-                            appleSignInCompleted = true
-                            onConfirm()
-                            dismiss()
-                        case .failure:
-                            errorMessage = "Apple Sign In failed. Please try again."
-                        }
+                        handleAppleReauth(result)
                     }
                     .signInWithAppleButtonStyle(.black)
                     .frame(height: 52)
                     .clipShape(Capsule())
+                    .disabled(isDeleting)
                 } else {
-                    // Email users re-enter their email
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Enter your email to confirm")
+                        Text("Enter your password to confirm")
                             .font(GatherFont.callout)
                             .foregroundStyle(Color.gatherSecondaryText)
 
-                        TextField("email@example.com", text: $email)
+                        SecureField("Your password", text: $password)
                             .font(GatherFont.body)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.emailAddress)
+                            .textContentType(.password)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .padding(Spacing.sm)
@@ -1361,27 +1346,33 @@ struct ReauthenticateSheet: View {
                     }
 
                     Button {
-                        verifyEmail()
+                        deleteWithEmail()
                     } label: {
-                        Text("Delete My Account")
-                            .font(GatherFont.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                email.isEmpty
-                                    ? Color.gatherSecondaryText
-                                    : Color.rsvpNoFallback
-                            )
-                            .clipShape(Capsule())
+                        HStack(spacing: 6) {
+                            if isDeleting {
+                                ProgressView().tint(.white)
+                            }
+                            Text("Delete My Account")
+                                .font(GatherFont.headline)
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(
+                            password.isEmpty
+                                ? Color.gatherSecondaryText
+                                : Color.rsvpNoFallback
+                        )
+                        .clipShape(Capsule())
                     }
-                    .disabled(email.isEmpty)
+                    .disabled(password.isEmpty || isDeleting)
                 }
 
                 if let error = errorMessage {
                     Text(error)
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.rsvpNoFallback)
+                        .multilineTextAlignment(.center)
                 }
 
                 Spacer()
@@ -1392,20 +1383,56 @@ struct ReauthenticateSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isDeleting)
                 }
             }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(isDeleting)
     }
 
-    private func verifyEmail() {
-        let currentEmail = authManager.currentUser?.email?.lowercased() ?? ""
-        if email.lowercased() == currentEmail {
-            onConfirm()
-            dismiss()
-        } else {
-            errorMessage = "Email does not match your account"
+    private func handleAppleReauth(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            errorMessage = nil
+            isDeleting = true
+            Task {
+                let deleted = await authManager.reauthenticateAndDeleteWithApple(
+                    authorization: authorization,
+                    modelContext: modelContext
+                )
+                isDeleting = false
+                if deleted {
+                    dismiss()
+                } else {
+                    errorMessage = authManager.authError?.errorDescription
+                        ?? "Couldn't delete your account. Please try again."
+                }
+            }
+        case .failure(let error):
+            if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
+                errorMessage = "Apple verification failed. Please try again."
+            }
+        }
+    }
+
+    private func deleteWithEmail() {
+        guard !password.isEmpty else { return }
+        errorMessage = nil
+        isDeleting = true
+        Task {
+            let deleted = await authManager.reauthenticateAndDeleteWithEmail(
+                password: password,
+                modelContext: modelContext
+            )
+            isDeleting = false
+            if deleted {
+                dismiss()
+            } else {
+                errorMessage = authManager.authError?.errorDescription
+                    ?? "Couldn't delete your account. Please try again."
+            }
         }
     }
 }

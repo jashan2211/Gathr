@@ -17,6 +17,7 @@ struct EditEventView: View {
     @State private var locationAddress: String
     @State private var locationCity: String
     @State private var locationState: String
+    @State private var locationCountry: String
     @State private var locationLatitude: Double?
     @State private var locationLongitude: Double?
     @State private var isVirtual: Bool
@@ -48,6 +49,7 @@ struct EditEventView: View {
         _locationAddress = State(initialValue: event.location?.address ?? "")
         _locationCity = State(initialValue: event.location?.city ?? "")
         _locationState = State(initialValue: event.location?.state ?? "")
+        _locationCountry = State(initialValue: event.location?.country ?? "")
         _locationLatitude = State(initialValue: event.location?.latitude)
         _locationLongitude = State(initialValue: event.location?.longitude)
         _isVirtual = State(initialValue: event.location?.isVirtual ?? false)
@@ -127,6 +129,7 @@ struct EditEventView: View {
                             locationAddress: $locationAddress,
                             locationCity: $locationCity,
                             locationState: $locationState,
+                            locationCountry: $locationCountry,
                             locationLatitude: $locationLatitude,
                             locationLongitude: $locationLongitude
                         )
@@ -384,6 +387,7 @@ struct EditEventView: View {
                 address: locationAddress.isEmpty ? nil : locationAddress,
                 city: locationCity.isEmpty ? nil : locationCity,
                 state: locationState.isEmpty ? nil : locationState,
+                country: locationCountry.isEmpty ? nil : locationCountry,
                 latitude: locationLatitude,
                 longitude: locationLongitude
             )
@@ -392,6 +396,7 @@ struct EditEventView: View {
         }
 
         modelContext.safeSave()
+        FirestoreService.shared.pushEvent(event)
 
         // Haptic feedback
         HapticService.success()
@@ -403,8 +408,10 @@ struct EditEventView: View {
     // MARK: - Delete Event
 
     private func deleteEvent() {
+        let eventId = event.id
         modelContext.delete(event)
         modelContext.safeSave()
+        FirestoreService.shared.deleteEvent(id: eventId)
 
         HapticService.warning()
 

@@ -6,7 +6,7 @@ struct LocationPickerView: View {
     @StateObject private var searchManager = LocationSearchManager()
     @Environment(\.dismiss) private var dismiss
 
-    let onSelect: (String, String?, String?, String?, Double, Double) -> Void
+    let onSelect: (String, String?, String?, String?, String?, Double, Double) -> Void
 
     @State private var selectedMapItem: MKMapItem?
     @State private var cameraPosition: MapCameraPosition = .automatic
@@ -216,9 +216,10 @@ struct LocationPickerView: View {
         let address = placemark.formattedAddress
         let city = placemark.locality
         let state = placemark.administrativeArea
+        let country = placemark.country
         let lat = placemark.coordinate.latitude
         let lon = placemark.coordinate.longitude
-        onSelect(name, address, city, state, lat, lon)
+        onSelect(name, address, city, state, country, lat, lon)
         dismiss()
     }
 }

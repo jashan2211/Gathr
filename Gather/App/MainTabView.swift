@@ -21,6 +21,10 @@ struct MainTabView: View {
             CreateEventView()
                 .presentationDragIndicator(.visible)
         }
+        .task {
+            // Pull the signed-in user's events down from the cloud on launch.
+            await FirestoreService.shared.mergeRemoteEvents(into: modelContext)
+        }
         .fullScreenCover(item: $deepLinkEvent) { event in
             NavigationStack {
                 EventDetailView(event: event)
@@ -35,13 +39,20 @@ struct MainTabView: View {
         }
         .onChange(of: appState.deepLinkEventId) { _, eventId in
             guard let eventId else { return }
+            let wantsRSVP = appState.showRSVPForDeepLink
             let descriptor = FetchDescriptor<Event>(
                 predicate: #Predicate { $0.id == eventId }
             )
             if let event = try? modelContext.fetch(descriptor).first {
                 deepLinkEvent = event
-                if appState.showRSVPForDeepLink {
-                    showDeepLinkRSVP = true
+                if wantsRSVP { showDeepLinkRSVP = true }
+            } else {
+                // Not on this device — load the shared event from the cloud.
+                Task { @MainActor in
+                    if let event = await FirestoreService.shared.fetchEvent(id: eventId, into: modelContext) {
+                        deepLinkEvent = event
+                        if wantsRSVP { showDeepLinkRSVP = true }
+                    }
                 }
             }
             appState.deepLinkEventId = nil

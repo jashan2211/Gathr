@@ -35,7 +35,7 @@ enum EventDetailTab: String, CaseIterable {
         case .guests:
             return event.hasGuestManagement
         case .photos:
-            return event.hasPhotos
+            return event.hasPhotos && EventFeature.photos.isAvailable
         case .budget:
             return event.hasBudget
         }
@@ -59,6 +59,7 @@ struct EventDetailView: View {
     @State private var showWaitlist = false
     @Namespace private var tabNamespace
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.modelContext) private var modelContext
     @Query private var eventTickets: [Ticket]
 
     init(event: Event) {
@@ -87,7 +88,9 @@ struct EventDetailView: View {
         }
         .ignoresSafeArea(edges: .top)
         .safeAreaInset(edge: .bottom) {
-            if shouldShowRSVPButton {
+            if isHost && event.isDraft {
+                draftPublishBar
+            } else if shouldShowRSVPButton {
                 rsvpButtonBar
             }
         }
@@ -408,6 +411,60 @@ struct EventDetailView: View {
     }
 
     // MARK: - RSVP Button Bar
+
+    private var draftPublishBar: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [Color.gatherBackground.opacity(0), Color.gatherBackground],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 16)
+
+            HStack(spacing: Spacing.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Draft")
+                        .font(GatherFont.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                    Text("Only you can see this — publish to share it")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+
+                Spacer()
+
+                Button {
+                    publishEvent()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.caption)
+                        Text("Publish")
+                            .font(GatherFont.callout)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.sm)
+                    .background(LinearGradient.gatherAccentGradient)
+                    .clipShape(Capsule())
+                }
+                .accessibilityLabel("Publish event")
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.bottom, Spacing.sm)
+            .background(.ultraThinMaterial)
+        }
+    }
+
+    private func publishEvent() {
+        event.isDraft = false
+        event.updatedAt = Date()
+        modelContext.safeSave()
+        FirestoreService.shared.pushEvent(event)
+        HapticService.success()
+    }
 
     private var shouldShowRSVPButton: Bool {
         guard !isHost else { return false }

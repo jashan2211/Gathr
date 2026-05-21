@@ -1,8 +1,27 @@
 import SwiftUI
 import SwiftData
+import FirebaseCore
+import GoogleSignIn
+
+// MARK: - App Delegate
+
+/// Configures Firebase before any SwiftUI state (including AuthManager) is
+/// created. `didFinishLaunching` runs before the first scene, so Firebase is
+/// ready by the time AuthManager attaches its auth-state listener.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        FirebaseApp.configure()
+        return true
+    }
+}
 
 @main
 struct GatherApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     // MARK: - SwiftData Container
 
     var sharedModelContainer: ModelContainer = {
@@ -67,6 +86,7 @@ struct GatherApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var eventService = EventService()
     @StateObject private var notificationService = NotificationService.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     // MARK: - Body
 
@@ -93,7 +113,14 @@ struct GatherApp: App {
                     notificationService.setupNotificationCategories()
                 }
                 .onOpenURL { url in
+                    if GIDSignIn.sharedInstance.handle(url) { return }
                     handleDeepLink(url)
+                }
+                .onChange(of: scenePhase) { _, newPhase in
+                    // Push guest/RSVP changes to the cloud when the app backgrounds.
+                    if newPhase == .background {
+                        FirestoreService.shared.pushHostedEvents(from: sharedModelContainer.mainContext)
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)

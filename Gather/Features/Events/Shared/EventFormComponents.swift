@@ -425,6 +425,19 @@ struct EventLocationSection: View {
     @Binding var locationLongitude: Double?
 
     @State private var showLocationPicker = false
+    @State private var showManualEntry = false
+
+    /// True once the user has picked a place on the map or typed a venue name.
+    private var hasLocation: Bool {
+        locationLatitude != nil || !locationName.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// One-line address summary for the confirmation card.
+    private var addressSummary: String {
+        [locationAddress, locationCity, locationState]
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .joined(separator: ", ")
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -437,14 +450,14 @@ struct EventLocationSection: View {
                     icon: "building.2.fill",
                     isSelected: !isVirtual
                 ) {
-                    withAnimation(.spring(response: 0.3)) { isVirtual = false }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { isVirtual = false }
                 }
                 EventFormLocationTypeButton(
                     label: "Virtual",
                     icon: "video.fill",
                     isSelected: isVirtual
                 ) {
-                    withAnimation(.spring(response: 0.3)) { isVirtual = true }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { isVirtual = true }
                 }
             }
 
@@ -457,60 +470,7 @@ struct EventLocationSection: View {
                     autocapitalization: .never
                 )
             } else {
-                VStack(spacing: Spacing.xs) {
-                    // Search on Map button
-                    Button {
-                        showLocationPicker = true
-                    } label: {
-                        HStack(spacing: Spacing.xs) {
-                            Image(systemName: "map.fill")
-                                .foregroundStyle(Color.accentPinkFallback)
-                            Text("Search on Map")
-                                .font(GatherFont.callout)
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.accentPinkFallback)
-                            Spacer()
-                            if locationLatitude != nil {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(Color.gatherSuccess)
-                            }
-                            Image(systemName: "chevron.right")
-                                .font(.caption2)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-                        .padding(Spacing.sm)
-                        .background(Color.accentPinkFallback.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                    }
-
-                    EventFormStyledTextField(
-                        placeholder: "Venue name",
-                        text: $locationName,
-                        icon: "mappin"
-                    )
-                    EventFormStyledTextField(
-                        placeholder: "Address (optional)",
-                        text: $locationAddress,
-                        icon: "map"
-                    )
-                    HStack(spacing: Spacing.xs) {
-                        EventFormStyledTextField(
-                            placeholder: "City",
-                            text: $locationCity,
-                            icon: "building.2"
-                        )
-                        EventFormStyledTextField(
-                            placeholder: "State / Region",
-                            text: $locationState,
-                            icon: "map"
-                        )
-                    }
-                    EventFormStyledTextField(
-                        placeholder: "Country",
-                        text: $locationCountry,
-                        icon: "globe"
-                    )
-                }
+                inPersonContent
             }
         }
         .padding(Spacing.md)
@@ -518,14 +478,145 @@ struct EventLocationSection: View {
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
         .sheet(isPresented: $showLocationPicker) {
             LocationPickerView { name, address, city, state, country, lat, lon in
-                locationName = name
-                if let address { locationAddress = address }
-                if let city { locationCity = city }
-                if let state { locationState = state }
-                if let country { locationCountry = country }
-                locationLatitude = lat
-                locationLongitude = lon
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    locationName = name
+                    locationAddress = address ?? ""
+                    locationCity = city ?? ""
+                    locationState = state ?? ""
+                    locationCountry = country ?? ""
+                    locationLatitude = lat
+                    locationLongitude = lon
+                    showManualEntry = false
+                }
+                HapticService.success()
             }
+        }
+    }
+
+    // MARK: In-person layout
+
+    /// Map-first: one prominent search action, the five address fields hidden
+    /// behind a disclosure most guests never need to open.
+    @ViewBuilder
+    private var inPersonContent: some View {
+        if hasLocation {
+            selectedLocationCard
+        } else {
+            searchButton
+        }
+
+        if showManualEntry {
+            VStack(spacing: Spacing.xs) {
+                EventFormStyledTextField(placeholder: "Venue name", text: $locationName, icon: "mappin")
+                EventFormStyledTextField(placeholder: "Address (optional)", text: $locationAddress, icon: "map")
+                HStack(spacing: Spacing.xs) {
+                    EventFormStyledTextField(placeholder: "City", text: $locationCity, icon: "building.2")
+                    EventFormStyledTextField(placeholder: "State / Region", text: $locationState, icon: "map")
+                }
+                EventFormStyledTextField(placeholder: "Country", text: $locationCountry, icon: "globe")
+            }
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        } else if !hasLocation {
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showManualEntry = true }
+            } label: {
+                Text("Enter address manually")
+                    .font(GatherFont.footnote)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .padding(.top, Spacing.xxs)
+        }
+    }
+
+    private var searchButton: some View {
+        Button {
+            HapticService.buttonTap()
+            showLocationPicker = true
+        } label: {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "magnifyingglass")
+                    .font(.headline)
+                Text("Search for a place")
+                    .font(GatherFont.callout)
+                    .fontWeight(.semibold)
+                Spacer()
+                Image(systemName: "map.fill")
+                    .font(.callout)
+            }
+            .foregroundStyle(.white)
+            .padding(Spacing.md)
+            .background(LinearGradient.gatherAccentGradient)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var selectedLocationCard: some View {
+        HStack(spacing: Spacing.sm) {
+            ZStack {
+                Circle()
+                    .fill(Color.gatherSuccess.opacity(0.15))
+                    .frame(width: 40, height: 40)
+                Image(systemName: locationLatitude != nil ? "mappin.circle.fill" : "mappin")
+                    .foregroundStyle(Color.gatherSuccess)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(locationName.isEmpty ? "Selected location" : locationName)
+                    .font(GatherFont.callout)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .lineLimit(1)
+                if !addressSummary.isEmpty {
+                    Text(addressSummary)
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: Spacing.xs)
+
+            Menu {
+                Button { showLocationPicker = true } label: {
+                    Label("Search again", systemImage: "magnifyingglass")
+                }
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showManualEntry.toggle() }
+                } label: {
+                    Label(showManualEntry ? "Hide details" : "Edit details", systemImage: "pencil")
+                }
+                Button(role: .destructive) { clearLocation() } label: {
+                    Label("Remove location", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle.fill")
+                    .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .accessibilityLabel("Location options")
+        }
+        .padding(Spacing.sm)
+        .background(Color.gatherBackground)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                .stroke(Color.gatherSeparator.opacity(0.5), lineWidth: 1)
+        )
+    }
+
+    private func clearLocation() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            locationName = ""
+            locationAddress = ""
+            locationCity = ""
+            locationState = ""
+            locationCountry = ""
+            locationLatitude = nil
+            locationLongitude = nil
+            showManualEntry = false
         }
     }
 }

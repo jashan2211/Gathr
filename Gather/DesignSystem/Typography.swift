@@ -5,11 +5,13 @@ import SwiftUI
 enum GatherFont {
     // MARK: - Display Styles
 
-    /// 34pt Bold Rounded - Screen titles, hero text
-    static let largeTitle = Font.system(.largeTitle, design: .rounded).weight(.bold)
+    /// 34pt Heavy SF Pro Display - Screen titles, hero text.
+    /// Editorial weight (was Rounded/Bold) for a more premium, less "toy" feel.
+    /// Pair with `.kerning(-0.5)` via `gatherLargeTitle()` (critique §3).
+    static let largeTitle = Font.system(.largeTitle, design: .default).weight(.heavy)
 
-    /// 28pt Bold Rounded - Section headers
-    static let title = Font.system(.title, design: .rounded).weight(.bold)
+    /// 28pt Heavy SF Pro Display - Section headers
+    static let title = Font.system(.title, design: .default).weight(.heavy)
 
     /// 22pt Semibold Rounded - Card titles, prominent labels
     static let title2 = Font.system(.title2, design: .rounded).weight(.semibold)
@@ -48,6 +50,7 @@ extension View {
     func gatherLargeTitle() -> some View {
         self
             .font(GatherFont.largeTitle)
+            .kerning(-0.5)
             .foregroundStyle(Color.gatherPrimaryText)
     }
 
@@ -55,6 +58,7 @@ extension View {
     func gatherTitle() -> some View {
         self
             .font(GatherFont.title)
+            .kerning(-0.4)
             .foregroundStyle(Color.gatherPrimaryText)
     }
 

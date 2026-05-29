@@ -19,27 +19,31 @@ class EventService: ObservableObject {
 
     // MARK: - Create Event
 
-    func createEvent(
-        title: String,
-        description: String?,
-        startDate: Date,
-        endDate: Date?,
-        location: EventLocation?,
-        capacity: Int?,
-        privacy: EventPrivacy,
-        guestListVisibility: GuestListVisibility,
-        hostId: UUID?
-    ) -> Event {
+    /// Parameters for creating an event. Groups the fields that were previously
+    /// passed as 9 positional arguments (SwiftLint `function_parameter_count`).
+    struct CreateEventRequest {
+        let title: String
+        let description: String?
+        let startDate: Date
+        let endDate: Date?
+        let location: EventLocation?
+        let capacity: Int?
+        let privacy: EventPrivacy
+        let guestListVisibility: GuestListVisibility
+        let hostId: UUID?
+    }
+
+    func createEvent(_ request: CreateEventRequest) -> Event {
         let event = Event(
-            title: title,
-            eventDescription: description,
-            startDate: startDate,
-            endDate: endDate,
-            location: location,
-            capacity: capacity,
-            privacy: privacy,
-            guestListVisibility: guestListVisibility,
-            hostId: hostId
+            title: request.title,
+            eventDescription: request.description,
+            startDate: request.startDate,
+            endDate: request.endDate,
+            location: request.location,
+            capacity: request.capacity,
+            privacy: request.privacy,
+            guestListVisibility: request.guestListVisibility,
+            hostId: request.hostId
         )
 
         modelContext?.insert(event)

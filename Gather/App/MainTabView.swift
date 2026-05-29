@@ -17,6 +17,9 @@ struct MainTabView: View {
                 iPhoneLayout
             }
         }
+        // Declarative selection haptic — fires on every tab change, including
+        // programmatic ones (deep links, iPad sidebar), not just button taps.
+        .sensoryFeedback(.selection, trigger: appState.selectedTab)
         .sheet(isPresented: $showCreateSheet) {
             CreateEventView()
                 .presentationDragIndicator(.visible)
@@ -126,7 +129,6 @@ struct MainTabView: View {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         appState.selectedTab = tab
                     }
-                    HapticService.tabSwitch()
                 } label: {
                     VStack(spacing: 4) {
                         ZStack {

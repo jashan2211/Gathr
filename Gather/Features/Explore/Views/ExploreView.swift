@@ -11,6 +11,7 @@ struct ExploreView: View {
     @State private var showCreateEvent = false
     @State private var showFilterSheet = false
     @FocusState private var isSearchFocused: Bool
+    @Namespace private var zoomNamespace
 
     // Location filters
     @State private var selectedCity: String?
@@ -89,6 +90,7 @@ struct ExploreView: View {
                 EventDetailView(event: event)
                     .toolbar(.visible, for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
+                    .zoomDestination(id: event.id, in: zoomNamespace)
             }
             .sheet(isPresented: $showCreateEvent) {
                 CreateEventView()
@@ -495,6 +497,7 @@ struct ExploreView: View {
             .shadow(color: .black.opacity(0.15), radius: 12, y: 6)
         }
         .buttonStyle(CardPressStyle())
+        .zoomSource(id: event.id, in: zoomNamespace)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Featured event: \(event.title). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending.")
         .accessibilityAddTraits(.isButton)
@@ -535,6 +538,7 @@ struct ExploreView: View {
                             HappeningSoonCard(event: event)
                         }
                         .buttonStyle(CardPressStyle())
+                        .zoomSource(id: event.id, in: zoomNamespace)
                         .accessibilityElement(children: .combine)
                         .accessibilityHint("Double tap to view event details")
                     }
@@ -574,6 +578,7 @@ struct ExploreView: View {
                         ExploreGridCard(event: event)
                     }
                     .buttonStyle(CardPressStyle())
+                    .zoomSource(id: event.id, in: zoomNamespace)
                 }
             }
         }
@@ -845,6 +850,7 @@ struct ExploreCategoryChip: View {
                     .font(GatherFont.caption)
                     .fontWeight(.semibold)
 
+                // swiftlint:disable:next empty_count — `count` is an Int badge value, not a collection
                 if count > 0 {
                     Text("\(count)")
                         .font(.caption2)
@@ -886,6 +892,7 @@ struct ExploreCategoryChip: View {
             .scaleEffect(isSelected ? 1.05 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
         }
+        // swiftlint:disable:next empty_count — `count` is an Int badge value, not a collection
         .accessibilityLabel("\(title)\(count > 0 ? ", \(count) events" : "")")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }

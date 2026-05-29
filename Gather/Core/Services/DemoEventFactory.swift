@@ -144,20 +144,20 @@ extension DemoDataService {
             event: event,
             total: 3000,
             categoryData: [
-                ("Venue", "building.2", "purple", 800, 800, true, "Skyline Rooftop"),
-                ("Food & Drinks", "fork.knife", "pink", 1200, 450, false, "Lucky's Catering"),
-                ("DJ", "music.note", "orange", 500, 500, true, "DJ Spinz"),
-                ("Decorations", "sparkles", "yellow", 300, 180, true, "Party City"),
-                ("Photo Booth", "camera", "blue", 200, 0, false, "SnapShot Co")
+                DemoBudgetCategory("Venue", "building.2", "purple", 800, 800),
+                DemoBudgetCategory("Food & Drinks", "fork.knife", "pink", 1200, 450),
+                DemoBudgetCategory("DJ", "music.note", "orange", 500, 500),
+                DemoBudgetCategory("Decorations", "sparkles", "yellow", 300, 180),
+                DemoBudgetCategory("Photo Booth", "camera", "blue", 200, 0)
             ],
             expenses: [
-                ("Rooftop deposit", 400, true, "Skyline Rooftop", 0, -14, "You"),
-                ("Rooftop balance", 400, true, "Skyline Rooftop", 0, -3, "You"),
-                ("Appetizer trays x5", 250, true, "Lucky's Catering", 1, -7, "Jordan Rivera"),
-                ("Open bar (3hr)", 200, false, "Lucky's Catering", 1, 10, nil),
-                ("DJ booking fee", 500, true, "DJ Spinz", 2, -10, "Aisha Chen"),
-                ("Balloon arch", 120, true, "Party City", 3, -5, "You"),
-                ("Table centerpieces", 60, true, "Party City", 3, -5, "Aisha Chen"),
+                DemoBudgetExpense("Rooftop deposit", 400, true, "Skyline Rooftop", 0, -14, "You"),
+                DemoBudgetExpense("Rooftop balance", 400, true, "Skyline Rooftop", 0, -3, "You"),
+                DemoBudgetExpense("Appetizer trays x5", 250, true, "Lucky's Catering", 1, -7, "Jordan Rivera"),
+                DemoBudgetExpense("Open bar (3hr)", 200, false, "Lucky's Catering", 1, 10, nil),
+                DemoBudgetExpense("DJ booking fee", 500, true, "DJ Spinz", 2, -10, "Aisha Chen"),
+                DemoBudgetExpense("Balloon arch", 120, true, "Party City", 3, -5, "You"),
+                DemoBudgetExpense("Table centerpieces", 60, true, "Party City", 3, -5, "Aisha Chen"),
             ],
             splits: [
                 ("Aisha Chen", "aisha.c@gmail.com", 750, 750),
@@ -343,23 +343,23 @@ extension DemoDataService {
             event: event,
             total: 800,
             categoryData: [
-                ("Turkey & Mains", "fork.knife", "pink", 250, 180, false, nil),
-                ("Sides & Desserts", "birthday.cake", "orange", 200, 85, false, nil),
-                ("Drinks", "cup.and.saucer", "blue", 150, 120, true, "Costco"),
-                ("Decorations", "sparkles", "yellow", 100, 45, false, nil),
-                ("Misc", "ellipsis.circle", "secondary", 100, 30, false, nil)
+                DemoBudgetCategory("Turkey & Mains", "fork.knife", "pink", 250, 180),
+                DemoBudgetCategory("Sides & Desserts", "birthday.cake", "orange", 200, 85),
+                DemoBudgetCategory("Drinks", "cup.and.saucer", "blue", 150, 120),
+                DemoBudgetCategory("Decorations", "sparkles", "yellow", 100, 45),
+                DemoBudgetCategory("Misc", "ellipsis.circle", "secondary", 100, 30)
             ],
             expenses: [
-                ("20lb turkey", 65, true, "Costco", 0, -7, "You"),
-                ("Ham", 45, false, nil, 0, 5, nil),
-                ("Mashed potatoes supplies", 70, true, "Trader Joe's", 0, -3, "Kevin O'Brien"),
-                ("Pie ingredients", 35, true, "Whole Foods", 1, -4, "Grace Kim"),
-                ("Mac & cheese (3 trays)", 50, false, nil, 1, 3, nil),
-                ("Wine (6 bottles)", 80, true, "Costco", 2, -5, "Kevin O'Brien"),
-                ("Craft beer (2 cases)", 40, true, "Costco", 2, -5, "Jake Chen"),
-                ("Fall leaf garland", 25, true, "Target", 3, -6, "You"),
-                ("Candles", 20, true, "Target", 3, -6, "You"),
-                ("Paper plates/cups", 30, false, nil, 4, 2, nil),
+                DemoBudgetExpense("20lb turkey", 65, true, "Costco", 0, -7, "You"),
+                DemoBudgetExpense("Ham", 45, false, nil, 0, 5, nil),
+                DemoBudgetExpense("Mashed potatoes supplies", 70, true, "Trader Joe's", 0, -3, "Kevin O'Brien"),
+                DemoBudgetExpense("Pie ingredients", 35, true, "Whole Foods", 1, -4, "Grace Kim"),
+                DemoBudgetExpense("Mac & cheese (3 trays)", 50, false, nil, 1, 3, nil),
+                DemoBudgetExpense("Wine (6 bottles)", 80, true, "Costco", 2, -5, "Kevin O'Brien"),
+                DemoBudgetExpense("Craft beer (2 cases)", 40, true, "Costco", 2, -5, "Jake Chen"),
+                DemoBudgetExpense("Fall leaf garland", 25, true, "Target", 3, -6, "You"),
+                DemoBudgetExpense("Candles", 20, true, "Target", 3, -6, "You"),
+                DemoBudgetExpense("Paper plates/cups", 30, false, nil, 4, 2, nil),
             ],
             splits: [
                 ("Kevin O'Brien", "kevin.ob@email.com", 200, 200),
@@ -417,10 +417,10 @@ extension DemoDataService {
             event: event,
             total: 2000,
             categoryData: [
-                ("Gas", "fuelpump", "orange", 500, 0, false, nil),
-                ("Airbnb", "house", "purple", 800, 0, false, nil),
-                ("Food", "fork.knife", "pink", 400, 0, false, nil),
-                ("Activities", "figure.hiking", "green", 300, 0, false, nil)
+                DemoBudgetCategory("Gas", "fuelpump", "orange", 500, 0),
+                DemoBudgetCategory("Airbnb", "house", "purple", 800, 0),
+                DemoBudgetCategory("Food", "fork.knife", "pink", 400, 0),
+                DemoBudgetCategory("Activities", "figure.hiking", "green", 300, 0)
             ],
             expenses: [],
             splits: [],
@@ -849,11 +849,49 @@ extension DemoDataService {
 
     // MARK: - Budget Helper
 
+    /// Compact demo-data carriers — replace large tuples (SwiftLint `large_tuple`).
+    struct DemoBudgetCategory {
+        let name: String
+        let icon: String
+        let color: String
+        let allocated: Double
+        let spent: Double
+
+        init(_ name: String, _ icon: String, _ color: String, _ allocated: Double, _ spent: Double) {
+            self.name = name
+            self.icon = icon
+            self.color = color
+            self.allocated = allocated
+            self.spent = spent
+        }
+    }
+
+    struct DemoBudgetExpense {
+        let name: String
+        let amount: Double
+        let isPaid: Bool
+        let vendor: String?
+        let categoryIndex: Int
+        let dayOffset: Int
+        let paidBy: String?
+
+        init(_ name: String, _ amount: Double, _ isPaid: Bool, _ vendor: String?,
+             _ categoryIndex: Int, _ dayOffset: Int, _ paidBy: String?) {
+            self.name = name
+            self.amount = amount
+            self.isPaid = isPaid
+            self.vendor = vendor
+            self.categoryIndex = categoryIndex
+            self.dayOffset = dayOffset
+            self.paidBy = paidBy
+        }
+    }
+
     func createBudgetForEvent(
         event: Event,
         total: Double,
-        categoryData: [(String, String, String, Double, Double, Bool, String?)],
-        expenses: [(String, Double, Bool, String?, Int, Int, String?)],
+        categoryData: [DemoBudgetCategory],
+        expenses: [DemoBudgetExpense],
         splits: [(String, String?, Double, Double)],
         modelContext: ModelContext
     ) {
@@ -862,39 +900,36 @@ extension DemoDataService {
         // Create categories
         var categories: [BudgetCategory] = []
         for (index, data) in categoryData.enumerated() {
-            let (name, icon, color, allocated, spent, _, _) = data
             let category = BudgetCategory(
-                name: name,
-                icon: icon,
-                allocated: allocated,
-                color: color,
+                name: data.name,
+                icon: data.icon,
+                allocated: data.allocated,
+                color: data.color,
                 sortOrder: index
             )
-            category.spent = spent
+            category.spent = data.spent
             categories.append(category)
             budget.categories.append(category)
         }
 
         // Create expenses
-        for expenseData in expenses {
-            let (name, amount, isPaid, vendor, categoryIndex, dayOffset, paidBy) = expenseData
+        for expense in expenses {
+            let dueDate: Date? = !expense.isPaid ? Date().addingTimeInterval(Double(expense.dayOffset) * 86400) : nil
+            let paidDate: Date? = expense.isPaid ? Date().addingTimeInterval(Double(expense.dayOffset) * 86400) : nil
 
-            let dueDate: Date? = !isPaid ? Date().addingTimeInterval(Double(dayOffset) * 86400) : nil
-            let paidDate: Date? = isPaid ? Date().addingTimeInterval(Double(dayOffset) * 86400) : nil
-
-            let expense = Expense(
-                name: name,
-                amount: amount,
-                isPaid: isPaid,
+            let newExpense = Expense(
+                name: expense.name,
+                amount: expense.amount,
+                isPaid: expense.isPaid,
                 paidDate: paidDate,
                 dueDate: dueDate,
-                vendorName: vendor,
-                paidByName: paidBy,
+                vendorName: expense.vendor,
+                paidByName: expense.paidBy,
                 functionId: nil
             )
 
-            if categoryIndex < categories.count {
-                categories[categoryIndex].expenses.append(expense)
+            if expense.categoryIndex < categories.count {
+                categories[expense.categoryIndex].expenses.append(newExpense)
             }
         }
 

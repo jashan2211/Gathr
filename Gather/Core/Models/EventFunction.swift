@@ -103,6 +103,32 @@ extension EventFunction {
         date > Date()
     }
 
+    /// An SF Symbol inferred from the function name, for compact surfaces like
+    /// the Live Activity and Dynamic Island. Falls back to a neutral glyph.
+    var iconName: String {
+        let name = self.name.lowercased()
+        switch true {
+        case name.contains("mehendi"), name.contains("henna"), name.contains("haldi"):
+            return "hand.raised.fill"
+        case name.contains("sangeet"), name.contains("dance"), name.contains("music"):
+            return "music.note"
+        case name.contains("ceremony"), name.contains("wedding"), name.contains("nikah"), name.contains("vows"):
+            return "heart.fill"
+        case name.contains("reception"), name.contains("party"), name.contains("after"):
+            return "party.popper.fill"
+        case name.contains("dinner"), name.contains("lunch"), name.contains("brunch"), name.contains("breakfast"), name.contains("meal"):
+            return "fork.knife"
+        case name.contains("cocktail"), name.contains("drinks"), name.contains("bar"):
+            return "wineglass.fill"
+        case name.contains("photo"):
+            return "camera.fill"
+        case name.contains("tea"):
+            return "cup.and.saucer.fill"
+        default:
+            return "sparkles"
+        }
+    }
+
     var isPast: Bool {
         (endTime ?? date) < Date()
     }

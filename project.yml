@@ -20,6 +20,14 @@ settings:
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: "AccentColor"
     ENABLE_PREVIEWS: true
 
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk.git
+    from: "12.13.0"
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "8.0.0"
+
 targets:
   Gather:
     type: application
@@ -48,6 +56,7 @@ targets:
         LSApplicationQueriesSchemes:
           - whatsapp
         ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -56,7 +65,18 @@ targets:
         NSCalendarsFullAccessUsageDescription: "Gather needs calendar access to add events to your calendar."
         NSContactsUsageDescription: "Gather needs access to your contacts to help you invite guests."
         NSPhotoLibraryUsageDescription: "Gather needs access to your photo library to add event photos."
-    dependencies: []
+    dependencies:
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
+      - target: GatherWidgets
     preBuildScripts:
       - name: SwiftLint
         script: |
@@ -66,6 +86,28 @@ targets:
             echo "warning: SwiftLint not installed"
           fi
         basedOnDependencyAnalysis: false
+
+  GatherWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: GatherWidgets
+        excludes:
+          - "**/.DS_Store"
+      - path: Gather/Core/LiveActivity/EventDayActivityAttributes.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ca.thebighead.gathr.GatherWidgets
+        INFOPLIST_KEY_CFBundleDisplayName: "Gathr"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 7HTTY6JAP6
+        SKIP_INSTALL: true
+    info:
+      path: GatherWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: "Gathr"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
   GatherTests:
     type: bundle.unit-test

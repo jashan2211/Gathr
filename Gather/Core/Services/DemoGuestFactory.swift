@@ -32,31 +32,53 @@ extension DemoDataService {
 
     // MARK: - Demo Notifications
 
+    /// A demo notification spec — replaces a 7-member tuple (SwiftLint `large_tuple`).
+    private struct DemoNotification {
+        let type: NotificationType
+        let title: String
+        let body: String
+        let eventId: UUID?
+        let eventTitle: String?
+        let isRead: Bool
+        let offset: TimeInterval
+
+        init(_ type: NotificationType, _ title: String, _ body: String,
+             _ eventId: UUID?, _ eventTitle: String?, _ isRead: Bool, _ offset: TimeInterval) {
+            self.type = type
+            self.title = title
+            self.body = body
+            self.eventId = eventId
+            self.eventTitle = eventTitle
+            self.isRead = isRead
+            self.offset = offset
+        }
+    }
+
     func addDemoNotifications(birthday: Event, friendsgiving: Event, modelContext: ModelContext) {
-        let notifications: [(NotificationType, String, String, UUID?, String?, Bool, TimeInterval)] = [
-            (.rsvpUpdate, "RSVP Received", "Fatima Hassan confirmed she's attending with +1", birthday.id, birthday.title, false, -300),
-            (.rsvpUpdate, "New RSVP", "Sam Oduya is attending your event", birthday.id, birthday.title, false, -1800),
-            (.memberJoined, "Team Member Joined", "Aisha Chen accepted the Admin invite", birthday.id, birthday.title, false, -3600),
-            (.paymentDue, "Payment Due Soon", "Open bar payment of $200 due in 10 days", birthday.id, birthday.title, false, -7200),
-            (.expenseAdded, "Expense Added", "Jordan added \"Appetizer trays\" ($250) to Food & Drinks", birthday.id, birthday.title, true, -14400),
-            (.budgetAlert, "Budget Alert", "Food & Drinks category is approaching its limit", birthday.id, birthday.title, true, -28800),
-            (.rsvpUpdate, "RSVP Update", "Elena Rodriguez confirmed for Friendsgiving with family of 3", friendsgiving.id, friendsgiving.title, true, -43200),
-            (.guestAdded, "Guest Added", "You added 3 new guests to Friendsgiving", friendsgiving.id, friendsgiving.title, true, -86400),
-            (.paymentReceived, "Payment Received", "Kevin O'Brien paid their share ($200)", friendsgiving.id, friendsgiving.title, true, -172800),
-            (.eventReminder, "Event Reminder", "Friday Game Night is in 5 days!", nil, nil, true, -259200),
-            (.memberInvite, "Invite Sent", "Dev Patel has been invited as Viewer", birthday.id, birthday.title, true, -345600),
+        let notifications: [DemoNotification] = [
+            DemoNotification(.rsvpUpdate, "RSVP Received", "Fatima Hassan confirmed she's attending with +1", birthday.id, birthday.title, false, -300),
+            DemoNotification(.rsvpUpdate, "New RSVP", "Sam Oduya is attending your event", birthday.id, birthday.title, false, -1800),
+            DemoNotification(.memberJoined, "Team Member Joined", "Aisha Chen accepted the Admin invite", birthday.id, birthday.title, false, -3600),
+            DemoNotification(.paymentDue, "Payment Due Soon", "Open bar payment of $200 due in 10 days", birthday.id, birthday.title, false, -7200),
+            DemoNotification(.expenseAdded, "Expense Added", "Jordan added \"Appetizer trays\" ($250) to Food & Drinks", birthday.id, birthday.title, true, -14400),
+            DemoNotification(.budgetAlert, "Budget Alert", "Food & Drinks category is approaching its limit", birthday.id, birthday.title, true, -28800),
+            DemoNotification(.rsvpUpdate, "RSVP Update", "Elena Rodriguez confirmed for Friendsgiving with family of 3", friendsgiving.id, friendsgiving.title, true, -43200),
+            DemoNotification(.guestAdded, "Guest Added", "You added 3 new guests to Friendsgiving", friendsgiving.id, friendsgiving.title, true, -86400),
+            DemoNotification(.paymentReceived, "Payment Received", "Kevin O'Brien paid their share ($200)", friendsgiving.id, friendsgiving.title, true, -172800),
+            DemoNotification(.eventReminder, "Event Reminder", "Friday Game Night is in 5 days!", nil, nil, true, -259200),
+            DemoNotification(.memberInvite, "Invite Sent", "Dev Patel has been invited as Viewer", birthday.id, birthday.title, true, -345600),
         ]
 
-        for (type, title, body, eventId, eventTitle, isRead, offset) in notifications {
+        for item in notifications {
             let notification = AppNotification(
-                type: type,
-                title: title,
-                body: body,
-                eventId: eventId,
-                eventTitle: eventTitle,
-                isRead: isRead
+                type: item.type,
+                title: item.title,
+                body: item.body,
+                eventId: item.eventId,
+                eventTitle: item.eventTitle,
+                isRead: item.isRead
             )
-            notification.createdAt = Date().addingTimeInterval(offset)
+            notification.createdAt = Date().addingTimeInterval(item.offset)
             modelContext.insert(notification)
         }
     }

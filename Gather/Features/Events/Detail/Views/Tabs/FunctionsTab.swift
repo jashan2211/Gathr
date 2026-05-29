@@ -4,6 +4,7 @@ struct FunctionsTab: View {
     @Bindable var event: Event
     @State private var showAddFunction = false
     @State private var selectedFunction: EventFunction?
+    @State private var liveActivityOn = false
 
     var body: some View {
         ScrollView {
@@ -80,6 +81,10 @@ struct FunctionsTab: View {
 
                 Spacer()
 
+                if hasLiveContent {
+                    liveActivityButton
+                }
+
                 Button {
                     showAddFunction = true
                 } label: {
@@ -124,6 +129,43 @@ struct FunctionsTab: View {
 
     private var sortedFunctions: [EventFunction] {
         event.functions.sorted { $0.date < $1.date }
+    }
+
+    // MARK: - Live Activity
+
+    /// Only offer a Live Activity when there's a function still happening or upcoming.
+    private var hasLiveContent: Bool {
+        event.functions.contains { !$0.isPast }
+    }
+
+    /// Start/stop the Lock Screen + Dynamic Island "event day" Live Activity.
+    private var liveActivityButton: some View {
+        Button {
+            if liveActivityOn {
+                LiveActivityService.shared.end(for: event.id)
+                liveActivityOn = false
+            } else {
+                liveActivityOn = LiveActivityService.shared.start(for: event)
+            }
+            HapticService.buttonTap()
+        } label: {
+            Label(liveActivityOn ? "Live" : "Go Live",
+                  systemImage: liveActivityOn ? "dot.radiowaves.left.and.right" : "livephoto")
+                .font(GatherFont.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(liveActivityOn ? .white : Color.accentPurpleFallback)
+                .padding(.horizontal, Spacing.sm)
+                .padding(.vertical, 6)
+                .background(
+                    liveActivityOn
+                        ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                        : AnyShapeStyle(Color.accentPurpleFallback.opacity(0.12))
+                )
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(liveActivityOn ? "Stop Live Activity" : "Start Live Activity")
+        .onAppear { liveActivityOn = LiveActivityService.shared.isActive(for: event.id) }
     }
 }
 

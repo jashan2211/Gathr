@@ -270,19 +270,14 @@ struct GlassCardLiteModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(colorScheme == .dark
-                ? Color.gatherSecondaryBackground.opacity(0.6)
-                : Color.gatherSecondaryBackground.opacity(0.4)
-            )
+            // Solid, calm surface for standard list rows (critique #1): no blur,
+            // no white "glass" stroke — just a clean fill with a soft drop shadow
+            // so the few intentional glass surfaces pop harder.
+            .background(Color.gatherSecondaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        colorScheme == .dark
-                            ? Color.white.opacity(0.08)
-                            : Color.white.opacity(0.15),
-                        lineWidth: 0.5
-                    )
+            .shadow(
+                color: .black.opacity(colorScheme == .dark ? 0.0 : 0.05),
+                radius: 8, y: 4
             )
     }
 }
@@ -302,18 +297,29 @@ extension View {
 // MARK: - Shimmer Loading Modifier
 
 struct ShimmerModifier: ViewModifier {
-    @State private var isAnimating = false
+    @State private var phase: CGFloat = -1
 
     func body(content: Content) -> some View {
         content
-            .opacity(isAnimating ? 0.4 : 0.8)
-            .animation(
-                .easeInOut(duration: 1.0)
-                .repeatForever(autoreverses: true),
-                value: isAnimating
+            // A slow (1.5s) sweeping highlight masked over the content reads as
+            // calm and premium, rather than an anxious opacity pulse (critique §6).
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [.clear, .white.opacity(0.45), .clear],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: geo.size.width * 1.5)
+                    .offset(x: phase * geo.size.width * 1.5)
+                    .blendMode(.plusLighter)
+                }
             )
+            .mask(content)
             .onAppear {
-                isAnimating = true
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
+                    phase = 1.5
+                }
             }
     }
 }
@@ -376,7 +382,8 @@ struct BouncyAppearModifier: ViewModifier {
                     return
                 }
                 hasAppeared = true
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.6).delay(delay)) {
+                // Snappy but controlled — was 0.5/0.6 (rubbery). See critique #8.
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.78).delay(delay)) {
                     isVisible = true
                 }
             }
@@ -407,6 +414,32 @@ extension View {
     /// Add 3D press effect to cards (scale + subtle rotation)
     func cardPress() -> some View {
         modifier(CardPressModifier())
+    }
+}
+
+// MARK: - Zoom Navigation Transition (iOS 18+)
+
+extension View {
+    /// Marks this view as the source of a zoom navigation transition. The card
+    /// seamlessly expands into the pushed destination on iOS 18+; on iOS 17 it's
+    /// a no-op and the standard push is used. Pair with `zoomDestination`.
+    @ViewBuilder
+    func zoomSource(id: some Hashable, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            self.matchedTransitionSource(id: id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    /// Animates this destination zooming out of the matching `zoomSource(id:)`.
+    @ViewBuilder
+    func zoomDestination(id: some Hashable, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            self.navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            self
+        }
     }
 }
 

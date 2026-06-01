@@ -162,7 +162,7 @@
 		01AEB78447E826A0186CEBF1 /* RSVPSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSVPSheet.swift; sourceTree = "<group>"; };
 		04278371F501F302319BC5D8 /* ContactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsView.swift; sourceTree = "<group>"; };
 		046498E046B15E6AA44A70FB /* EventFunction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventFunction.swift; sourceTree = "<group>"; };
-		0C30D092DB4F757F84F4E850 /* Gather.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Gather.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0C30D092DB4F757F84F4E850 /* Gather.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Gather.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0F27F21615A2A3C2BB63E95A /* EventTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTests.swift; sourceTree = "<group>"; };
 		115B66B914A4A5BAECE7FB76 /* EventFormComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventFormComponents.swift; sourceTree = "<group>"; };
 		1320DC634E90CD9DA0C1AAF4 /* BudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetView.swift; sourceTree = "<group>"; };
@@ -218,7 +218,7 @@
 		90AEF265B59F8F189CB8FE4C /* CalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
 		93543939E79191E57393AF8A /* GuestListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestListSheet.swift; sourceTree = "<group>"; };
 		950D7B23A74B7C993ABF400F /* FunctionsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunctionsTab.swift; sourceTree = "<group>"; };
-		987ECBE23E5DDB13E96059AD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		987ECBE23E5DDB13E96059AD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		98DF62CB3C56D5725150D2AE /* BudgetFilterChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetFilterChip.swift; sourceTree = "<group>"; };
 		98EBEEDF26D6D7E7C7F9386C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A0448E5116329A27DA2460B8 /* FunctionDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunctionDetailSheet.swift; sourceTree = "<group>"; };
@@ -235,7 +235,7 @@
 		AE4BD893AD8DB60B33095BDE /* EventMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventMember.swift; sourceTree = "<group>"; };
 		AE84E75047EC0249EBA3C82D /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
 		AF3F21D416B34677A4E0FB94 /* GatherUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GatherUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B2035890D607D037056B0B31 /* GatherWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = GatherWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2035890D607D037056B0B31 /* GatherWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GatherWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B21EC58D914E3DDB37B928FE /* GuestDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestDetailSheet.swift; sourceTree = "<group>"; };
 		B25BD16A6DDB692D62D93D2A /* EventDayActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDayActivityAttributes.swift; sourceTree = "<group>"; };
 		B3E4C1658A0BA8658B8C95D9 /* PriceFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriceFormatter.swift; sourceTree = "<group>"; };
@@ -858,11 +858,9 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					6022918118A1B800B69E1EA2 = {
-						DevelopmentTeam = 7HTTY6JAP6;
 						ProvisioningStyle = Automatic;
 					};
 					BD2649E0C5613F9C850AEA9B = {
-						DevelopmentTeam = 7HTTY6JAP6;
 						ProvisioningStyle = Automatic;
 					};
 					E9CAD071E176383166DBEED2 = {
@@ -1104,7 +1102,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7HTTY6JAP6;
+				DEVELOPMENT_TEAM = F385ZL83XQ;
 				INFOPLIST_FILE = GatherWidgets/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Gathr;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1157,7 +1155,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7HTTY6JAP6;
+				DEVELOPMENT_TEAM = F385ZL83XQ;
 				INFOPLIST_FILE = GatherWidgets/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Gathr;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1208,7 +1206,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1252,7 +1250,7 @@
 				CODE_SIGN_ENTITLEMENTS = Gather/Gather.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7HTTY6JAP6;
+				DEVELOPMENT_TEAM = F385ZL83XQ;
 				INFOPLIST_FILE = Gather/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Gathr;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1301,7 +1299,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_PREVIEWS = YES;
@@ -1355,7 +1353,7 @@
 				CODE_SIGN_ENTITLEMENTS = Gather/Gather.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 7HTTY6JAP6;
+				DEVELOPMENT_TEAM = F385ZL83XQ;
 				INFOPLIST_FILE = Gather/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Gathr;
 				LD_RUNPATH_SEARCH_PATHS = (

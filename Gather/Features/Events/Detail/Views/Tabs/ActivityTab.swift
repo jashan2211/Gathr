@@ -64,7 +64,7 @@ struct ActivityTab: View {
                     }
                 }
             }
-            .padding(.horizontal, Spacing.md)
+            .horizontalPadding()
             .padding(.vertical, Spacing.sm)
         }
         .sheet(isPresented: $showComposer) {
@@ -109,7 +109,7 @@ struct ActivityTab: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Spacing.md)
                     .padding(.vertical, Spacing.sm)
-                    .background(Color.gatherSecondaryBackground)
+                    .background(Color.gatherTertiaryBackground)
                     .clipShape(Capsule())
             }
 
@@ -146,31 +146,26 @@ struct ActivityTab: View {
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard()
     }
 
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.md) {
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-
-            Text("No activity yet")
-                .font(GatherFont.headline)
-                .foregroundStyle(Color.gatherSecondaryText)
-
-            Text(isHost
-                 ? "Post an announcement or create a poll to engage your guests"
-                 : "Be the first to ask a question about this event")
-                .font(GatherFont.callout)
-                .foregroundStyle(Color.gatherTertiaryText)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.xxl)
+        GatherEmptyState(
+            icon: "bubble.left.and.bubble.right",
+            title: "No Activity Yet",
+            message: isHost
+                ? "Post an announcement or create a poll to engage your guests"
+                : "Be the first to ask a question about this event",
+            actionTitle: isHost ? "Share an Update" : "Ask a Question",
+            action: {
+                composerType = isHost ? .announcement : .question
+                replyingTo = nil
+                showComposer = true
+            }
+        )
+        .padding(.vertical, Spacing.xl)
     }
 
     // MARK: - Helpers

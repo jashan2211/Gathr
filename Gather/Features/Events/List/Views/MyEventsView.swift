@@ -8,6 +8,7 @@ struct MyEventsView: View {
     @State private var selectedTab: EventTab = .active
     @State private var selectedEvent: Event?
     @State private var showCreateEvent = false
+    @Namespace private var zoomNamespace
 
     enum EventTab: String, CaseIterable {
         case active = "Active"
@@ -38,8 +39,8 @@ struct MyEventsView: View {
                                 .bouncyAppear()
                         }
 
-                        // Create Event Card (only on Active tab)
-                        if selectedTab == .active {
+                        // Create Event Card (only on Active tab; empty state carries the CTA otherwise)
+                        if selectedTab == .active && !filteredEvents.isEmpty {
                             createEventCard
                                 .bouncyAppear(delay: 0.03)
                         }
@@ -52,6 +53,7 @@ struct MyEventsView: View {
                                 MyEventCard(event: event)
                             }
                             .buttonStyle(CardPressStyle())
+                            .zoomSource(id: event.id, in: zoomNamespace)
                         }
                         if horizontalSizeClass == .regular {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.sm) {
@@ -61,11 +63,12 @@ struct MyEventsView: View {
                             cards
                         }
 
-                        if filteredEvents.isEmpty && selectedTab != .active {
+                        if filteredEvents.isEmpty {
                             emptyState
                         }
                     }
-                    .padding()
+                    .horizontalPadding()
+                    .padding(.vertical)
                     .padding(.bottom, 20)
                 }
                 .refreshable {
@@ -80,6 +83,7 @@ struct MyEventsView: View {
             }
             .navigationDestination(item: $selectedEvent) { event in
                 EventDetailView(event: event)
+                    .zoomDestination(id: event.id, in: zoomNamespace)
             }
             .sheet(isPresented: $showCreateEvent) {
                 CreateEventView()
@@ -96,7 +100,7 @@ struct MyEventsView: View {
                 let count = countForTab(tab)
                 Button {
                     HapticService.tabSwitch()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                         selectedTab = tab
                     }
                 } label: {
@@ -128,34 +132,15 @@ struct MyEventsView: View {
                     .background(
                         selectedTab == tab
                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                            : AnyShapeStyle(Color.clear)
+                            : AnyShapeStyle(Color.gatherSecondaryBackground)
                     )
                     .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(
-                                selectedTab == tab
-                                    ? AnyShapeStyle(Color.clear)
-                                    : AnyShapeStyle(LinearGradient(
-                                        colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )),
-                                lineWidth: 1
-                            )
-                    )
-                    .background(
-                        selectedTab == tab
-                            ? nil
-                            : Capsule()
-                                .fill(.ultraThinMaterial)
-                    )
                 }
                 .scaleEffect(selectedTab == tab ? 1.02 : 1.0)
                 .animation(.spring(response: 0.3, dampingFraction: 0.6), value: selectedTab == tab)
             }
         }
-        .padding(.horizontal)
+        .horizontalPadding()
         .padding(.vertical, Spacing.sm)
     }
 
@@ -220,62 +205,39 @@ struct MyEventsView: View {
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .padding(Spacing.sm)
-            .glassCard()
+            .surfaceCard()
         }
     }
 
     // MARK: - Empty State
 
+    @ViewBuilder
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
-            Spacer()
-                .frame(height: 40)
-
-            ZStack {
-                Circle()
-                    .fill(Color.accentPurpleFallback.opacity(0.08))
-                    .frame(width: 100, height: 100)
-                Circle()
-                    .fill(Color.accentPinkFallback.opacity(0.06))
-                    .frame(width: 70, height: 70)
-                Image(systemName: emptyStateIcon)
-                    .font(.system(size: 32))
-                    .foregroundStyle(
-                        LinearGradient.gatherAccentGradient
-                    )
+        Group {
+            switch selectedTab {
+            case .active:
+                GatherEmptyState(
+                    icon: "sparkles",
+                    title: "Nothing on the calendar",
+                    message: "Plan your next get-together and it'll show up right here.",
+                    actionTitle: "Create Event",
+                    action: { showCreateEvent = true }
+                )
+            case .drafts:
+                GatherEmptyState(
+                    icon: "doc.badge.plus",
+                    title: "No drafts yet",
+                    message: "Events you save before publishing will wait for you here."
+                )
+            case .past:
+                GatherEmptyState(
+                    icon: "clock.arrow.circlepath",
+                    title: "No past events",
+                    message: "Once an event wraps up, it'll move here for the memories."
+                )
             }
-
-            VStack(spacing: Spacing.sm) {
-                Text(emptyStateTitle)
-                    .font(GatherFont.title3)
-                    .foregroundStyle(Color.gatherPrimaryText)
-
-                Text(emptyStateMessage)
-                    .font(GatherFont.body)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .multilineTextAlignment(.center)
-            }
-
-            if selectedTab == .drafts {
-                Button {
-                    showCreateEvent = true
-                } label: {
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Create Event")
-                    }
-                    .font(GatherFont.callout)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.lg)
-                    .padding(.vertical, Spacing.sm)
-                    .background(LinearGradient.gatherAccentGradient)
-                    .clipShape(Capsule())
-                }
-            }
-
-            Spacer()
         }
+        .padding(.top, Spacing.xl)
     }
 
     // MARK: - Filtered Events
@@ -304,29 +266,6 @@ struct MyEventsView: View {
         }
     }
 
-    private var emptyStateIcon: String {
-        switch selectedTab {
-        case .active: return "calendar"
-        case .drafts: return "doc"
-        case .past: return "clock"
-        }
-    }
-
-    private var emptyStateTitle: String {
-        switch selectedTab {
-        case .active: return "No active events"
-        case .drafts: return "No drafts"
-        case .past: return "No past events"
-        }
-    }
-
-    private var emptyStateMessage: String {
-        switch selectedTab {
-        case .active: return "Your upcoming events will appear here"
-        case .drafts: return "Draft events you haven't published yet"
-        case .past: return "Your past events will appear here"
-        }
-    }
 }
 
 // MARK: - Quick Stat Bubble
@@ -358,7 +297,7 @@ struct QuickStatBubble: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.sm)
-        .glassCard()
+        .surfaceCard()
     }
 }
 
@@ -369,12 +308,6 @@ struct MyEventCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Category gradient header
-            ZStack(alignment: .leading) {
-                LinearGradient.categoryGradientVibrant(for: event.category)
-                    .frame(height: 6)
-            }
-
             VStack(alignment: .leading, spacing: Spacing.sm) {
                 // Top row: emoji + title + badges
                 HStack(alignment: .top, spacing: Spacing.sm) {
@@ -392,7 +325,7 @@ struct MyEventCard: View {
                             .foregroundStyle(Color.forCategory(event.category))
                     }
                     .frame(width: 48, height: 54)
-                    .background(LinearGradient.cardGradient(for: event.category))
+                    .background(Color.gatherTertiaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
                     VStack(alignment: .leading, spacing: 3) {
@@ -481,8 +414,10 @@ struct MyEventCard: View {
                 }
             }
             .padding(Spacing.sm)
+            .padding(.top, 3) // clear the accent bar
         }
-        .glassCardLite()
+        .surfaceCard()
+        .categoryAccentBar(Color.forCategory(event.category))
         .drawingGroup()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(event.title)\(event.isDraft ? ", Draft" : "")")

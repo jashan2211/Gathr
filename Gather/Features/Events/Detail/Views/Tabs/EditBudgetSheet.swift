@@ -24,6 +24,7 @@ struct EditBudgetSheet: View {
                     }
                     .padding(.vertical, Spacing.sm)
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 Section("Current Spending") {
                     HStack {
@@ -46,19 +47,40 @@ struct EditBudgetSheet: View {
                         Text("\(budget.categories.count)")
                     }
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.gatherBackground)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    budget.totalBudget = totalBudget
+                    budget.updatedAt = Date()
+                    dismiss()
+                } label: {
+                    Text("Save Budget")
+                        .font(GatherFont.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(LinearGradient.gatherAccentGradient)
+                        .clipShape(Capsule())
+                }
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.vertical, Spacing.sm)
+                .background(
+                    LinearGradient(
+                        colors: [Color.gatherBackground.opacity(0), Color.gatherBackground],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
             .navigationTitle("Edit Budget")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        budget.totalBudget = totalBudget
-                        budget.updatedAt = Date()
-                        dismiss()
-                    }
                 }
             }
             .onAppear {

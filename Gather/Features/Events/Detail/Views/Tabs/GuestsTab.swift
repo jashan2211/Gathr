@@ -133,10 +133,9 @@ struct GuestsTab: View {
                     )
                 }
             }
-            .padding(.horizontal)
+            .horizontalPadding()
             .padding(.vertical, Spacing.sm)
         }
-        .background(.ultraThinMaterial.opacity(0.5))
     }
 
     // MARK: - Header Section
@@ -145,7 +144,7 @@ struct GuestsTab: View {
         HStack {
             if isSelectionMode {
                 Button("Cancel") {
-                    withAnimation {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                         isSelectionMode = false
                         selectedGuests.removeAll()
                     }
@@ -168,11 +167,15 @@ struct GuestsTab: View {
                         Text("Send")
                     }
                     .font(GatherFont.callout)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
                     .foregroundStyle(.white)
                     .padding(.horizontal, Spacing.md)
                     .padding(.vertical, Spacing.xs)
-                    .background(selectedGuests.isEmpty ? Color.gray : Color.accentPurpleFallback)
+                    .background(
+                        selectedGuests.isEmpty
+                            ? AnyShapeStyle(Color.gatherSecondaryText.opacity(0.4))
+                            : AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                    )
                     .clipShape(Capsule())
                 }
                 .disabled(selectedGuests.isEmpty)
@@ -194,7 +197,7 @@ struct GuestsTab: View {
                     if !event.guests.isEmpty {
                         // Select button
                         Button {
-                            withAnimation { isSelectionMode = true }
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { isSelectionMode = true }
                         } label: {
                             Image(systemName: "checklist")
                                 .font(.title3)
@@ -226,7 +229,7 @@ struct GuestsTab: View {
                 }
             }
         }
-        .padding(.horizontal)
+        .horizontalPadding()
         .padding(.vertical, Spacing.sm)
     }
 
@@ -255,64 +258,38 @@ struct GuestsTab: View {
             }
         }
         .padding(Spacing.sm)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-        .overlay(
-            RoundedRectangle(cornerRadius: CornerRadius.sm)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 0.5
-                )
-        )
-        .padding(.horizontal)
+        .background(Color.gatherSecondaryBackground)
+        .clipShape(Capsule())
+        .horizontalPadding()
         .padding(.bottom, Spacing.sm)
     }
 
     // MARK: - Empty State
 
+    @ViewBuilder
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
+        VStack {
             Spacer()
 
-            Image(systemName: "person.3")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-
-            VStack(spacing: Spacing.sm) {
-                Text(event.guests.isEmpty ? "No Guests Yet" : "No Matching Guests")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
-                    .accessibilityAddTraits(.isHeader)
-
-                Text(event.guests.isEmpty
-                     ? "Add guests to start managing your event"
-                     : "Try adjusting your search or filters")
-                    .font(GatherFont.body)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .multilineTextAlignment(.center)
-            }
-
             if event.guests.isEmpty {
-                Button {
-                    showAddGuest = true
-                } label: {
-                    Label("Add Guest", systemImage: "person.badge.plus")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, Spacing.lg)
-                        .padding(.vertical, Spacing.sm)
-                        .background(Color.accentPurpleFallback)
-                        .clipShape(Capsule())
-                }
+                GatherEmptyState(
+                    icon: "person.2",
+                    title: "No Guests Yet",
+                    message: "Add your first guest to start building the list.",
+                    actionTitle: "Add Guest",
+                    action: { showAddGuest = true }
+                )
+            } else {
+                GatherEmptyState(
+                    icon: "person.2",
+                    title: "No Matching Guests",
+                    message: "Try adjusting your search or filters."
+                )
             }
 
             Spacer()
         }
-        .padding()
+        .horizontalPadding()
     }
 
     // MARK: - Guest List
@@ -337,7 +314,7 @@ struct GuestsTab: View {
                     )
                 }
             }
-            .padding(.horizontal)
+            .horizontalPadding()
             .padding(.bottom, Layout.scrollBottomInset)
         }
     }
@@ -425,7 +402,8 @@ struct GuestsTab: View {
 
                 Spacer()
             }
-            .padding()
+            .horizontalPadding()
+            .padding(.vertical, Spacing.md)
 
             // Simple first-name list
             ScrollView {
@@ -434,7 +412,7 @@ struct GuestsTab: View {
                         FirstNameGuestCard(guest: guest)
                     }
                 }
-                .padding(.horizontal)
+                .horizontalPadding()
                 .padding(.bottom, Layout.scrollBottomInset)
             }
         }
@@ -468,24 +446,18 @@ struct GuestsTab: View {
     // MARK: - Hidden View
 
     private var hiddenView: some View {
-        VStack(spacing: Spacing.lg) {
+        VStack {
             Spacer()
 
-            Image(systemName: "eye.slash")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-
-            Text("Guest list is private")
-                .font(GatherFont.headline)
-                .foregroundStyle(Color.gatherPrimaryText)
-                .accessibilityAddTraits(.isHeader)
-
-            Text("Only the host can see who's attending")
-                .font(GatherFont.callout)
-                .foregroundStyle(Color.gatherSecondaryText)
+            GatherEmptyState(
+                icon: "eye.slash",
+                title: "Guest list is private",
+                message: "Only the host can see who's attending."
+            )
 
             Spacer()
         }
+        .horizontalPadding()
     }
 }
 
@@ -556,19 +528,8 @@ struct StatusPill: View {
             .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
             .padding(.horizontal, Spacing.sm)
             .padding(.vertical, Spacing.xs)
-            .background(isSelected ? AnyShapeStyle(filter.color) : AnyShapeStyle(.ultraThinMaterial))
+            .background(isSelected ? filter.color : Color.gatherSecondaryBackground)
             .clipShape(Capsule())
-            .overlay(
-                isSelected ? nil : Capsule()
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 0.5
-                    )
-            )
         }
         .accessibilityLabel("\(filter.rawValue) filter, \(count) guests")
         .accessibilityHint("Double tap to filter by \(filter.rawValue.lowercased())")
@@ -588,105 +549,19 @@ struct ImprovedGuestCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: Spacing.md) {
-                // Selection checkbox
-                if isSelectionMode {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.title2)
-                        .foregroundStyle(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryText)
-                }
-
-                // Avatar with status ring
-                ZStack {
-                    Circle()
-                        .stroke(statusColor, lineWidth: 2)
-                        .frame(width: 48, height: 48)
-
-                    Circle()
-                        .fill(avatarColor)
-                        .frame(width: 42, height: 42)
-                        .overlay {
-                            Text(guest.name.prefix(1).uppercased())
-                                .font(GatherFont.headline)
-                                .foregroundStyle(.white)
-                        }
-                }
-
-                // Info
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: Spacing.xs) {
-                        Text(guest.name)
-                            .font(GatherFont.headline)
-                            .foregroundStyle(Color.gatherPrimaryText)
-                            .lineLimit(1)
-
-                        if guest.totalHeadcount > 1 {
-                            Text("+\(guest.totalHeadcount - 1)")
-                                .font(.caption2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.accentPurpleFallback)
-                                .clipShape(Capsule())
-                        }
-
-                        if guest.role != .guest {
-                            Text(guest.role.displayName)
-                                .font(.caption2)
-                                .foregroundStyle(Color.rsvpMaybeFallback)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.rsvpMaybeFallback.opacity(0.15))
-                                .clipShape(Capsule())
-                        }
-                    }
-
-                    // Contact info
-                    if let contact = guest.displayContact {
-                        HStack(spacing: 4) {
-                            Image(systemName: guest.email != nil ? "envelope" : "phone")
-                                .font(.caption2)
-                            Text(contact)
-                                .font(GatherFont.caption)
-                        }
-                        .foregroundStyle(Color.gatherSecondaryText)
-                        .lineLimit(1)
-                    }
-
-                    // Function status chips (if has functions)
-                    if !event.functions.isEmpty {
-                        functionStatusRow
-                    }
-                }
-
-                Spacer()
-
-                // Main status badge
-                if !isSelectionMode {
-                    StatusBadge(status: guest.status)
-                }
-            }
-            .padding(Spacing.sm)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: CornerRadius.md)
-                        .fill(Color.accentPurpleFallback.opacity(0.1))
-                } else {
-                    RoundedRectangle(cornerRadius: CornerRadius.md)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: CornerRadius.md)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 0.5
-                                )
-                        )
-                }
+            if isSelected {
+                rowContent
+                    .background(
+                        RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                            .fill(Color.accentPurpleFallback.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                            .strokeBorder(Color.accentPurpleFallback, lineWidth: 1.5)
+                    )
+            } else {
+                rowContent
+                    .surfaceCard(cornerRadius: CornerRadius.md)
             }
         }
         .buttonStyle(CardPressStyle())
@@ -694,6 +569,89 @@ struct ImprovedGuestCard: View {
         .accessibilityLabel("\(guest.name), \(guest.status.displayName)\(guest.totalHeadcount > 1 ? ", plus \(guest.totalHeadcount - 1)" : "")")
         .accessibilityHint(isSelectionMode ? "Double tap to toggle selection" : "Double tap for details")
         .accessibilityValue(isSelectionMode ? (isSelected ? "Selected" : "Not selected") : "")
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: Spacing.md) {
+            // Selection checkbox
+            if isSelectionMode {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title2)
+                    .foregroundStyle(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryText)
+            }
+
+            // Avatar with status ring
+            ZStack {
+                Circle()
+                    .stroke(statusColor, lineWidth: 2)
+                    .frame(width: 48, height: 48)
+
+                Circle()
+                    .fill(avatarColor)
+                    .frame(width: 42, height: 42)
+                    .overlay {
+                        Text(guest.name.prefix(1).uppercased())
+                            .font(GatherFont.headline)
+                            .foregroundStyle(.white)
+                    }
+            }
+
+            // Info
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: Spacing.xs) {
+                    Text(guest.name)
+                        .font(GatherFont.headline)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .lineLimit(1)
+
+                    if guest.totalHeadcount > 1 {
+                        Text("+\(guest.totalHeadcount - 1)")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.accentPurpleFallback)
+                            .clipShape(Capsule())
+                    }
+
+                    if guest.role != .guest {
+                        Text(guest.role.displayName)
+                            .font(.caption2)
+                            .foregroundStyle(Color.rsvpMaybeFallback)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.rsvpMaybeFallback.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
+
+                // Contact info
+                if let contact = guest.displayContact {
+                    HStack(spacing: 4) {
+                        Image(systemName: guest.email != nil ? "envelope" : "phone")
+                            .font(.caption2)
+                        Text(contact)
+                            .font(GatherFont.caption)
+                    }
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .lineLimit(1)
+                }
+
+                // Function status chips (if has functions)
+                if !event.functions.isEmpty {
+                    functionStatusRow
+                }
+            }
+
+            Spacer()
+
+            // Main status badge
+            if !isSelectionMode {
+                StatusBadge(status: guest.status)
+            }
+        }
+        .padding(Spacing.sm)
     }
 
     private var functionStatusRow: some View {

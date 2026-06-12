@@ -15,7 +15,7 @@ struct FunctionsTab: View {
                     functionsGrid
                 }
             }
-            .padding(.horizontal)
+            .horizontalPadding()
             .padding(.top, Spacing.md)
             .padding(.bottom, Layout.scrollBottomInset)
         }
@@ -30,43 +30,14 @@ struct FunctionsTab: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
-            ZStack {
-                Circle()
-                    .fill(Color.accentPurpleFallback.opacity(0.08))
-                    .frame(width: 100, height: 100)
-                Circle()
-                    .fill(Color.accentPinkFallback.opacity(0.06))
-                    .frame(width: 70, height: 70)
-                Image(systemName: "calendar.badge.plus")
-                    .font(.system(size: 32))
-                    .foregroundStyle(LinearGradient.gatherAccentGradient)
-            }
-
-            VStack(spacing: Spacing.sm) {
-                Text("No Functions Yet")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
-
-                Text("Add your first function like Mehendi, Sangeet, Ceremony, or Reception")
-                    .font(GatherFont.callout)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .multilineTextAlignment(.center)
-            }
-
-            Button {
-                showAddFunction = true
-            } label: {
-                Label("Add Function", systemImage: "plus.circle.fill")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.xl)
-                    .padding(.vertical, Spacing.sm)
-                    .background(LinearGradient.gatherAccentGradient)
-                    .clipShape(Capsule())
-            }
-        }
-        .padding(.vertical, Spacing.xxxl)
+        GatherEmptyState(
+            icon: "calendar.day.timeline.left",
+            title: "No Functions Yet",
+            message: "Add your first function like Mehendi, Sangeet, Ceremony, or Reception",
+            actionTitle: "Add Function",
+            action: { showAddFunction = true }
+        )
+        .padding(.vertical, Spacing.xxl)
     }
 
     // MARK: - Functions Grid

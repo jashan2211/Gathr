@@ -30,8 +30,10 @@ struct SeatingChartView: View {
                     }
                     unassignedGuestsSection
                 }
-                .padding()
+                .padding(.vertical, Spacing.md)
+                .horizontalPadding()
             }
+            .background(Color.gatherBackground)
             .navigationTitle("Seating Chart")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -67,32 +69,14 @@ struct SeatingChartView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.md) {
-            Image(systemName: "tablecells")
-                .font(.system(size: 50))
-                .foregroundStyle(Color.accentPurpleFallback)
-
-            Text("No Tables Yet")
-                .font(GatherFont.headline)
-
-            Text("Create tables to assign guests for seating")
-                .font(GatherFont.body)
-                .foregroundStyle(Color.gatherSecondaryText)
-                .multilineTextAlignment(.center)
-
-            Button {
-                showAddTable = true
-            } label: {
-                Text("Add First Table")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.xl)
-                    .padding(.vertical, Spacing.md)
-                    .background(LinearGradient.gatherAccentGradient)
-                    .clipShape(Capsule())
-            }
-        }
-        .padding(.vertical, Spacing.xxl)
+        GatherEmptyState(
+            icon: "tablecells",
+            title: "No Tables Yet",
+            message: "Create tables to seat your guests, then assign everyone a spot.",
+            actionTitle: "Add First Table",
+            action: { showAddTable = true }
+        )
+        .padding(.vertical, Spacing.xl)
     }
 
     // MARK: - Tables Grid
@@ -146,7 +130,7 @@ struct SeatingChartView: View {
                 ForEach(unassignedGuests) { guest in
                     HStack {
                         Circle()
-                            .fill(Color.gatherSecondaryBackground)
+                            .fill(Color.gatherTertiaryBackground)
                             .frame(width: AvatarSize.sm, height: AvatarSize.sm)
                             .overlay {
                                 Text(guest.name.prefix(1))
@@ -161,7 +145,8 @@ struct SeatingChartView: View {
                         }
                         Spacer()
                     }
-                    .padding(.vertical, Spacing.xs)
+                    .padding(Spacing.sm)
+                    .surfaceCard(cornerRadius: CornerRadius.md)
                 }
             }
         }
@@ -189,8 +174,7 @@ struct StatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color.gatherSecondaryBackground.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .surfaceCard(cornerRadius: CornerRadius.md)
     }
 }
 
@@ -220,7 +204,7 @@ struct TableCard: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.gatherSecondaryBackground)
+                        .fill(Color.gatherTertiaryBackground)
                         .frame(height: 4)
                     RoundedRectangle(cornerRadius: 2)
                         .fill(table.isFull ? Color.gatherSuccess : Color.accentPurpleFallback)
@@ -251,8 +235,7 @@ struct TableCard: View {
             }
         }
         .padding()
-        .background(Color.gatherSecondaryBackground.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard()
     }
 }
 
@@ -279,6 +262,8 @@ struct AddTableSheet: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.gatherBackground)
             .navigationTitle("Add Table")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -376,6 +361,8 @@ struct AssignGuestsSheet: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.gatherBackground)
             .navigationTitle(table.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

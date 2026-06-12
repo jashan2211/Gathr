@@ -35,57 +35,49 @@ struct ContactsView: View {
         NavigationStack {
             Group {
                 if uniqueContacts.isEmpty {
-                    VStack(spacing: Spacing.lg) {
+                    VStack {
                         Spacer()
-
-                        Image(systemName: "person.crop.rectangle.stack")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-
-                        VStack(spacing: Spacing.sm) {
-                            Text("No Contacts Yet")
-                                .font(GatherFont.title3)
-                                .foregroundStyle(Color.gatherPrimaryText)
-
-                            Text("Import contacts from your phone or add guests to events to build your contact list.")
-                                .font(GatherFont.body)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                                .multilineTextAlignment(.center)
-                        }
-
-                        Button {
-                            showImportSheet = true
-                        } label: {
-                            HStack(spacing: Spacing.xs) {
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                Text("Import Contacts")
-                            }
-                            .font(GatherFont.headline)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, Spacing.lg)
-                            .padding(.vertical, Spacing.sm)
-                            .background(LinearGradient.gatherAccentGradient)
-                            .clipShape(Capsule())
-                        }
-
+                        GatherEmptyState(
+                            icon: "person.crop.rectangle.stack",
+                            title: "No Contacts Yet",
+                            message: "Import contacts from your phone or add guests to events to build your contact list.",
+                            actionTitle: "Import Contacts",
+                            action: { showImportSheet = true }
+                        )
                         Spacer()
                     }
                     .horizontalPadding()
                 } else {
-                    List {
-                        ForEach(filteredContacts) { guest in
-                            ContactRow(
-                                name: guest.name,
-                                email: guest.email,
-                                phone: guest.phone
-                            )
+                    ScrollView {
+                        LazyVStack(spacing: Spacing.sm) {
+                            searchField
+
+                            if filteredContacts.isEmpty {
+                                GatherEmptyState(
+                                    icon: "magnifyingglass",
+                                    title: "No Matches",
+                                    message: "No contacts match \"\(searchText)\". Try a different name, email, or phone number."
+                                )
+                                .padding(.top, Spacing.lg)
+                            } else {
+                                ForEach(filteredContacts) { guest in
+                                    ContactRow(
+                                        name: guest.name,
+                                        email: guest.email,
+                                        phone: guest.phone
+                                    )
+                                    .padding(Spacing.sm)
+                                    .surfaceCard(cornerRadius: CornerRadius.md)
+                                }
+                            }
                         }
+                        .padding(.vertical, Spacing.md)
+                        .horizontalPadding()
                     }
-                    .listStyle(.plain)
                 }
             }
+            .background(Color.gatherBackground)
             .navigationTitle("Contacts")
-            .searchable(text: $searchText, prompt: "Search contacts")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -101,6 +93,38 @@ struct ContactsView: View {
                 })
             }
         }
+    }
+
+    // MARK: - Search Field
+
+    private var searchField: some View {
+        HStack(spacing: Spacing.xs) {
+            Image(systemName: "magnifyingglass")
+                .font(.callout)
+                .foregroundStyle(Color.gatherSecondaryText)
+
+            TextField("Search contacts", text: $searchText)
+                .font(GatherFont.body)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.callout)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, Spacing.sm)
+        .background(Color.gatherSecondaryBackground)
+        .clipShape(Capsule())
+        .padding(.bottom, Spacing.xs)
     }
 
     private func importContacts(_ contacts: [CNContact]) {
@@ -249,17 +273,18 @@ struct ImportContactsSheet: View {
                     Button {
                         checkContactsAccessAndShowPicker()
                     } label: {
-                    HStack(spacing: Spacing.sm) {
-                        Image(systemName: "person.2.fill")
-                        Text("Choose Contacts")
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: "person.2.fill")
+                            Text("Choose Contacts")
+                                .fontWeight(.bold)
+                        }
+                        .font(GatherFont.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(LinearGradient.gatherAccentGradient)
+                        .clipShape(Capsule())
                     }
-                    .font(GatherFont.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(LinearGradient.gatherAccentGradient)
-                    .foregroundStyle(.white)
-                    .cornerRadius(CornerRadius.md)
-                }
 
                     if !selectedContacts.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -284,8 +309,7 @@ struct ImportContactsSheet: View {
                                             }
                                         }
                                         .padding(Spacing.sm)
-                                        .background(Color.gatherSecondaryBackground)
-                                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                                        .surfaceCard(cornerRadius: CornerRadius.sm)
                                     }
                                 }
                             }
@@ -296,6 +320,7 @@ struct ImportContactsSheet: View {
                 Spacer()
             }
             .horizontalPadding()
+            .background(Color.gatherBackground)
             .navigationTitle("Import")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

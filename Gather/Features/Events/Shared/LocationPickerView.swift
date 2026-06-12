@@ -24,9 +24,9 @@ struct LocationPickerView: View {
                         .autocorrectionDisabled()
                 }
                 .padding(Spacing.sm)
-                .background(Color.gatherSecondaryBackground.opacity(0.5))
+                .background(Color.gatherSecondaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                .padding(.horizontal, Spacing.md)
+                .padding(.horizontal, Layout.horizontalPadding)
                 .padding(.top, Spacing.sm)
 
                 if let item = selectedMapItem {
@@ -50,13 +50,6 @@ struct LocationPickerView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                if selectedMapItem != nil {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Use This") {
-                            confirmSelection()
-                        }
-                    }
-                }
             }
             .overlay {
                 if isResolving {
@@ -65,8 +58,7 @@ struct LocationPickerView: View {
                         .overlay {
                             ProgressView("Finding location...")
                                 .padding()
-                                .background(.ultraThinMaterial)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .surfaceCard(cornerRadius: CornerRadius.md)
                         }
                 }
             }
@@ -77,7 +69,7 @@ struct LocationPickerView: View {
 
     private var suggestionsList: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: Spacing.xs) {
                 ForEach(searchManager.suggestions, id: \.self) { suggestion in
                     Button {
                         selectSuggestion(suggestion)
@@ -106,12 +98,14 @@ struct LocationPickerView: View {
                                 .font(.caption2)
                                 .foregroundStyle(Color.gatherSecondaryText)
                         }
-                        .padding(.horizontal, Spacing.md)
-                        .padding(.vertical, Spacing.sm)
+                        .padding(Spacing.sm)
+                        .surfaceCard(cornerRadius: CornerRadius.md)
                     }
-                    Divider().padding(.leading, 56)
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, Layout.horizontalPadding)
+            .padding(.top, Spacing.sm)
         }
     }
 
@@ -128,7 +122,7 @@ struct LocationPickerView: View {
             }
             .frame(height: 220)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.top, Spacing.sm)
 
             // Info card
@@ -144,19 +138,46 @@ struct LocationPickerView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Spacing.md)
+            .padding(Spacing.md)
+            .surfaceCard(cornerRadius: CornerRadius.lg)
+            .padding(.horizontal, Layout.horizontalPadding)
 
             Spacer()
 
-            // Change button
-            Button {
-                selectedMapItem = nil
-                cameraPosition = .automatic
-            } label: {
-                Text("Search Again")
-                    .font(GatherFont.callout)
-                    .foregroundStyle(Color.accentPurpleFallback)
+            // Primary select + secondary search-again actions
+            VStack(spacing: Spacing.sm) {
+                Button {
+                    confirmSelection()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.callout)
+                        Text("Use This Location")
+                            .font(GatherFont.callout)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Layout.buttonHeight)
+                    .background(LinearGradient.gatherAccentGradient)
+                    .clipShape(Capsule())
+                }
+
+                Button {
+                    selectedMapItem = nil
+                    cameraPosition = .automatic
+                } label: {
+                    Text("Search Again")
+                        .font(GatherFont.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Layout.buttonHeight)
+                        .background(Color.gatherSecondaryBackground)
+                        .clipShape(Capsule())
+                }
             }
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.bottom, Spacing.md)
         }
     }
@@ -164,30 +185,25 @@ struct LocationPickerView: View {
     // MARK: - Empty / No Results
 
     private var emptyPrompt: some View {
-        VStack(spacing: Spacing.md) {
+        VStack {
             Spacer()
-            Image(systemName: "map")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-            Text("Search for a venue, address, or city")
-                .font(GatherFont.callout)
-                .foregroundStyle(Color.gatherSecondaryText)
+            GatherEmptyState(
+                icon: "map",
+                title: "Find your spot",
+                message: "Search for a venue, address, or city to pin your event."
+            )
             Spacer()
         }
     }
 
     private var noResults: some View {
-        VStack(spacing: Spacing.md) {
+        VStack {
             Spacer()
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 36))
-                .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-            Text("No locations found")
-                .font(GatherFont.headline)
-                .foregroundStyle(Color.gatherSecondaryText)
-            Text("Try a different search term")
-                .font(GatherFont.callout)
-                .foregroundStyle(Color.gatherTertiaryText)
+            GatherEmptyState(
+                icon: "magnifyingglass",
+                title: "No locations found",
+                message: "Try a different name, or search a nearby street or city."
+            )
             Spacer()
         }
     }

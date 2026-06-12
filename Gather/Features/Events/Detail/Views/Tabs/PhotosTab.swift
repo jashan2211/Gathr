@@ -55,7 +55,7 @@ struct PhotosTab: View {
                             .foregroundStyle(Color.gatherSecondaryText)
                         Spacer()
                     }
-                    .padding(.horizontal, Spacing.md)
+                    .horizontalPadding()
 
                     // Photo grid
                     LazyVGrid(columns: columns, spacing: 2) {
@@ -143,12 +143,13 @@ struct PhotosTab: View {
                     .overlay {
                         VStack(spacing: Spacing.sm) {
                             ProgressView()
+                                .tint(Color.accentPurpleFallback)
                             Text(loadingProgress)
                                 .font(GatherFont.callout)
+                                .foregroundStyle(Color.gatherPrimaryText)
                         }
                         .padding(Spacing.lg)
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .surfaceCard(cornerRadius: CornerRadius.md)
                     }
             }
         }
@@ -181,10 +182,9 @@ struct PhotosTab: View {
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .padding(Spacing.md)
-            .background(Color.gatherSecondaryBackground.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .surfaceCard(cornerRadius: CornerRadius.lg)
         }
-        .padding(.horizontal, Spacing.md)
+        .horizontalPadding()
     }
 
     // MARK: - Photo Cell
@@ -244,19 +244,12 @@ struct PhotosTab: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.md) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-
-            Text("No photos yet")
-                .font(GatherFont.headline)
-                .foregroundStyle(Color.gatherSecondaryText)
-
-            Text("Tap above to add the first photo")
-                .font(GatherFont.callout)
-                .foregroundStyle(Color.gatherTertiaryText)
-        }
+        GatherEmptyState(
+            icon: "photo.on.rectangle.angled",
+            title: "No photos yet",
+            message: "Add the first photo and start this event's album.",
+            accent: Color.forCategory(event.category)
+        )
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.xxl)
     }
@@ -419,7 +412,7 @@ struct PhotoViewerView: View {
                         .font(GatherFont.body)
                         .lineLimit(3)
                         .padding(Spacing.sm)
-                        .background(Color.gatherSecondaryBackground.opacity(0.5))
+                        .background(Color.gatherTertiaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                 }
 

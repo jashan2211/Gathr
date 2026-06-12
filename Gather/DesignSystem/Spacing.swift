@@ -121,8 +121,9 @@ enum AnimationDuration {
 // MARK: - Layout Constants
 
 enum Layout {
-    /// Horizontal padding for screen edges
-    static let horizontalPadding: CGFloat = Spacing.md
+    /// Horizontal padding for screen edges — 20pt of breathing room so list
+    /// content reads calm rather than edge-to-edge busy (critique §2).
+    static let horizontalPadding: CGFloat = 20
 
     /// Minimum touch target size (44pt Apple HIG)
     static let minTouchTarget: CGFloat = 44
@@ -262,35 +263,73 @@ struct GlassCardModifier: ViewModifier {
     }
 }
 
-// MARK: - Lightweight Glass Card (for scroll performance in lists)
+// MARK: - Surface Card (calm canvas)
 
-struct GlassCardLiteModifier: ViewModifier {
+/// The default container for standard cards and list rows: a solid, calm
+/// surface. No blur, no white "glass" stroke — a clean fill with a whisper of
+/// elevation in light mode and a hairline for definition on true-black dark
+/// backgrounds. Glass is reserved for floating bars and elements over imagery.
+struct SurfaceCardModifier: ViewModifier {
     var cornerRadius: CGFloat = CornerRadius.card
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content
-            // Solid, calm surface for standard list rows (critique #1): no blur,
-            // no white "glass" stroke — just a clean fill with a soft drop shadow
-            // so the few intentional glass surfaces pop harder.
             .background(Color.gatherSecondaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        Color.white.opacity(colorScheme == .dark ? 0.07 : 0),
+                        lineWidth: 1
+                    )
+            )
             .shadow(
-                color: .black.opacity(colorScheme == .dark ? 0.0 : 0.05),
+                color: .black.opacity(colorScheme == .dark ? 0 : 0.05),
                 radius: 8, y: 4
             )
     }
 }
 
 extension View {
-    /// Apply glassmorphic card style
+    /// Solid card surface — the standard treatment for cards and list rows.
+    func surfaceCard(cornerRadius: CGFloat = CornerRadius.card) -> some View {
+        modifier(SurfaceCardModifier(cornerRadius: cornerRadius))
+    }
+
+    /// Apply glassmorphic card style. Reserve for the 20%: floating bars and
+    /// content layered over photos or mesh gradients — never on plain canvas.
     func glassCard(tint: Color = .clear, cornerRadius: CGFloat = CornerRadius.card) -> some View {
         modifier(GlassCardModifier(tint: tint, cornerRadius: cornerRadius))
     }
 
-    /// Lightweight glass card — no material blur, better scroll performance
+    @available(*, deprecated, renamed: "surfaceCard")
     func glassCardLite(cornerRadius: CGFloat = CornerRadius.card) -> some View {
-        modifier(GlassCardLiteModifier(cornerRadius: cornerRadius))
+        surfaceCard(cornerRadius: cornerRadius)
+    }
+}
+
+// MARK: - Category Accent Bar
+
+extension View {
+    /// A slim accent strip along the card's top edge in the event's category
+    /// color. Categories color the *accents*, not the canvas — this replaces
+    /// full-card category gradient backgrounds (critique §4).
+    func categoryAccentBar(
+        _ color: Color,
+        height: CGFloat = 3,
+        cornerRadius: CGFloat = CornerRadius.card
+    ) -> some View {
+        overlay(alignment: .top) {
+            UnevenRoundedRectangle(
+                topLeadingRadius: cornerRadius,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: cornerRadius
+            )
+            .fill(color)
+            .frame(height: height)
+        }
     }
 }
 
@@ -649,6 +688,139 @@ extension View {
     /// Add gradient ring around avatars (color matches RSVP status)
     func gradientRing(color: Color, lineWidth: CGFloat = 2.5) -> some View {
         modifier(GradientRing(color: color, lineWidth: lineWidth))
+    }
+}
+
+// MARK: - Empty State
+
+/// A premium empty state: a slightly tilted, desaturated ticket-stub
+/// illustration that floats gently, with a title, message, and optional CTA.
+/// Replaces bare "No events yet" text — the empty state should feel like an
+/// intentional part of the app, not a missing one (critique §6).
+struct GatherEmptyState: View {
+    let icon: String
+    let title: String
+    let message: String
+    var accent: Color = .accentPurpleFallback
+    var actionTitle: String? = nil
+    var action: (() -> Void)? = nil
+
+    @State private var floating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(spacing: Spacing.lg) {
+            TicketStubIllustration(icon: icon, accent: accent)
+                .rotationEffect(.degrees(-8))
+                .offset(y: floating ? -5 : 5)
+                .onAppear {
+                    guard !reduceMotion else { return }
+                    withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) {
+                        floating = true
+                    }
+                }
+                .accessibilityHidden(true)
+
+            VStack(spacing: Spacing.xs) {
+                Text(title)
+                    .font(GatherFont.title3)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .accessibilityAddTraits(.isHeader)
+
+                Text(message)
+                    .font(GatherFont.subheadline)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let actionTitle, let action {
+                Button(action: action) {
+                    Text(actionTitle)
+                        .font(GatherFont.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.lg)
+                        .padding(.vertical, Spacing.sm)
+                        .background(LinearGradient.gatherAccentGradient)
+                        .clipShape(Capsule())
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(Spacing.xl)
+    }
+}
+
+/// Desaturated ticket-stub vector drawn in SwiftUI: rounded body with side
+/// notches, a dashed perforation, an icon on the main half, and "barcode"
+/// marks on the stub half. Fixed 150×88 canvas keeps the geometry exact.
+struct TicketStubIllustration: View {
+    let icon: String
+    var accent: Color = .accentPurpleFallback
+    @Environment(\.colorScheme) private var colorScheme
+
+    private let ticketWidth: CGFloat = 150
+    private let ticketHeight: CGFloat = 88
+    private let perforationX: CGFloat = 102
+
+    var body: some View {
+        ZStack {
+            TicketShape(notchRadius: 9, perforationX: perforationX / ticketWidth)
+                .fill(Color.gatherSecondaryBackground)
+            TicketShape(notchRadius: 9, perforationX: perforationX / ticketWidth)
+                .stroke(accent.opacity(0.25), lineWidth: 1.5)
+
+            // Dashed perforation between body and stub
+            Path { p in
+                p.move(to: CGPoint(x: perforationX, y: 16))
+                p.addLine(to: CGPoint(x: perforationX, y: ticketHeight - 16))
+            }
+            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+            .foregroundStyle(accent.opacity(0.25))
+
+            Image(systemName: icon)
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(accent.opacity(0.45))
+                .position(x: perforationX / 2, y: ticketHeight / 2)
+
+            VStack(spacing: 5) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Capsule()
+                        .fill(accent.opacity(0.18))
+                        .frame(width: 22, height: 5)
+                }
+            }
+            .position(x: (perforationX + ticketWidth) / 2, y: ticketHeight / 2)
+        }
+        .frame(width: ticketWidth, height: ticketHeight)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.08), radius: 10, y: 6)
+    }
+}
+
+/// A ticket outline: rounded rectangle with semicircular notches punched out
+/// of the top and bottom edges at the perforation line.
+struct TicketShape: Shape {
+    var notchRadius: CGFloat = 9
+    /// Perforation position as a fraction of the width (0...1)
+    var perforationX: CGFloat = 0.68
+    var cornerRadius: CGFloat = 14
+
+    func path(in rect: CGRect) -> Path {
+        let px = rect.minX + rect.width * perforationX
+        let body = Path(roundedRect: rect, cornerRadius: cornerRadius)
+
+        var notches = Path()
+        notches.addEllipse(in: CGRect(
+            x: px - notchRadius, y: rect.minY - notchRadius,
+            width: notchRadius * 2, height: notchRadius * 2
+        ))
+        notches.addEllipse(in: CGRect(
+            x: px - notchRadius, y: rect.maxY - notchRadius,
+            width: notchRadius * 2, height: notchRadius * 2
+        ))
+
+        return body.subtracting(notches)
     }
 }
 

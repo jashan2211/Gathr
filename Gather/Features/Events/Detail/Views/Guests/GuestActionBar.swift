@@ -8,90 +8,90 @@ struct GuestActionBar: View {
     @Binding var showSendInvites: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            Divider()
+        HStack(spacing: Spacing.md) {
+            // Selection mode toggle / Cancel
+            if isSelectionMode {
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        isSelectionMode = false
+                    }
+                } label: {
+                    Text("Cancel")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
 
-            HStack(spacing: Spacing.md) {
-                // Selection mode toggle / Cancel
-                if isSelectionMode {
+                Spacer()
+
+                // Selected count
+                Text("\(selectedGuests.count) selected")
+                    .font(GatherFont.callout)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                Spacer()
+
+                // Send to Selected
+                Button {
+                    showSendInvites = true
+                } label: {
+                    Label("Send Invites", systemImage: "paperplane.fill")
+                        .font(GatherFont.callout)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.md)
+                        .padding(.vertical, Spacing.sm)
+                        .background(
+                            selectedGuests.isEmpty
+                                ? AnyShapeStyle(Color.gatherSecondaryText.opacity(0.4))
+                                : AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                        )
+                        .clipShape(Capsule())
+                }
+                .disabled(selectedGuests.isEmpty)
+            } else {
+                // Add Guest
+                Button {
+                    showAddGuest = true
+                } label: {
+                    Label("Add Guest", systemImage: "person.badge.plus")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.accentPurpleFallback)
+                }
+
+                Spacer()
+
+                // Select & Send
+                if !event.guests.isEmpty {
                     Button {
-                        withAnimation {
-                            isSelectionMode = false
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                            isSelectionMode = true
                         }
                     } label: {
-                        Text("Cancel")
+                        Label("Select", systemImage: "checkmark.circle")
                             .font(GatherFont.callout)
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
 
-                    Spacer()
-
-                    // Selected count
-                    Text("\(selectedGuests.count) selected")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(Color.gatherPrimaryText)
-
-                    Spacer()
-
-                    // Send to Selected
+                    // Send All
                     Button {
                         showSendInvites = true
                     } label: {
-                        Label("Send Invites", systemImage: "paperplane.fill")
+                        Label("Send All", systemImage: "paperplane.fill")
                             .font(GatherFont.callout)
+                            .fontWeight(.bold)
                             .foregroundStyle(.white)
                             .padding(.horizontal, Spacing.md)
                             .padding(.vertical, Spacing.sm)
-                            .background(
-                                selectedGuests.isEmpty
-                                    ? Color.gatherSecondaryText
-                                    : Color.accentPurpleFallback
-                            )
+                            .background(LinearGradient.gatherAccentGradient)
                             .clipShape(Capsule())
-                    }
-                    .disabled(selectedGuests.isEmpty)
-                } else {
-                    // Add Guest
-                    Button {
-                        showAddGuest = true
-                    } label: {
-                        Label("Add Guest", systemImage: "person.badge.plus")
-                            .font(GatherFont.callout)
-                            .foregroundStyle(Color.accentPurpleFallback)
-                    }
-
-                    Spacer()
-
-                    // Select & Send
-                    if !event.guests.isEmpty {
-                        Button {
-                            withAnimation {
-                                isSelectionMode = true
-                            }
-                        } label: {
-                            Label("Select", systemImage: "checkmark.circle")
-                                .font(GatherFont.callout)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-
-                        // Send All
-                        Button {
-                            showSendInvites = true
-                        } label: {
-                            Label("Send All", systemImage: "paperplane.fill")
-                                .font(GatherFont.callout)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, Spacing.md)
-                                .padding(.vertical, Spacing.sm)
-                                .background(Color.accentPurpleFallback)
-                                .clipShape(Capsule())
-                        }
                     }
                 }
             }
-            .padding()
-            .background(.ultraThinMaterial)
         }
+        .padding()
+        // Floating bar over scrolling content — glass stays per design whitelist.
+        .background(.ultraThinMaterial)
+        .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
     }
 }
 

@@ -126,7 +126,7 @@ struct MainTabView: View {
         HStack(spacing: 0) {
             ForEach(AppState.Tab.allCases, id: \.self) { tab in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         appState.selectedTab = tab
                     }
                 } label: {
@@ -170,9 +170,10 @@ struct MainTabView: View {
         .padding(.top, Spacing.sm)
         .padding(.bottom, Spacing.xs)
         .background(
+            // Glass stays here by design: a floating bar hovering over scrolling content.
             Rectangle()
                 .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.08), radius: 12, y: -4)
+                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
                 .ignoresSafeArea(edges: .bottom)
         )
     }

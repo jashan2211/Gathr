@@ -42,6 +42,19 @@ enum EventDetailTab: String, CaseIterable {
     }
 }
 
+// MARK: - Floating Bottom Bar Background
+
+private extension View {
+    /// Glass background for bottom-pinned action bars; shadow casts upward.
+    func floatingBottomBar() -> some View {
+        background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+        )
+    }
+}
+
 // MARK: - Event Detail View
 
 struct EventDetailView: View {
@@ -253,8 +266,8 @@ struct EventDetailView: View {
                 .clipShape(Capsule())
 
                 Text(event.title)
-                    .font(GatherFont.title2)
-                    .fontWeight(.bold)
+                    .font(GatherFont.title)
+                    .kerning(-0.4)
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
                     .lineLimit(2)
@@ -332,7 +345,7 @@ struct EventDetailView: View {
             ForEach(visibleTabs, id: \.self) { tab in
                 Button {
                     HapticService.tabSwitch()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                         selectedTab = tab
                     }
                 } label: {
@@ -381,7 +394,7 @@ struct EventDetailView: View {
                             lineWidth: 0.5
                         )
                 )
-                .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
+                .shadow(color: .black.opacity(0.1), radius: 15, y: 8)
         )
         .padding(.horizontal, Spacing.lg)
     }
@@ -452,9 +465,9 @@ struct EventDetailView: View {
                 }
                 .accessibilityLabel("Publish event")
             }
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.bottom, Spacing.sm)
-            .background(.ultraThinMaterial)
+            .floatingBottomBar()
         }
     }
 
@@ -481,8 +494,6 @@ struct EventDetailView: View {
 
     private var rsvpButtonBar: some View {
         VStack(spacing: 0) {
-            Divider()
-
             if selectedTab != .overview, let guest = currentUserGuest {
                 // Compact pill on non-overview tabs
                 compactRSVPPill(guest: guest)
@@ -521,7 +532,7 @@ struct EventDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.xs)
-        .background(.ultraThinMaterial)
+        .floatingBottomBar()
     }
 
     // Attending status bar for users who have already RSVPed
@@ -572,7 +583,7 @@ struct EventDetailView: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
+        .floatingBottomBar()
     }
 
     // Ticket purchase bar for ticketed events
@@ -617,10 +628,10 @@ struct EventDetailView: View {
                     Text("Not Yet Available")
                 }
                 .font(GatherFont.headline)
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(Color.gatherSecondaryText)
                 .padding(.horizontal, Spacing.lg)
                 .padding(.vertical, Spacing.sm)
-                .background(Color.gatherSecondaryText.opacity(0.4))
+                .background(Color.gatherTertiaryBackground)
                 .clipShape(Capsule())
             } else if isSoldOut {
                 Button {
@@ -631,10 +642,11 @@ struct EventDetailView: View {
                         Text("Join Waitlist")
                     }
                     .font(GatherFont.headline)
+                    .fontWeight(.bold)
                     .foregroundStyle(.white)
                     .padding(.horizontal, Spacing.lg)
                     .padding(.vertical, Spacing.sm)
-                    .background(Color.rsvpMaybeFallback)
+                    .background(LinearGradient.gatherAccentGradient)
                     .clipShape(Capsule())
                 }
             } else {
@@ -655,7 +667,7 @@ struct EventDetailView: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
+        .floatingBottomBar()
     }
 
     /// True when all visible tiers have a future salesStartDate
@@ -706,7 +718,7 @@ struct EventDetailView: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
+        .floatingBottomBar()
     }
 
     // MARK: - Helpers

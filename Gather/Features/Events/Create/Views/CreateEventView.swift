@@ -40,6 +40,7 @@ struct CreateEventView: View {
     @State private var showTemplates = true
     @State private var step: CreateStep = .typeAndTitle
     @State private var showDiscardAlert = false
+    @State private var showCoverDetails = false
 
     // Optional: pre-fill from template
     var template: EventTemplate? = nil
@@ -135,7 +136,7 @@ struct CreateEventView: View {
                 Spacer()
             }
         }
-        .padding(.horizontal, Spacing.md)
+        .padding(.horizontal, Layout.horizontalPadding)
         .padding(.top, Spacing.sm)
         .padding(.bottom, Spacing.xs)
     }
@@ -146,33 +147,26 @@ struct CreateEventView: View {
     private var stepContent: some View {
         switch step {
         case .typeAndTitle:
-            VStack(spacing: 0) {
-                EventHeroImagePicker(
-                    selectedPhoto: $selectedPhoto,
-                    heroImage: $heroImage,
-                    selectedCategory: selectedCategory
+            // Minimum-ask step: template shortcut, category, title.
+            // Cover photo + description live in a collapsed optional section.
+            VStack(spacing: Spacing.lg) {
+                if showTemplates && template == nil {
+                    templateSection
+                }
+
+                EventCategorySelector(
+                    selectedCategory: $selectedCategory,
+                    enabledFeatures: $enabledFeatures,
+                    headerTitle: "What kind of event?"
                 )
 
-                VStack(spacing: Spacing.lg) {
-                    if showTemplates && template == nil {
-                        templateSection
-                    }
+                titleSection
 
-                    EventCategorySelector(
-                        selectedCategory: $selectedCategory,
-                        enabledFeatures: $enabledFeatures,
-                        headerTitle: "What kind of event?"
-                    )
-
-                    EventBasicsSection(
-                        title: $title,
-                        description: $description
-                    )
-                }
-                .padding(.horizontal, Spacing.md)
-                .padding(.top, Spacing.lg)
-                .padding(.bottom, 100)
+                coverDetailsSection
             }
+            .padding(.horizontal, Layout.horizontalPadding)
+            .padding(.top, Spacing.lg)
+            .padding(.bottom, 100)
 
         case .whenAndWhere:
             VStack(spacing: Spacing.lg) {
@@ -194,7 +188,7 @@ struct CreateEventView: View {
                     locationLongitude: $locationLongitude
                 )
             }
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.top, Spacing.lg)
             .padding(.bottom, 100)
 
@@ -202,7 +196,7 @@ struct CreateEventView: View {
             VStack(spacing: Spacing.lg) {
                 EventFeaturesSection(enabledFeatures: $enabledFeatures)
             }
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.top, Spacing.lg)
             .padding(.bottom, 100)
 
@@ -215,9 +209,181 @@ struct CreateEventView: View {
                     hasCapacity: $hasCapacity
                 )
             }
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.top, Spacing.lg)
             .padding(.bottom, 100)
+        }
+    }
+
+    // MARK: - Title Section
+
+    private var titleSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            EventFormSectionHeader(title: "Name your event", icon: "textformat")
+
+            TextField("Give your event a vibe...", text: $title, axis: .vertical)
+                .font(GatherFont.title3)
+                .fontWeight(.semibold)
+                .lineLimit(1...2)
+                .padding(Spacing.md)
+                .background(Color.gatherTertiaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .overlay(
+                    RoundedRectangle(cornerRadius: CornerRadius.md)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: title.isEmpty
+                                    ? [Color.clear, Color.clear]
+                                    : [Color.accentPurpleFallback, Color.accentPinkFallback],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+
+            HStack {
+                Spacer()
+                Text("\(title.count)/100")
+                    .font(.caption2)
+                    .foregroundStyle(title.count > 90 ? Color.warmCoral : Color.gatherSecondaryText)
+            }
+        }
+        .padding(Spacing.md)
+        .surfaceCard(cornerRadius: CornerRadius.lg)
+    }
+
+    // MARK: - Optional Cover & Details
+
+    /// Collapsed by default so step 1 asks only for the minimum.
+    private var coverDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    showCoverDetails.toggle()
+                }
+                HapticService.buttonTap()
+            } label: {
+                HStack(spacing: Spacing.sm) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.forCategory(selectedCategory))
+                        .frame(width: 36, height: 36)
+                        .background(Color.gatherTertiaryBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Add a cover & details")
+                            .font(GatherFont.callout)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.gatherPrimaryText)
+                        Text(coverDetailsSummary)
+                            .font(.caption2)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .rotationEffect(.degrees(showCoverDetails ? 180 : 0))
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add a cover photo and description")
+            .accessibilityValue(showCoverDetails ? "Expanded" : "Collapsed")
+            .accessibilityHint("Double tap to \(showCoverDetails ? "collapse" : "expand")")
+
+            if showCoverDetails {
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    coverPickerRow
+                    descriptionField
+                }
+                .padding(.top, Spacing.md)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(Spacing.md)
+        .surfaceCard(cornerRadius: CornerRadius.lg)
+    }
+
+    private var coverDetailsSummary: String {
+        switch (heroImage != nil, !description.isEmpty) {
+        case (true, true): return "Cover and description added"
+        case (true, false): return "Cover added"
+        case (false, true): return "Description added"
+        case (false, false): return "Optional — you can add these later"
+        }
+    }
+
+    private var coverPickerRow: some View {
+        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+            HStack(spacing: Spacing.sm) {
+                if let heroImage {
+                    heroImage
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 64, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                } else {
+                    RoundedRectangle(cornerRadius: CornerRadius.sm)
+                        .fill(Color.gatherSecondaryBackground)
+                        .frame(width: 64, height: 48)
+                        .overlay {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.callout)
+                                .foregroundStyle(Color.forCategory(selectedCategory))
+                        }
+                }
+
+                Text(heroImage == nil ? "Add a cover photo" : "Change cover photo")
+                    .font(GatherFont.callout)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .padding(Spacing.sm)
+            .background(Color.gatherTertiaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        }
+        .accessibilityLabel(heroImage == nil ? "Add a cover photo" : "Change cover photo")
+        .onChange(of: selectedPhoto) { _, newValue in
+            Task {
+                if let data = try? await newValue?.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    heroImage = Image(uiImage: uiImage)
+                }
+            }
+        }
+    }
+
+    private var descriptionField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("DESCRIPTION")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .tracking(0.5)
+                Text("optional")
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherTertiaryText)
+            }
+
+            TextField("Tell people what to expect...", text: $description, axis: .vertical)
+                .font(GatherFont.body)
+                .lineLimit(3...6)
+                .padding(Spacing.md)
+                .background(Color.gatherTertiaryBackground)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
         }
     }
 
@@ -238,7 +404,7 @@ struct CreateEventView: View {
                 Spacer()
 
                 Button {
-                    withAnimation(.spring(response: 0.3)) { showTemplates = false }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showTemplates = false }
                 } label: {
                     Text("Skip")
                         .font(GatherFont.caption)
@@ -258,14 +424,19 @@ struct CreateEventView: View {
                         } label: {
                             VStack(spacing: Spacing.xs) {
                                 ZStack {
-                                    LinearGradient.categoryGradientVibrant(for: tmpl.category)
+                                    Color.forCategory(tmpl.category)
                                         .frame(width: 56, height: 56)
                                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
 
                                     Image(systemName: tmpl.icon)
                                         .font(.title3)
                                         .fontWeight(.semibold)
-                                        .foregroundStyle(.white)
+                                        // Conference/meetup fills are light; white glyphs fail contrast
+                                        .foregroundStyle(
+                                            tmpl.category == .conference || tmpl.category == .meetup
+                                                ? Color.black.opacity(0.85)
+                                                : Color.white
+                                        )
                                 }
 
                                 Text(tmpl.name)
@@ -282,12 +453,11 @@ struct CreateEventView: View {
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
     }
 
     private func applyTemplate(_ tmpl: EventTemplate) {
-        withAnimation(.spring(response: 0.3)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             selectedCategory = tmpl.category
             enabledFeatures = tmpl.suggestedFeatures
             description = tmpl.suggestedDescription
@@ -336,7 +506,7 @@ struct CreateEventView: View {
                             }
                             .foregroundStyle(Color.gatherSecondaryText)
                             .padding(.horizontal, Spacing.lg)
-                            .padding(.vertical, Spacing.sm)
+                            .frame(height: Layout.buttonHeight)
                             .background(Color.gatherSecondaryBackground)
                             .clipShape(Capsule())
                         }
@@ -365,7 +535,7 @@ struct CreateEventView: View {
                         }
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, Spacing.sm)
+                        .frame(height: Layout.buttonHeight)
                         .background(
                             canProceed
                                 ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
@@ -374,6 +544,7 @@ struct CreateEventView: View {
                         .clipShape(Capsule())
                     }
                     .disabled(!canProceed || isSubmitting)
+                    .accessibilityIdentifier("wizardPrimaryButton")
                 }
 
                 if step == .settings {
@@ -389,7 +560,7 @@ struct CreateEventView: View {
                     .padding(.top, 2)
                 }
             }
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.bottom, Spacing.md)
             .background(Color.gatherBackground)
             .animation(.easeInOut(duration: 0.2), value: stepHint)
@@ -408,7 +579,7 @@ struct CreateEventView: View {
 
     private func goNext() {
         guard canProceed, let next = CreateStep(rawValue: step.rawValue + 1) else { return }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             step = next
         }
         HapticService.buttonTap()
@@ -416,7 +587,7 @@ struct CreateEventView: View {
 
     private func goBack() {
         guard let previous = CreateStep(rawValue: step.rawValue - 1) else { return }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             step = previous
         }
     }
@@ -560,8 +731,7 @@ struct FormSection<Content: View>: View {
             content
         }
         .padding()
-        .background(Color.gatherSecondaryBackground.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
     }
 }
 

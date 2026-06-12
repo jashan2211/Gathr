@@ -36,7 +36,9 @@ struct WaitlistSheet: View {
                     joinForm
                 }
             }
-            .padding()
+            .horizontalPadding()
+            .padding(.vertical)
+            .background(Color.gatherBackground)
             .navigationTitle("Waitlist")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -119,18 +121,17 @@ struct WaitlistSheet: View {
                 if isSubmitting {
                     ProgressView()
                         .tint(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                 } else {
                     Text("Join Waitlist")
                         .font(GatherFont.headline)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                 }
             }
             .disabled(name.isEmpty || email.isEmpty || isSubmitting)
@@ -171,7 +172,8 @@ struct WaitlistSheet: View {
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 Text("#\(waitlistPosition)")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.system(size: 48, weight: .heavy))
+                    .kerning(-0.5)
                     .foregroundStyle(Color.accentPurpleFallback)
 
                 Text("in the waitlist")
@@ -180,8 +182,7 @@ struct WaitlistSheet: View {
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(Color.gatherSecondaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .surfaceCard(cornerRadius: CornerRadius.lg)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Your waitlist position is number \(waitlistPosition)")
 
@@ -193,11 +194,11 @@ struct WaitlistSheet: View {
             } label: {
                 Text("Done")
                     .font(GatherFont.headline)
+                    .fontWeight(.bold)
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
+                    .frame(maxWidth: .infinity, minHeight: 52)
                     .background(LinearGradient.gatherAccentGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    .clipShape(Capsule())
             }
         }
     }
@@ -233,7 +234,8 @@ struct WaitlistSheet: View {
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 Text("#\(existingEntry?.position ?? 0)")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.system(size: 48, weight: .heavy))
+                    .kerning(-0.5)
                     .foregroundStyle(Color.accentPurpleFallback)
 
                 Text("in the waitlist")
@@ -242,8 +244,7 @@ struct WaitlistSheet: View {
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(Color.gatherSecondaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .surfaceCard(cornerRadius: CornerRadius.lg)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Your waitlist position is number \(existingEntry?.position ?? 0)")
 
@@ -268,11 +269,10 @@ struct WaitlistSheet: View {
             } label: {
                 Text("Leave Waitlist")
                     .font(GatherFont.headline)
-                    .foregroundStyle(Color.rsvpNoFallback)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.rsvpNoFallback.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    .foregroundStyle(Color.gatherError)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(Color.gatherError.opacity(0.1))
+                    .clipShape(Capsule())
             }
             .accessibilityLabel("Leave Waitlist")
             .accessibilityHint("Removes you from the waitlist for this event")
@@ -330,7 +330,7 @@ struct WaitlistSheet: View {
             try? await Task.sleep(for: .seconds(0.5))
             HapticService.success()
 
-            withAnimation {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                 isSubmitting = false
                 showSuccess = true
             }

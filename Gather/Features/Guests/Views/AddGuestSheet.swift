@@ -34,15 +34,15 @@ struct AddGuestSheet: View {
                         label: "Manual",
                         icon: "pencil.line",
                         isSelected: selectedTab == 0
-                    ) { withAnimation(.spring(response: 0.3)) { selectedTab = 0 } }
+                    ) { withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { selectedTab = 0 } }
 
                     AddGuestTabButton(
                         label: "Contacts",
                         icon: "person.crop.rectangle.stack",
                         isSelected: selectedTab == 1
-                    ) { withAnimation(.spring(response: 0.3)) { selectedTab = 1 } }
+                    ) { withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { selectedTab = 1 } }
                 }
-                .padding(.horizontal, Spacing.md)
+                .horizontalPadding()
                 .padding(.vertical, Spacing.sm)
 
                 TabView(selection: $selectedTab) {
@@ -51,6 +51,7 @@ struct AddGuestSheet: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
+            .background(Color.gatherBackground)
             .navigationTitle("Add Guests")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -130,7 +131,7 @@ struct AddGuestSheet: View {
                                 .submitLabel(.done)
                         }
                         .padding(Spacing.sm)
-                        .background(Color.gatherSecondaryBackground)
+                        .background(Color.gatherTertiaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
 
@@ -154,7 +155,7 @@ struct AddGuestSheet: View {
                                 .submitLabel(.done)
                         }
                         .padding(Spacing.sm)
-                        .background(Color.gatherSecondaryBackground)
+                        .background(Color.gatherTertiaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                         .overlay(
                             RoundedRectangle(cornerRadius: CornerRadius.md)
@@ -188,7 +189,7 @@ struct AddGuestSheet: View {
                                 .submitLabel(.done)
                         }
                         .padding(Spacing.sm)
-                        .background(Color.gatherSecondaryBackground)
+                        .background(Color.gatherTertiaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
 
@@ -203,7 +204,7 @@ struct AddGuestSheet: View {
                         HStack(spacing: Spacing.xs) {
                             ForEach(GuestRole.allCases, id: \.self) { guestRole in
                                 Button {
-                                    withAnimation(.spring(response: 0.25)) { role = guestRole }
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { role = guestRole }
                                     HapticService.buttonTap()
                                 } label: {
                                     HStack(spacing: 4) {
@@ -219,19 +220,18 @@ struct AddGuestSheet: View {
                                     .background(
                                         role == guestRole
                                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                                            : AnyShapeStyle(Color.gatherSecondaryBackground)
+                                            : AnyShapeStyle(Color.gatherTertiaryBackground)
                                     )
                                     .clipShape(Capsule())
                                 }
                                 .scaleEffect(role == guestRole ? 1.03 : 1.0)
-                                .animation(.spring(response: 0.25, dampingFraction: 0.6), value: role == guestRole)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: role == guestRole)
                             }
                         }
                     }
                 }
                 .padding(Spacing.md)
-                .background(Color.gatherSecondaryBackground.opacity(0.3))
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+                .surfaceCard()
 
                 // Add button
                 Button {
@@ -246,7 +246,7 @@ struct AddGuestSheet: View {
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.sm)
+                    .frame(height: 52)
                     .background(
                         canSave
                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
@@ -256,9 +256,10 @@ struct AddGuestSheet: View {
                 }
                 .disabled(!canSave)
                 .scaleEffect(canSave ? 1.0 : 0.97)
-                .animation(.spring(response: 0.3), value: canSave)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: canSave)
             }
-            .padding(Spacing.md)
+            .padding(.vertical, Spacing.md)
+            .horizontalPadding()
         }
         .scrollDismissesKeyboard(.interactively)
     }
@@ -268,48 +269,15 @@ struct AddGuestSheet: View {
     private var contactsImportView: some View {
         VStack(spacing: Spacing.lg) {
             if selectedContacts.isEmpty {
-                VStack(spacing: Spacing.md) {
+                VStack {
                     Spacer()
-
-                    ZStack {
-                        Circle()
-                            .fill(Color.accentPurpleFallback.opacity(0.08))
-                            .frame(width: 110, height: 110)
-                        Circle()
-                            .fill(Color.accentPinkFallback.opacity(0.06))
-                            .frame(width: 80, height: 80)
-                        Image(systemName: "person.crop.rectangle.stack.fill")
-                            .font(.system(size: 36))
-                            .foregroundStyle(LinearGradient.gatherAccentGradient)
-                    }
-
-                    Text("Import from Contacts")
-                        .font(GatherFont.title3)
-                        .fontWeight(.semibold)
-
-                    Text("Quickly add guests from your phone contacts")
-                        .font(GatherFont.body)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Spacing.xl)
-
-                    Button {
-                        showContactsPicker = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.callout)
-                            Text("Choose Contacts")
-                                .font(GatherFont.callout)
-                                .fontWeight(.bold)
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, Spacing.xl)
-                        .padding(.vertical, Spacing.sm)
-                        .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(Capsule())
-                    }
-
+                    GatherEmptyState(
+                        icon: "person.crop.rectangle.stack",
+                        title: "Import from Contacts",
+                        message: "Quickly add guests from your phone contacts.",
+                        actionTitle: "Choose Contacts",
+                        action: { showContactsPicker = true }
+                    )
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -340,7 +308,7 @@ struct AddGuestSheet: View {
                                 .clipShape(Capsule())
                         }
                     }
-                    .padding(.horizontal, Spacing.md)
+                    .horizontalPadding()
 
                     ScrollView {
                         LazyVStack(spacing: Spacing.xs) {
@@ -378,11 +346,10 @@ struct AddGuestSheet: View {
                                     Spacer()
                                 }
                                 .padding(Spacing.sm)
-                                .background(Color.gatherSecondaryBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .surfaceCard(cornerRadius: CornerRadius.md)
                             }
                         }
-                        .padding(.horizontal, Spacing.md)
+                        .horizontalPadding()
                     }
 
                     // Import button
@@ -404,12 +371,12 @@ struct AddGuestSheet: View {
                         }
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, Spacing.sm)
+                        .frame(height: 52)
                         .background(LinearGradient.gatherAccentGradient)
                         .clipShape(Capsule())
                     }
                     .disabled(isImporting)
-                    .padding(.horizontal, Spacing.md)
+                    .horizontalPadding()
                     .padding(.bottom, Spacing.md)
                 }
             }
@@ -432,7 +399,7 @@ struct AddGuestSheet: View {
         HapticService.success()
 
         // Show success briefly
-        withAnimation(.spring(response: 0.3)) { showSuccess = true }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showSuccess = true }
         Task {
             try? await Task.sleep(for: .seconds(2))
             withAnimation { showSuccess = false }

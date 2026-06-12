@@ -48,36 +48,21 @@ struct MyTicketsView: View {
                         }
                     }
                 }
-                .padding()
+                .horizontalPadding()
+                .padding(.vertical)
             }
         }
+        .background(Color.gatherBackground)
         .navigationTitle("My Tickets")
     }
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.md) {
-            Spacer()
-                .frame(height: 80)
-
-            ZStack {
-                Circle()
-                    .fill(Color.accentPurpleFallback.opacity(0.1))
-                    .frame(width: 80, height: 80)
-                Image(systemName: "ticket")
-                    .font(.system(size: 32))
-                    .foregroundStyle(Color.accentPurpleFallback)
-            }
-
-            Text("No Tickets Yet")
-                .font(GatherFont.title3)
-                .foregroundStyle(Color.gatherPrimaryText)
-
-            Text("Tickets you purchase will appear here with QR codes for easy check-in.")
-                .font(GatherFont.body)
-                .foregroundStyle(Color.gatherSecondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Spacing.xl)
-        }
+        GatherEmptyState(
+            icon: "ticket",
+            title: "No Tickets Yet",
+            message: "Tickets you grab will land here, QR codes ready for check-in."
+        )
+        .padding(.top, 80)
     }
 }
 
@@ -93,7 +78,7 @@ private struct TicketCard: View {
             HStack(spacing: Spacing.sm) {
                 ZStack {
                     RoundedRectangle(cornerRadius: CornerRadius.sm)
-                        .fill(LinearGradient.categoryGradientVibrant(for: event?.category ?? .custom))
+                        .fill(Color.forCategory(event?.category ?? .custom).opacity(0.12))
                         .frame(width: 44, height: 44)
                     Text(event?.category.emoji ?? "🎫")
                         .font(.title3)
@@ -151,7 +136,7 @@ private struct TicketCard: View {
             }
             .padding(Spacing.md)
         }
-        .glassCard()
+        .surfaceCard()
     }
 
     private var statusBadge: some View {

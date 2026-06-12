@@ -198,7 +198,17 @@ extension Color {
         case .conference: return .sunshineYellow
         case .concert: return .warmCoral
         case .meetup: return .mintGreen
-        case .custom: return .gatherSecondaryText
+        // Brand purple, not gray — as an accent bar gray reads like a glitch.
+        case .custom: return .accentPurpleFallback
+        }
+    }
+
+    /// Foreground that keeps WCAG contrast on a solid `forCategory` fill —
+    /// the conference amber and meetup mint accents are too light for white.
+    static func onCategory(_ category: EventCategory) -> Color {
+        switch category {
+        case .conference, .meetup: return .black.opacity(0.85)
+        default: return .white
         }
     }
 }

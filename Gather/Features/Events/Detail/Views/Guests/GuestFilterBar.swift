@@ -25,7 +25,7 @@ struct GuestFilterBar: View {
                             )
                         }
                     }
-                    .padding(.horizontal)
+                    .horizontalPadding()
                 }
             }
 
@@ -40,7 +40,7 @@ struct GuestFilterBar: View {
                         )
                     }
                 }
-                .padding(.horizontal)
+                .horizontalPadding()
             }
         }
         .padding(.vertical, Spacing.sm)
@@ -99,11 +99,11 @@ struct StatusFilterPill: View {
 
     private var colorForStatus: Color {
         switch status {
-        case .all: return .purple
-        case .pending: return .gray
-        case .sent: return .blue
-        case .confirmed: return .green
-        case .declined: return .red
+        case .all: return .accentPurpleFallback
+        case .pending: return .gatherSecondaryText
+        case .sent: return .neonBlue
+        case .confirmed: return .rsvpYesFallback
+        case .declined: return .rsvpNoFallback
         }
     }
 }

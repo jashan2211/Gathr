@@ -8,6 +8,31 @@ struct GuestRowWithFunctions: View {
     let onToggleSelection: () -> Void
 
     var body: some View {
+        Group {
+            if isSelected {
+                rowContent
+                    .background(
+                        RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                            .fill(Color.accentPurpleFallback.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                            .strokeBorder(Color.accentPurpleFallback, lineWidth: 1.5)
+                    )
+            } else {
+                rowContent
+                    .surfaceCard(cornerRadius: CornerRadius.md)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isSelectionMode {
+                onToggleSelection()
+            }
+        }
+    }
+
+    private var rowContent: some View {
         HStack(spacing: Spacing.md) {
             // Selection checkbox (in selection mode)
             if isSelectionMode {
@@ -86,14 +111,6 @@ struct GuestRowWithFunctions: View {
             }
         }
         .padding()
-        .background(isSelected ? Color.accentPurpleFallback.opacity(0.1) : Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if isSelectionMode {
-                onToggleSelection()
-            }
-        }
     }
 
     private var sortedFunctions: [EventFunction] {
@@ -135,24 +152,24 @@ struct FunctionInvitePill: View {
 
     private func statusColor(for invite: FunctionInvite?) -> Color {
         guard let invite = invite else {
-            return Color.gray.opacity(0.5)
+            return Color.gatherSecondaryText.opacity(0.5)
         }
 
         switch invite.inviteStatus {
         case .notSent:
-            return .gray
+            return .gatherSecondaryText
         case .sent:
-            return .blue
+            return .neonBlue
         case .responded:
             switch invite.response {
             case .yes:
-                return .green
+                return .rsvpYesFallback
             case .no:
-                return .red
+                return .rsvpNoFallback
             case .maybe:
-                return .orange
+                return .rsvpMaybeFallback
             case .none:
-                return .blue
+                return .neonBlue
             }
         }
     }

@@ -148,7 +148,7 @@ struct EditEventView: View {
                         dangerZone
                             .bouncyAppear(delay: 0.23)
                     }
-                    .padding(.horizontal, Spacing.md)
+                    .padding(.horizontal, Layout.horizontalPadding)
                     .padding(.top, Spacing.lg)
                 }
             }
@@ -244,8 +244,7 @@ struct EditEventView: View {
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
     }
 
     // MARK: - Floating Save Button
@@ -277,7 +276,7 @@ struct EditEventView: View {
                     }
                     .foregroundStyle(Color.gatherSecondaryText)
                     .padding(.horizontal, Spacing.lg)
-                    .padding(.vertical, Spacing.sm)
+                    .frame(height: Layout.buttonHeight)
                     .background(Color.gatherSecondaryBackground)
                     .clipShape(Capsule())
                 }
@@ -301,7 +300,7 @@ struct EditEventView: View {
                     }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.sm)
+                    .frame(height: Layout.buttonHeight)
                     .background(
                         isValid
                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
@@ -311,9 +310,9 @@ struct EditEventView: View {
                 }
                 .disabled(!isValid || isSubmitting)
                 .scaleEffect(isValid ? 1.0 : 0.97)
-                .animation(.spring(response: 0.3), value: isValid)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isValid)
             }
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.bottom, Spacing.md)
             .background(Color.gatherBackground)
         }

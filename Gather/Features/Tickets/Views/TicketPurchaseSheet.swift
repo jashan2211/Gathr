@@ -107,8 +107,10 @@ struct TicketPurchaseSheet: View {
                         // Spacer for bottom bar
                         Color.clear.frame(height: 100)
                     }
-                    .padding()
+                    .horizontalPadding()
+                    .padding(.vertical)
                 }
+                .background(Color.gatherBackground)
                 .scrollDismissesKeyboard(.interactively)
 
                 // Sticky bottom checkout bar
@@ -168,7 +170,7 @@ struct TicketPurchaseSheet: View {
                     quantity: selectedTiers[tier.id] ?? 0,
                     isPopular: tier.id == mostPopularTierId && sortedTiers.count > 1,
                     onQuantityChange: { qty in
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                             if qty == 0 {
                                 selectedTiers.removeValue(forKey: tier.id)
                             } else {
@@ -195,14 +197,15 @@ struct TicketPurchaseSheet: View {
                         .fontWeight(.medium)
                     Spacer()
                     Button {
-                        withAnimation { appliedPromo = nil; promoCode = "" }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { appliedPromo = nil; promoCode = "" }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
                 }
                 .padding(Spacing.sm)
-                .glassCard(tint: .mintGreen, cornerRadius: CornerRadius.sm)
+                .background(Color.mintGreen.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
             } else if showPromoField {
                 HStack(spacing: Spacing.sm) {
                     TextField("Enter code", text: $promoCode)
@@ -235,7 +238,7 @@ struct TicketPurchaseSheet: View {
                 }
             } else {
                 Button {
-                    withAnimation { showPromoField = true }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showPromoField = true }
                 } label: {
                     HStack(spacing: Spacing.xs) {
                         Image(systemName: "tag.fill")
@@ -266,7 +269,8 @@ struct TicketPurchaseSheet: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
                 .padding(Spacing.sm)
-                .glassCard(tint: .accentPurpleFallback, cornerRadius: CornerRadius.sm)
+                .background(Color.accentPurpleFallback.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
             }
 
             if groupDiscount > 0 {
@@ -310,7 +314,7 @@ struct TicketPurchaseSheet: View {
                     .textContentType(.name)
                     .submitLabel(.done)
                     .padding(Spacing.sm)
-                    .background(Color.gatherSecondaryBackground)
+                    .background(Color.gatherTertiaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
                 TextField("Email", text: $guestEmail)
@@ -320,12 +324,12 @@ struct TicketPurchaseSheet: View {
                     .autocapitalization(.none)
                     .submitLabel(.done)
                     .padding(Spacing.sm)
-                    .background(Color.gatherSecondaryBackground)
+                    .background(Color.gatherTertiaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
             }
         }
         .padding(Spacing.md)
-        .glassCard()
+        .surfaceCard()
     }
 
     // MARK: - Order Summary Section
@@ -413,7 +417,7 @@ struct TicketPurchaseSheet: View {
             .accessibilityLabel("Total: \(formatPrice(totalPrice))")
         }
         .padding(Spacing.md)
-        .glassCard()
+        .surfaceCard()
     }
 
     // MARK: - Checkout Bar
@@ -430,9 +434,9 @@ struct TicketPurchaseSheet: View {
                     } label: {
                         Text("Confirm - Free")
                             .font(GatherFont.headline)
+                            .fontWeight(.bold)
                             .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Spacing.sm)
+                            .frame(maxWidth: .infinity, minHeight: 52)
                             .background(LinearGradient.gatherAccentGradient)
                             .clipShape(Capsule())
                     }
@@ -456,9 +460,13 @@ struct TicketPurchaseSheet: View {
                     .padding(.vertical, Spacing.sm)
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.vertical, Spacing.sm)
-            .background(.ultraThinMaterial)
+            .background(
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+            )
         }
     }
 
@@ -479,8 +487,13 @@ struct TicketPurchaseSheet: View {
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
-            .padding()
-            .background(.ultraThinMaterial)
+            .padding(.horizontal, Layout.horizontalPadding)
+            .padding(.vertical)
+            .background(
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+            )
         }
     }
 
@@ -494,14 +507,14 @@ struct TicketPurchaseSheet: View {
             VStack(spacing: Spacing.lg) {
                 ProgressView()
                     .scaleEffect(1.5)
-                    .tint(.white)
+                    .tint(Color.accentPurpleFallback)
 
                 Text("Processing payment...")
                     .font(GatherFont.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.gatherPrimaryText)
             }
             .padding(Spacing.xl)
-            .glassCard()
+            .surfaceCard()
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Processing payment, please wait")
             .accessibilityAddTraits(.updatesFrequently)
@@ -527,7 +540,7 @@ struct TicketPurchaseSheet: View {
 
         if let promo = event.promoCodes.first(where: { $0.code == code }) {
             if promo.isValid {
-                withAnimation { appliedPromo = promo }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { appliedPromo = promo }
             } else {
                 promoError = "This promo code has expired or reached its limit"
             }
@@ -627,7 +640,7 @@ struct TierCard: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, Spacing.xs)
                         .padding(.vertical, 2)
-                        .background(Color.sunshineYellow.gradient)
+                        .background(Color.sunshineYellowText)
                         .clipShape(Capsule())
                 }
 
@@ -737,15 +750,17 @@ struct TierCard: View {
             }
         }
         .padding(Spacing.md)
-        .opacity(tier.isSoldOut ? 0.6 : 1.0)
-        .glassCard(
-            tint: quantity > 0 ? .accentPurpleFallback : .clear,
-            cornerRadius: CornerRadius.card
+        // Selected tier: accent wash over the solid card, plus accent border.
+        .background(
+            RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
+                .fill(quantity > 0 ? Color.accentPurpleFallback.opacity(0.08) : Color.clear)
         )
+        .opacity(tier.isSoldOut ? 0.6 : 1.0)
+        .surfaceCard()
         .overlay(
             RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
-                .stroke(
-                    quantity > 0 ? Color.accentPurpleFallback.opacity(0.5) : Color.clear,
+                .strokeBorder(
+                    quantity > 0 ? Color.accentPurpleFallback : Color.clear,
                     lineWidth: 1.5
                 )
         )

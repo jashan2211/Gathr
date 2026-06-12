@@ -38,7 +38,7 @@ struct InviteQuickActionPill: View {
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
         }
         .scaleEffect(isSelected ? 1.03 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isSelected)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
     }
 }
 
@@ -70,8 +70,7 @@ struct CompletionStatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.sm)
-        .background(Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .surfaceCard(cornerRadius: CornerRadius.md)
     }
 }
 
@@ -204,7 +203,7 @@ struct ChannelButton: View {
             .frame(maxWidth: .infinity)
         }
         .scaleEffect(isSelected ? 1.05 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isSelected)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
     }
 }
 

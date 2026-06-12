@@ -18,8 +18,7 @@ struct ExpenseDetailSheet: View {
                 Section {
                     VStack(spacing: Spacing.sm) {
                         Text(expense.amount.asCurrency)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                            .font(GatherFont.largeTitle)
                             .foregroundStyle(Color.gatherPrimaryText)
 
                         HStack(spacing: Spacing.xs) {
@@ -60,6 +59,7 @@ struct ExpenseDetailSheet: View {
                         }
                     }
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 // Payment status
                 Section("Payment") {
@@ -95,6 +95,7 @@ struct ExpenseDetailSheet: View {
                         }
                     }
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 // Function link
                 if !functions.isEmpty {
@@ -107,6 +108,7 @@ struct ExpenseDetailSheet: View {
                                 .foregroundStyle(Color.gatherSecondaryText)
                         }
                     }
+                    .listRowBackground(Color.gatherSecondaryBackground)
                 }
 
                 // Delete
@@ -115,16 +117,38 @@ struct ExpenseDetailSheet: View {
                         showDeleteConfirm = true
                     } label: {
                         Label("Delete Expense", systemImage: "trash")
+                            .foregroundStyle(Color.gatherError)
                     }
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.gatherBackground)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Done")
+                        .font(GatherFont.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(LinearGradient.gatherAccentGradient)
+                        .clipShape(Capsule())
+                }
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.vertical, Spacing.sm)
+                .background(
+                    LinearGradient(
+                        colors: [Color.gatherBackground.opacity(0), Color.gatherBackground],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
             .navigationTitle("Expense")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
             .confirmationDialog("Delete Expense", isPresented: $showDeleteConfirm) {
                 Button("Delete", role: .destructive) {
                     onDelete()

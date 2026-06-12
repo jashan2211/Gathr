@@ -17,10 +17,10 @@ struct FunctionCard: View {
                     Text(dayNumber)
                         .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundStyle(Color.gatherPrimaryText)
+                        .foregroundStyle(Color.accentPurpleFallback)
                 }
                 .frame(width: 48, height: 48)
-                .background(Color.accentPurpleFallback.opacity(0.1))
+                .background(Color.gatherTertiaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -90,8 +90,7 @@ struct FunctionCard: View {
             }
         }
         .padding()
-        .background(Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(function.name), \(formattedTime)\(function.location.map { ", \($0.name)" } ?? "")")
     }

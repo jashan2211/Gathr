@@ -44,7 +44,7 @@ struct RSVPSheet: View {
                         confirmationView
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, Layout.horizontalPadding)
 
                 Spacer()
 
@@ -80,7 +80,7 @@ struct RSVPSheet: View {
     private var statusSelection: some View {
         VStack(spacing: Spacing.lg) {
             Text("Will you be attending?")
-                .font(GatherFont.title2)
+                .gatherTitle2()
                 .padding(.top, Spacing.lg)
 
             VStack(spacing: Spacing.md) {
@@ -88,7 +88,7 @@ struct RSVPSheet: View {
                     status: .attending,
                     isSelected: selectedStatus == .attending
                 ) {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         selectedStatus = .attending
                         hapticFeedback()
                     }
@@ -98,7 +98,7 @@ struct RSVPSheet: View {
                     status: .maybe,
                     isSelected: selectedStatus == .maybe
                 ) {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         selectedStatus = .maybe
                         hapticFeedback()
                     }
@@ -108,7 +108,7 @@ struct RSVPSheet: View {
                     status: .declined,
                     isSelected: selectedStatus == .declined
                 ) {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         selectedStatus = .declined
                         hapticFeedback()
                     }
@@ -122,7 +122,7 @@ struct RSVPSheet: View {
     private var detailsForm: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
             Text("Any additional details?")
-                .font(GatherFont.title2)
+                .gatherTitle2()
                 .padding(.top, Spacing.lg)
 
             // Plus ones
@@ -209,10 +209,9 @@ struct RSVPSheet: View {
                     }
                     .font(GatherFont.headline)
                     .foregroundStyle(calendarMessage != nil ? Color.rsvpYesFallback : Color.accentPurpleFallback)
-                    .padding()
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 52)
                     .background((calendarMessage != nil ? Color.rsvpYesFallback : Color.accentPurpleFallback).opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    .clipShape(Capsule())
                 }
                 .disabled(isAddingToCalendar || calendarMessage != nil)
                 .accessibilityLabel("Add to Calendar")
@@ -228,7 +227,7 @@ struct RSVPSheet: View {
             switch step {
             case .status:
                 Button {
-                    withAnimation {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                         if selectedStatus == .declined {
                             submitRSVP() // Skip details for decline
                         } else {
@@ -238,28 +237,27 @@ struct RSVPSheet: View {
                 } label: {
                     Text(selectedStatus == .declined ? "Submit" : "Continue")
                         .font(GatherFont.headline)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                 }
                 .disabled(isSubmitting)
 
             case .details:
                 HStack(spacing: Spacing.md) {
                     Button {
-                        withAnimation {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             step = .status
                         }
                     } label: {
                         Text("Back")
                             .font(GatherFont.headline)
                             .foregroundStyle(Color.gatherPrimaryText)
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                            .frame(maxWidth: .infinity, minHeight: 52)
                             .background(Color.gatherSecondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                            .clipShape(Capsule())
                     }
 
                     Button {
@@ -268,18 +266,17 @@ struct RSVPSheet: View {
                         if isSubmitting {
                             ProgressView()
                                 .tint(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
+                                .frame(maxWidth: .infinity, minHeight: 52)
                                 .background(LinearGradient.gatherAccentGradient)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .clipShape(Capsule())
                         } else {
                             Text("Submit")
                                 .font(GatherFont.headline)
+                                .fontWeight(.bold)
                                 .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
+                                .frame(maxWidth: .infinity, minHeight: 52)
                                 .background(LinearGradient.gatherAccentGradient)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .clipShape(Capsule())
                         }
                     }
                     .disabled(isSubmitting)
@@ -291,15 +288,16 @@ struct RSVPSheet: View {
                 } label: {
                     Text("Done")
                         .font(GatherFont.headline)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                 }
             }
         }
-        .padding()
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical)
         .background(Color.gatherBackground)
     }
 
@@ -351,7 +349,7 @@ struct RSVPSheet: View {
         Task {
             let result = await CalendarService.shared.addEventToCalendar(event: event)
             isAddingToCalendar = false
-            withAnimation {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                 calendarMessage = result
             }
             if result.contains("added") {
@@ -412,7 +410,7 @@ struct RSVPSheet: View {
             try? await Task.sleep(for: .seconds(0.5))
             HapticService.success()
 
-            withAnimation(.spring(response: 0.4)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                 step = .confirmation
                 isSubmitting = false
             }
@@ -502,12 +500,13 @@ struct RSVPOptionCard: View {
                 }
             }
             .padding()
+            // Semantic selected state: status-colored wash + border on a solid row.
             .background(
-                RoundedRectangle(cornerRadius: CornerRadius.lg)
-                    .fill(Color.gatherSecondaryBackground)
+                RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
+                    .fill(isSelected ? Color.forRSVPStatus(status).opacity(0.1) : Color.gatherSecondaryBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: CornerRadius.lg)
-                            .stroke(isSelected ? Color.forRSVPStatus(status) : .clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
+                            .strokeBorder(isSelected ? Color.forRSVPStatus(status) : .clear, lineWidth: 1.5)
                     )
             )
         }

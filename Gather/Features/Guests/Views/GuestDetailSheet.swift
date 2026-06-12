@@ -57,7 +57,8 @@ struct GuestDetailSheet: View {
 
                     dangerZone
                 }
-                .padding()
+                .padding(.vertical, Spacing.md)
+                .horizontalPadding()
                 .padding(.bottom, 40)
             }
             .background(Color.gatherBackground)
@@ -129,7 +130,7 @@ struct GuestDetailSheet: View {
     // MARK: - Guest Info Section
 
     private var guestInfoSection: some View {
-        FormSection(title: "Guest Info", icon: "person.text.rectangle") {
+        GuestDetailSection(title: "Guest Info", icon: "person.text.rectangle") {
             VStack(spacing: Spacing.md) {
                 formField(label: "Name", text: $name, placeholder: "Full name")
                 formField(label: "Email", text: $email, placeholder: "email@example.com", keyboardType: .emailAddress)
@@ -156,7 +157,7 @@ struct GuestDetailSheet: View {
                                 .foregroundStyle(role == guestRole ? .white : Color.gatherPrimaryText)
                                 .padding(.horizontal, Spacing.sm)
                                 .padding(.vertical, Spacing.xs)
-                                .background(role == guestRole ? Color.accentPurpleFallback : Color.gatherSecondaryBackground)
+                                .background(role == guestRole ? Color.accentPurpleFallback : Color.gatherTertiaryBackground)
                                 .clipShape(Capsule())
                             }
                         }
@@ -169,7 +170,7 @@ struct GuestDetailSheet: View {
     // MARK: - RSVP Status Section
 
     private var rsvpStatusSection: some View {
-        FormSection(title: "RSVP Status", icon: "envelope.open") {
+        GuestDetailSection(title: "RSVP Status", icon: "envelope.open") {
             HStack(spacing: Spacing.sm) {
                 ForEach([RSVPStatus.attending, .maybe, .declined, .pending], id: \.self) { rsvpStatus in
                     Button {
@@ -196,7 +197,7 @@ struct GuestDetailSheet: View {
     // MARK: - Party Members Section
 
     private var partyMembersSection: some View {
-        FormSection(title: "Party Members", icon: "person.3") {
+        GuestDetailSection(title: "Party Members", icon: "person.3") {
             VStack(spacing: Spacing.sm) {
                 if guest.partyMembers.isEmpty && newMemberName.isEmpty {
                     Text("No party members yet")
@@ -216,7 +217,7 @@ struct GuestDetailSheet: View {
                         TextField("Name", text: $newMemberName)
                             .font(GatherFont.body)
                             .padding(Spacing.sm)
-                            .background(Color.gatherBackground)
+                            .background(Color.gatherTertiaryBackground)
                             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
                         Picker("", selection: $newMemberRelationship) {
@@ -294,14 +295,14 @@ struct GuestDetailSheet: View {
             .accessibilityLabel("Remove party member")
         }
         .padding(Spacing.sm)
-        .background(Color.gatherBackground)
+        .background(Color.gatherTertiaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
     }
 
     // MARK: - Dietary & Preferences Section
 
     private var dietarySection: some View {
-        FormSection(title: "Dietary & Notes", icon: "fork.knife") {
+        GuestDetailSection(title: "Dietary & Notes", icon: "fork.knife") {
             VStack(spacing: Spacing.md) {
                 formField(label: "Meal Choice", text: $mealChoice, placeholder: "e.g. Vegetarian, Chicken...")
                 formField(label: "Dietary Restrictions", text: $dietaryRestrictions, placeholder: "e.g. Gluten-free, Nut allergy...")
@@ -315,7 +316,7 @@ struct GuestDetailSheet: View {
                         .font(GatherFont.body)
                         .lineLimit(3...6)
                         .padding(Spacing.sm)
-                        .background(Color.gatherBackground)
+                        .background(Color.gatherTertiaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                 }
             }
@@ -325,7 +326,7 @@ struct GuestDetailSheet: View {
     // MARK: - Function Invites Section
 
     private var functionInvitesSection: some View {
-        FormSection(title: "Function Invites", icon: "list.clipboard") {
+        GuestDetailSection(title: "Function Invites", icon: "list.clipboard") {
             VStack(spacing: Spacing.sm) {
                 ForEach(event.functions.sorted { $0.date < $1.date }) { function in
                     functionInviteRow(function)
@@ -380,7 +381,7 @@ struct GuestDetailSheet: View {
             }
         }
         .padding(Spacing.sm)
-        .background(Color.gatherBackground)
+        .background(Color.gatherTertiaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
     }
 
@@ -397,11 +398,11 @@ struct GuestDetailSheet: View {
                 }
                 .font(GatherFont.callout)
                 .fontWeight(.medium)
-                .foregroundStyle(Color.rsvpNoFallback)
+                .foregroundStyle(Color.gatherError)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Spacing.md)
-                .background(Color.rsvpNoFallback.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .background(Color.gatherError.opacity(0.1))
+                .clipShape(Capsule())
             }
         }
     }
@@ -419,7 +420,7 @@ struct GuestDetailSheet: View {
                 .keyboardType(keyboardType)
                 .textContentType(contentType(for: label))
                 .padding(Spacing.sm)
-                .background(Color.gatherBackground)
+                .background(Color.gatherTertiaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
         }
     }
@@ -515,5 +516,32 @@ struct GuestDetailSheet: View {
         let colors: [Color] = [.accentPurpleFallback, .neonBlue, .rsvpYesFallback, .rsvpMaybeFallback, .accentPinkFallback, .mintGreen]
         let index = name.stableHash % colors.count
         return colors[index]
+    }
+}
+
+// MARK: - Form Section (solid surface)
+
+private struct GuestDetailSection<Content: View>: View {
+    let title: String
+    let icon: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.headline)
+                    .foregroundStyle(Color.accentPurpleFallback)
+
+                Text(title)
+                    .font(GatherFont.headline)
+                    .foregroundStyle(Color.gatherPrimaryText)
+            }
+
+            content
+        }
+        .padding(Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surfaceCard()
     }
 }

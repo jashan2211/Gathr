@@ -76,7 +76,8 @@ struct SendInvitesSheet: View {
                         // Spacer for floating button
                         Color.clear.frame(height: 80)
                     }
-                    .padding()
+                    .horizontalPadding()
+                    .padding(.vertical, Spacing.md)
                 }
 
                 // Floating send bar
@@ -189,8 +190,7 @@ struct SendInvitesSheet: View {
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .surfaceCard(cornerRadius: CornerRadius.md)
     }
 
     // MARK: - Function Selection
@@ -210,7 +210,7 @@ struct SendInvitesSheet: View {
                 Spacer()
 
                 Button {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         if selectedFunctions.count == event.functions.count {
                             selectedFunctions.removeAll()
                         } else {
@@ -240,8 +240,7 @@ struct SendInvitesSheet: View {
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .surfaceCard(cornerRadius: CornerRadius.md)
     }
 
     // MARK: - Channel Selection
@@ -265,7 +264,7 @@ struct SendInvitesSheet: View {
                         availableCount: guestsForChannel(channel).count,
                         totalCount: selectedGuestIds.count,
                         onTap: {
-                            withAnimation(.spring(response: 0.25)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 selectedChannel = channel
                             }
                             HapticService.buttonTap()
@@ -290,8 +289,7 @@ struct SendInvitesSheet: View {
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .surfaceCard(cornerRadius: CornerRadius.md)
     }
 
     // MARK: - Floating Send Bar
@@ -341,14 +339,15 @@ struct SendInvitesSheet: View {
                 }
                 .disabled(!canSend)
                 .scaleEffect(canSend ? 1.0 : 0.95)
-                .animation(.spring(response: 0.3), value: canSend)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: canSend)
             }
-            .padding(.horizontal, Spacing.md)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.vertical, Spacing.sm)
+            // Floating bar over scrolling content — glass stays per design whitelist.
             .background(
                 Rectangle()
                     .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.06), radius: 8, y: -4)
+                    .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
             )
         }
     }
@@ -366,13 +365,13 @@ struct SendInvitesSheet: View {
                 Text("Guest \(min(currentSendIndex + 1, totalToSend)) of \(totalToSend)")
                     .font(GatherFont.caption)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.gatherSecondaryText)
 
                 ProgressView(
                     value: Double(currentSendIndex),
                     total: Double(max(totalToSend, 1))
                 )
-                .tint(.white)
+                .tint(Color.accentPurpleFallback)
                 .frame(width: 200)
 
                 if let guest = currentSendGuest {
@@ -380,11 +379,11 @@ struct SendInvitesSheet: View {
                         Text(guest.name)
                             .font(GatherFont.title3)
                             .fontWeight(.bold)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.gatherPrimaryText)
                         if let contact = guest.displayContact {
                             Text(contact)
                                 .font(GatherFont.caption)
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(Color.gatherSecondaryText)
                         }
                     }
 
@@ -408,18 +407,17 @@ struct SendInvitesSheet: View {
                         skipCurrentGuest()
                     }
                     .font(GatherFont.caption)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Color.gatherSecondaryText)
                 }
 
                 Text("Opens \(selectedChannel.shortName) for one guest. Send the message, then come back here for the next.")
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(Color.gatherSecondaryText.opacity(0.8))
                     .multilineTextAlignment(.center)
             }
             .padding(Spacing.xl)
             .frame(maxWidth: 320)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .surfaceCard(cornerRadius: CornerRadius.lg)
             .padding(Spacing.xl)
         }
     }
@@ -428,35 +426,8 @@ struct SendInvitesSheet: View {
 
     private var completionView: some View {
         ZStack {
-            // Gradient background
-            LinearGradient(
-                colors: [
-                    Color.accentPurpleFallback.opacity(0.08),
-                    Color.accentPinkFallback.opacity(0.05),
-                    Color.gatherBackground
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            // Floating decorative circles
-            GeometryReader { geo in
-                Circle()
-                    .fill(Color.rsvpYesFallback.opacity(0.08))
-                    .frame(width: 200, height: 200)
-                    .offset(x: geo.size.width * 0.6, y: geo.size.height * 0.1)
-
-                Circle()
-                    .fill(Color.accentPurpleFallback.opacity(0.06))
-                    .frame(width: 150, height: 150)
-                    .offset(x: -60, y: geo.size.height * 0.55)
-
-                Circle()
-                    .fill(Color.accentPinkFallback.opacity(0.07))
-                    .frame(width: 100, height: 100)
-                    .offset(x: geo.size.width * 0.7, y: geo.size.height * 0.65)
-            }
+            Color.gatherBackground
+                .ignoresSafeArea()
 
             VStack(spacing: Spacing.xl) {
                 Spacer()
@@ -481,7 +452,7 @@ struct SendInvitesSheet: View {
 
                 VStack(spacing: Spacing.sm) {
                     Text("Invites Prepared!")
-                        .font(GatherFont.title)
+                        .gatherTitle()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .bouncyAppear(delay: 0.15)
 
@@ -522,7 +493,7 @@ struct SendInvitesSheet: View {
                     )
                     .bouncyAppear(delay: 0.35)
                 }
-                .padding(.horizontal)
+                .horizontalPadding()
 
                 Spacer()
 
@@ -539,12 +510,11 @@ struct SendInvitesSheet: View {
                             .fontWeight(.bold)
                     }
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.sm)
+                    .frame(maxWidth: .infinity, minHeight: 52)
                     .background(LinearGradient.gatherAccentGradient)
                     .clipShape(Capsule())
                 }
-                .padding(.horizontal, Spacing.md)
+                .horizontalPadding()
                 .padding(.bottom, Spacing.lg)
                 .bouncyAppear(delay: 0.4)
             }
@@ -586,7 +556,7 @@ struct SendInvitesSheet: View {
     }
 
     private func toggleGuest(_ id: UUID) {
-        withAnimation(.spring(response: 0.25)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
             if selectedGuestIds.contains(id) {
                 selectedGuestIds.remove(id)
             } else {
@@ -596,7 +566,7 @@ struct SendInvitesSheet: View {
     }
 
     private func toggleFunction(_ id: UUID) {
-        withAnimation(.spring(response: 0.25)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
             if selectedFunctions.contains(id) {
                 selectedFunctions.remove(id)
             } else {
@@ -653,7 +623,7 @@ struct SendInvitesSheet: View {
             }
             modelContext.safeSave()
             HapticService.success()
-            withAnimation(.spring(response: 0.4)) { showComplete = true }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showComplete = true }
             return
         }
 
@@ -702,7 +672,7 @@ struct SendInvitesSheet: View {
         modelContext.safeSave()
         isSending = false
         HapticService.success()
-        withAnimation(.spring(response: 0.4)) { showComplete = true }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showComplete = true }
     }
 
     private func markGuestSent(_ guest: Guest, functions: [EventFunction]) {

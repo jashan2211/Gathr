@@ -118,27 +118,19 @@ struct EventHeroImagePicker: View {
 
 // MARK: - Category Gradient Placeholder
 
-/// Vibrant category-tinted placeholder shown when no hero image is selected
+/// Category mesh placeholder shown when no hero image is selected
 struct EventFormCategoryGradientPlaceholder: View {
     let category: EventCategory
 
     var body: some View {
         ZStack {
-            LinearGradient.categoryGradientVibrant(for: category)
-                .opacity(0.8)
+            CategoryMeshBackground(category: category)
 
             // Floating emoji watermark
             Text(category.emoji)
                 .font(.system(size: 80))
                 .opacity(0.15)
                 .rotationEffect(.degrees(-15))
-
-            // Subtle pattern overlay
-            LinearGradient(
-                colors: [.white.opacity(0.1), .clear, .white.opacity(0.05)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
         }
         .frame(height: Layout.heroHeight)
     }
@@ -165,7 +157,7 @@ struct EventCategorySelector: View {
                             category: category,
                             isSelected: selectedCategory == category
                         ) {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 selectedCategory = category
                                 enabledFeatures = category.defaultFeatures
                             }
@@ -202,7 +194,7 @@ struct EventBasicsSection: View {
                     .fontWeight(.semibold)
                     .lineLimit(1...2)
                     .padding(Spacing.md)
-                    .background(Color.gatherSecondaryBackground)
+                    .background(Color.gatherTertiaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     .overlay(
                         RoundedRectangle(cornerRadius: CornerRadius.md)
@@ -243,13 +235,12 @@ struct EventBasicsSection: View {
                     .font(GatherFont.body)
                     .lineLimit(3...6)
                     .padding(Spacing.md)
-                    .background(Color.gatherSecondaryBackground)
+                    .background(Color.gatherTertiaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
     }
 }
 
@@ -273,7 +264,7 @@ struct EventFeaturesSection: View {
                         feature: feature,
                         isEnabled: enabledFeatures.contains(feature)
                     ) {
-                        withAnimation(.spring(response: 0.25)) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                             if enabledFeatures.contains(feature) {
                                 enabledFeatures.remove(feature)
                             } else {
@@ -286,8 +277,7 @@ struct EventFeaturesSection: View {
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
     }
 }
 
@@ -367,7 +357,7 @@ struct EventDateTimeSection: View {
                     }
                 }
                 .padding(Spacing.sm)
-                .background(Color.gatherSecondaryBackground)
+                .background(Color.gatherTertiaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
 
                 // End time toggle + picker
@@ -400,13 +390,12 @@ struct EventDateTimeSection: View {
                         .scaleEffect(0.85)
                 }
                 .padding(Spacing.sm)
-                .background(Color.gatherSecondaryBackground)
+                .background(Color.gatherTertiaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
     }
 }
 
@@ -474,11 +463,10 @@ struct EventLocationSection: View {
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
         .sheet(isPresented: $showLocationPicker) {
             LocationPickerView { name, address, city, state, country, lat, lon in
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                     locationName = name
                     locationAddress = address ?? ""
                     locationCity = city ?? ""
@@ -518,7 +506,7 @@ struct EventLocationSection: View {
             .transition(.opacity.combined(with: .move(edge: .top)))
         } else if !hasLocation {
             Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showManualEntry = true }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showManualEntry = true }
             } label: {
                 Text("Enter address manually")
                     .font(GatherFont.footnote)
@@ -583,7 +571,7 @@ struct EventLocationSection: View {
                     Label("Search again", systemImage: "magnifyingglass")
                 }
                 Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showManualEntry.toggle() }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showManualEntry.toggle() }
                 } label: {
                     Label(showManualEntry ? "Hide details" : "Edit details", systemImage: "pencil")
                 }
@@ -608,7 +596,7 @@ struct EventLocationSection: View {
     }
 
     private func clearLocation() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             locationName = ""
             locationAddress = ""
             locationCity = ""
@@ -654,13 +642,13 @@ struct EventSettingsSection: View {
                         option: .unlisted,
                         icon: "link",
                         isSelected: privacy == .unlisted
-                    ) { withAnimation(.spring(response: 0.3)) { privacy = .unlisted } }
+                    ) { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { privacy = .unlisted } }
 
                     EventFormPrivacyCard(
                         option: .inviteOnly,
                         icon: "lock.fill",
                         isSelected: privacy == .inviteOnly
-                    ) { withAnimation(.spring(response: 0.3)) { privacy = .inviteOnly } }
+                    ) { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { privacy = .inviteOnly } }
                 }
             }
 
@@ -675,7 +663,7 @@ struct EventSettingsSection: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.xs) {
                     ForEach(GuestListVisibility.allCases, id: \.self) { option in
                         Button {
-                            withAnimation(.spring(response: 0.3)) { guestListVisibility = option }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { guestListVisibility = option }
                         } label: {
                             Text(option.displayName)
                                 .font(.caption)
@@ -688,7 +676,7 @@ struct EventSettingsSection: View {
                                 .background(
                                     guestListVisibility == option
                                         ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                                        : AnyShapeStyle(Color.gatherSecondaryBackground)
+                                        : AnyShapeStyle(Color.gatherTertiaryBackground)
                                 )
                                 .clipShape(Capsule())
                         }
@@ -713,7 +701,7 @@ struct EventSettingsSection: View {
                     .tint(Color.accentPurpleFallback)
             }
             .padding(Spacing.sm)
-            .background(Color.gatherSecondaryBackground)
+            .background(Color.gatherTertiaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
 
             if hasCapacity {
@@ -741,6 +729,10 @@ struct EventSettingsSection: View {
                             .padding(.vertical, Spacing.xs)
                             .background(Color.gatherSecondaryBackground)
                             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: CornerRadius.sm)
+                                    .strokeBorder(Color.gatherSeparator.opacity(0.5), lineWidth: 1)
+                            )
 
                         Button {
                             capacity = (capacity ?? 50) + 10
@@ -752,13 +744,12 @@ struct EventSettingsSection: View {
                     }
                 }
                 .padding(Spacing.sm)
-                .background(Color.gatherSecondaryBackground)
+                .background(Color.gatherTertiaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             }
         }
         .padding(Spacing.md)
-        .background(Color.gatherSecondaryBackground.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
     }
 }
 
@@ -771,6 +762,11 @@ struct EventFormCategoryChip: View {
     let isSelected: Bool
     let action: () -> Void
 
+    // Conference/meetup accents are light fills; white text fails contrast on them
+    private var usesDarkText: Bool {
+        category == .conference || category == .meetup
+    }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -780,12 +776,16 @@ struct EventFormCategoryChip: View {
                     .font(.caption)
                     .fontWeight(.bold)
             }
-            .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
+            .foregroundStyle(
+                isSelected
+                    ? (usesDarkText ? Color.black.opacity(0.85) : Color.white)
+                    : Color.gatherPrimaryText
+            )
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, Spacing.xs)
             .background(
                 isSelected
-                    ? AnyShapeStyle(LinearGradient.categoryGradientVibrant(for: category))
+                    ? AnyShapeStyle(Color.forCategory(category))
                     : AnyShapeStyle(Color.gatherSecondaryBackground)
             )
             .clipShape(Capsule())
@@ -830,7 +830,7 @@ struct EventFeatureCard: View {
                     .background(
                         active
                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                            : AnyShapeStyle(Color.gatherTertiaryBackground)
+                            : AnyShapeStyle(Color.gatherSecondaryBackground)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
 
@@ -868,7 +868,7 @@ struct EventFeatureCard: View {
             .padding(Spacing.sm)
             .background(
                 RoundedRectangle(cornerRadius: CornerRadius.md)
-                    .fill(active ? Color.accentPurpleFallback.opacity(0.07) : Color.gatherSecondaryBackground)
+                    .fill(active ? Color.accentPurpleFallback.opacity(0.07) : Color.gatherTertiaryBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.md)
@@ -882,7 +882,7 @@ struct EventFeatureCard: View {
         .buttonStyle(.plain)
         .disabled(!available)
         .scaleEffect(active ? 1.01 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: active)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: active)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(feature.displayName). \(feature.description)\(available ? "" : ". Coming soon")")
         .accessibilityValue(available ? (isEnabled ? "On" : "Off") : "")
@@ -916,7 +916,7 @@ struct EventFormStyledTextField: View {
                 .textInputAutocapitalization(autocapitalization)
         }
         .padding(Spacing.sm)
-        .background(Color.gatherSecondaryBackground)
+        .background(Color.gatherTertiaryBackground)
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
     }
 }
@@ -975,7 +975,7 @@ struct EventFormLocationTypeButton: View {
             .background(
                 isSelected
                     ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                    : AnyShapeStyle(Color.gatherSecondaryBackground)
+                    : AnyShapeStyle(Color.gatherTertiaryBackground)
             )
             .clipShape(Capsule())
         }
@@ -1004,7 +1004,7 @@ struct EventFormPrivacyCard: View {
                     .background(
                         isSelected
                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                            : AnyShapeStyle(Color.gatherTertiaryBackground)
+                            : AnyShapeStyle(Color.gatherSecondaryBackground)
                     )
                     .clipShape(Circle())
 
@@ -1020,7 +1020,7 @@ struct EventFormPrivacyCard: View {
             .background(
                 isSelected
                     ? Color.accentPurpleFallback.opacity(0.08)
-                    : Color.gatherSecondaryBackground
+                    : Color.gatherTertiaryBackground
             )
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             .overlay(

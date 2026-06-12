@@ -73,7 +73,8 @@ struct BudgetTab: View {
                     emptyState
                 }
             }
-            .padding()
+            .padding(.vertical)
+            .horizontalPadding()
             .padding(.bottom, Layout.scrollBottomInsetCompact)
         }
         .sheet(isPresented: $showAddCategory) {
@@ -134,35 +135,14 @@ struct BudgetTab: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
-            Image(systemName: "chart.bar.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(LinearGradient.gatherAccentGradient)
-
-            VStack(spacing: Spacing.sm) {
-                Text("No Budget Set")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
-
-                Text("Track expenses, manage payments, and split costs with co-hosts")
-                    .font(GatherFont.callout)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .multilineTextAlignment(.center)
-            }
-
-            Button {
-                createBudget()
-            } label: {
-                Label("Create Budget", systemImage: "plus.circle.fill")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.xl)
-                    .padding(.vertical, Spacing.sm)
-                    .background(LinearGradient.gatherAccentGradient)
-                    .clipShape(Capsule())
-            }
-        }
-        .padding(.vertical, Spacing.xxxl)
+        GatherEmptyState(
+            icon: "dollarsign.circle",
+            title: "No budget yet",
+            message: "Track expenses, manage payments, and split costs with co-hosts.",
+            actionTitle: "Set a Budget",
+            action: createBudget
+        )
+        .padding(.vertical, Spacing.xxl)
         .bouncyAppear()
     }
 
@@ -191,7 +171,7 @@ struct BudgetTab: View {
                 Spacer()
             }
             .padding(Spacing.sm)
-            .background(Color.red.gradient)
+            .background(Color.gatherError.gradient)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             // A11Y-019: Alert banner accessibility
             .accessibilityElement(children: .ignore)
@@ -300,7 +280,7 @@ struct BudgetTab: View {
             }
         }
         .padding()
-        .glassCard()
+        .surfaceCard()
         // A11Y-009: Financial data grouping for budget summary
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Budget overview. Total budget \(budget.totalBudget.asCurrency). Spent \(spentAmount.asCurrency). \(percentUsed) percent used. \(remainingAmount.asCurrency) remaining.")
@@ -376,7 +356,7 @@ struct BudgetTab: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.sm)
         .padding(.horizontal, Spacing.xs)
-        .glassCard()
+        .surfaceCard()
         // A11Y-009: Financial data grouping for payment stat cards
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label). \(amount.asCurrency)")
@@ -450,7 +430,7 @@ struct BudgetTab: View {
                         }
                     }
                     .padding(Spacing.sm)
-                    .glassCard()
+                    .surfaceCard()
                 }
             }
             .bouncyAppear(delay: 0.08)
@@ -470,12 +450,12 @@ struct BudgetTab: View {
                         Text("Add Expense")
                     }
                     .font(GatherFont.callout)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.sm)
                     .background(LinearGradient.gatherAccentGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    .clipShape(Capsule())
                 }
                 // A11Y-023: Add Expense button touch target
                 .frame(minHeight: 44)
@@ -492,8 +472,8 @@ struct BudgetTab: View {
                     .foregroundStyle(Color.accentPurpleFallback)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.sm)
-                    .background(Color.accentPurpleFallback.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    .background(Color.gatherSecondaryBackground)
+                    .clipShape(Capsule())
                 }
             }
 
@@ -568,7 +548,7 @@ struct BudgetTab: View {
                 }
             }
             .padding()
-            .glassCard()
+            .surfaceCard()
             .bouncyAppear(delay: 0.05)
         }
     }
@@ -587,7 +567,8 @@ struct BudgetTab: View {
                         .foregroundStyle(isOverdue ? Color.rsvpNoFallback : Color.gatherSecondaryText)
                     Text(dueDate.formatted(.dateTime.day()))
                         // A11Y-005: Dynamic Type-compatible font
-                        .font(.system(.title3, design: .rounded, weight: .bold))
+                        .font(GatherFont.title3)
+                        .fontWeight(.bold)
                         .foregroundStyle(isOverdue ? Color.rsvpNoFallback : Color.gatherPrimaryText)
                 }
             }
@@ -675,11 +656,14 @@ struct BudgetTab: View {
             let categories = filteredCategories(budget).sorted { $0.sortOrder < $1.sortOrder }
 
             if categories.isEmpty {
-                Text("No categories yet. Tap \"Add Category\" above.")
-                    .font(GatherFont.callout)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, Spacing.md)
+                GatherEmptyState(
+                    icon: "folder.badge.plus",
+                    title: "No categories yet",
+                    message: "Break your budget into categories like venue, food, and decor to track spending.",
+                    actionTitle: "Add Category"
+                ) {
+                    showAddCategory = true
+                }
             } else {
                 ForEach(categories) { category in
                     categoryCard(category, budget: budget)
@@ -695,7 +679,7 @@ struct BudgetTab: View {
         return VStack(spacing: Spacing.sm) {
             // Main row - tap to expand
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                     expandedCategoryId = isExpanded ? nil : category.id
                 }
             } label: {
@@ -823,7 +807,7 @@ struct BudgetTab: View {
             }
         }
         .padding(Spacing.sm)
-        .glassCard()
+        .surfaceCard()
     }
 
     private func expenseRow(_ expense: Expense) -> some View {
@@ -951,7 +935,7 @@ struct BudgetTab: View {
                         }
                     }
                     .padding(Spacing.sm)
-                    .glassCard()
+                    .surfaceCard()
                 }
             }
             .bouncyAppear(delay: 0.2)
@@ -1034,7 +1018,7 @@ struct BudgetTab: View {
                         }
                     }
                     .padding(Spacing.sm)
-                    .glassCard()
+                    .surfaceCard()
                 }
             }
         }
@@ -1105,7 +1089,7 @@ struct BudgetTab: View {
                 }
             }
             .padding()
-            .glassCard()
+            .surfaceCard()
             .bouncyAppear(delay: 0.3)
         }
     }

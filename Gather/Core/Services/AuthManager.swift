@@ -439,6 +439,9 @@ class AuthManager: ObservableObject {
             return "Too many attempts. Please wait a moment and try again."
         case .requiresRecentLogin:
             return "Please sign out and back in, then try again."
+        case .adminRestrictedOperation, .operationNotAllowed:
+            // Provider disabled in the Firebase console (e.g. Anonymous off).
+            return "This sign-in method isn't available right now. Please use another option."
         default:
             return nsError.localizedDescription
         }

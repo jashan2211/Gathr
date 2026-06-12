@@ -68,7 +68,8 @@ struct AuthView: View {
                     }
 
                     Text("Gather")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .font(.system(size: 48, weight: .heavy))
+                        .kerning(-1)
                         .foregroundStyle(Color.gatherPrimaryText)
                         .scaleEffect(logoVisible ? 1 : 0.8)
                         .opacity(logoVisible ? 1 : 0)
@@ -206,24 +207,23 @@ struct AuthView: View {
                     VStack(spacing: Spacing.md) {
                         ProgressView()
                             .scaleEffect(1.5)
-                            .tint(.white)
+                            .tint(Color.accentPurpleFallback)
 
                         Text("Signing in...")
                             .font(GatherFont.callout)
                             .fontWeight(.medium)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.gatherPrimaryText)
                     }
                     .padding(Spacing.xl)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+                    .surfaceCard(cornerRadius: CornerRadius.lg)
                 }
             }
         }
         .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75).delay(0.1)) {
                 logoVisible = true
             }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.4)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75).delay(0.4)) {
                 buttonsVisible = true
             }
         }
@@ -357,7 +357,7 @@ struct EmailAuthSheet: View {
                     }
 
                     if let error = authManager.authError?.errorDescription {
-                        banner(error, icon: "exclamationmark.triangle.fill", color: Color.rsvpNoFallback)
+                        banner(error, icon: "exclamationmark.triangle.fill", color: Color.gatherError)
                     }
 
                     primaryButton
@@ -366,7 +366,8 @@ struct EmailAuthSheet: View {
 
                     Spacer(minLength: Spacing.lg)
                 }
-                .padding(Spacing.md)
+                .horizontalPadding()
+                .padding(.vertical, Spacing.md)
             }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("")
@@ -538,7 +539,7 @@ struct EmailAuthSheet: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .frame(height: 52)
             .background(
                 canSubmit
                     ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
@@ -555,7 +556,7 @@ struct EmailAuthSheet: View {
             switch mode {
             case .signIn:
                 Button("Forgot password?") {
-                    withAnimation(.spring(response: 0.3)) { mode = .forgotPassword }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { mode = .forgotPassword }
                 }
                 .font(GatherFont.caption)
                 .foregroundStyle(Color.accentPurpleFallback)
@@ -565,7 +566,7 @@ struct EmailAuthSheet: View {
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
                     Button("Create an account") {
-                        withAnimation(.spring(response: 0.3)) { mode = .createAccount }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { mode = .createAccount }
                     }
                     .font(GatherFont.caption.weight(.bold))
                     .foregroundStyle(Color.accentPurpleFallback)
@@ -577,7 +578,7 @@ struct EmailAuthSheet: View {
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
                     Button("Sign in") {
-                        withAnimation(.spring(response: 0.3)) { mode = .signIn }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { mode = .signIn }
                     }
                     .font(GatherFont.caption.weight(.bold))
                     .foregroundStyle(Color.accentPurpleFallback)
@@ -585,7 +586,7 @@ struct EmailAuthSheet: View {
 
             case .forgotPassword:
                 Button("Back to sign in") {
-                    withAnimation(.spring(response: 0.3)) { mode = .signIn }
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { mode = .signIn }
                 }
                 .font(GatherFont.caption)
                 .foregroundStyle(Color.accentPurpleFallback)

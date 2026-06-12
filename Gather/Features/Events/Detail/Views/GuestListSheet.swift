@@ -20,11 +20,14 @@ struct GuestListSheet: View {
                     List {
                         ForEach(filteredGuests) { guest in
                             GuestRow(guest: guest)
+                                .listRowBackground(Color.gatherBackground)
                         }
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
+            .background(Color.gatherBackground)
             .navigationTitle("Guests (\(event.guests.count))")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search guests")
@@ -94,21 +97,13 @@ struct GuestListSheet: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.md) {
-            Image(systemName: "person.2.slash")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.gatherSecondaryText)
-
-            Text("No guests found")
-                .font(GatherFont.headline)
-
-            Text(emptyMessage)
-                .font(GatherFont.callout)
-                .foregroundStyle(Color.gatherSecondaryText)
-                .multilineTextAlignment(.center)
-        }
+        GatherEmptyState(
+            icon: "person.2",
+            title: "No Guests Found",
+            message: emptyMessage
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .horizontalPadding()
     }
 
     private var emptyMessage: String {
@@ -157,27 +152,24 @@ struct FilterChip: View {
             HStack(spacing: Spacing.xs) {
                 Text(label)
                     .font(GatherFont.callout)
+                    .fontWeight(isSelected ? .semibold : .regular)
 
                 Text("\(count)")
                     .font(GatherFont.caption)
                     .padding(.horizontal, Spacing.xs)
                     .padding(.vertical, 2)
                     .background(
-                        isSelected ? color.opacity(0.2) : Color.gatherTertiaryBackground
+                        isSelected ? .white.opacity(0.25) : Color.gatherTertiaryBackground
                     )
                     .clipShape(Capsule())
             }
-            .foregroundStyle(isSelected ? color : Color.gatherSecondaryText)
+            .foregroundStyle(isSelected ? .white : Color.gatherSecondaryText)
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, Spacing.sm)
             .background(
-                isSelected ? color.opacity(0.1) : Color.gatherSecondaryBackground
+                isSelected ? color : Color.gatherSecondaryBackground
             )
             .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(isSelected ? color : .clear, lineWidth: 1)
-            )
         }
     }
 }

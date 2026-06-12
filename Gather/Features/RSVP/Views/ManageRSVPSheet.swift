@@ -62,8 +62,10 @@ struct ManageRSVPSheet: View {
                     // Actions
                     actionButtons
                 }
-                .padding()
+                .horizontalPadding()
+                .padding(.vertical)
             }
+            .background(Color.gatherBackground)
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Your RSVP")
             .navigationBarTitleDisplayMode(.inline)
@@ -152,8 +154,7 @@ struct ManageRSVPSheet: View {
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .background(Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("RSVP status: \(statusTitle). \(statusSubtitle)")
     }
@@ -207,8 +208,7 @@ struct ManageRSVPSheet: View {
             }
         }
         .padding()
-        .background(Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Ticket \(ticket.ticketNumber), \(ticket.quantity) ticket\(ticket.quantity > 1 ? "s" : ""), \(ticket.totalPrice > 0 ? formatPrice(ticket.totalPrice) : "Free")")
     }
@@ -227,7 +227,7 @@ struct ManageRSVPSheet: View {
                         status: status,
                         isSelected: selectedStatus == status
                     ) {
-                        withAnimation {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                             selectedStatus = status
                         }
                     }
@@ -273,8 +273,7 @@ struct ManageRSVPSheet: View {
             .padding(.top, Spacing.sm)
         }
         .padding()
-        .background(Color.gatherSecondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard(cornerRadius: CornerRadius.lg)
     }
 
     // MARK: - Action Buttons
@@ -285,7 +284,7 @@ struct ManageRSVPSheet: View {
                 // Save / Cancel edit buttons
                 HStack(spacing: Spacing.md) {
                     Button {
-                        withAnimation {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             isEditing = false
                             // Reset to original values
                             selectedStatus = guest.status
@@ -296,10 +295,9 @@ struct ManageRSVPSheet: View {
                         Text("Cancel")
                             .font(GatherFont.headline)
                             .foregroundStyle(Color.gatherPrimaryText)
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                            .frame(maxWidth: .infinity, minHeight: 52)
                             .background(Color.gatherSecondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                            .clipShape(Capsule())
                     }
 
                     Button {
@@ -308,18 +306,17 @@ struct ManageRSVPSheet: View {
                         if isSubmitting {
                             ProgressView()
                                 .tint(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
+                                .frame(maxWidth: .infinity, minHeight: 52)
                                 .background(LinearGradient.gatherAccentGradient)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .clipShape(Capsule())
                         } else {
                             Text("Save Changes")
                                 .font(GatherFont.headline)
+                                .fontWeight(.bold)
                                 .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
+                                .frame(maxWidth: .infinity, minHeight: 52)
                                 .background(LinearGradient.gatherAccentGradient)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .clipShape(Capsule())
                         }
                     }
                     .disabled(isSubmitting || !hasChanges)
@@ -328,7 +325,7 @@ struct ManageRSVPSheet: View {
                 // View mode buttons
                 if canModify {
                     Button {
-                        withAnimation {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             isEditing = true
                         }
                     } label: {
@@ -337,11 +334,11 @@ struct ManageRSVPSheet: View {
                             Text("Modify Response")
                         }
                         .font(GatherFont.headline)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                     }
                     .accessibilityLabel("Modify Response")
                     .accessibilityHint("Opens editor to change your RSVP status")
@@ -352,11 +349,10 @@ struct ManageRSVPSheet: View {
                         } label: {
                             Text("Cancel RSVP")
                                 .font(GatherFont.headline)
-                                .foregroundStyle(Color.rsvpNoFallback)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.rsvpNoFallback.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .foregroundStyle(Color.gatherError)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                                .background(Color.gatherError.opacity(0.1))
+                                .clipShape(Capsule())
                         }
                         .accessibilityLabel("Cancel RSVP")
                         .accessibilityHint("Cancels your attendance for this event")
@@ -372,10 +368,9 @@ struct ManageRSVPSheet: View {
                         }
                         .font(GatherFont.headline)
                         .foregroundStyle(Color.rsvpMaybeFallback)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(Color.rsvpMaybeFallback.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                     }
                     .accessibilityLabel("Request Cancellation")
                     .accessibilityHint("Sends a cancellation request to the event host for your paid ticket")
@@ -398,10 +393,9 @@ struct ManageRSVPSheet: View {
                         }
                         .font(GatherFont.headline)
                         .foregroundStyle(calendarMessage != nil ? Color.rsvpYesFallback : Color.accentPurpleFallback)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background((calendarMessage != nil ? Color.rsvpYesFallback : Color.accentPurpleFallback).opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                     }
                     .disabled(isAddingToCalendar || calendarMessage != nil)
                     .accessibilityLabel("Add to Calendar")
@@ -484,7 +478,7 @@ struct ManageRSVPSheet: View {
         Task {
             let result = await CalendarService.shared.addEventToCalendar(event: event)
             isAddingToCalendar = false
-            withAnimation {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                 calendarMessage = result
             }
             if result.contains("added") {
@@ -534,12 +528,13 @@ private struct EditStatusOption: View {
                 }
             }
             .padding()
+            // Semantic selected state: status-colored wash + border on a solid row.
             .background(
-                RoundedRectangle(cornerRadius: CornerRadius.md)
-                    .fill(Color.gatherTertiaryBackground)
+                RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                    .fill(isSelected ? Color.forRSVPStatus(status).opacity(0.1) : Color.gatherTertiaryBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: CornerRadius.md)
-                            .stroke(isSelected ? Color.forRSVPStatus(status) : .clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                            .strokeBorder(isSelected ? Color.forRSVPStatus(status) : .clear, lineWidth: 1.5)
                     )
             )
         }
@@ -597,13 +592,14 @@ struct RequestCancellationSheet: View {
                     } label: {
                         Text("Done")
                             .font(GatherFont.headline)
+                            .fontWeight(.bold)
                             .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                            .frame(maxWidth: .infinity, minHeight: 52)
                             .background(LinearGradient.gatherAccentGradient)
-                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                            .clipShape(Capsule())
                     }
-                    .padding()
+                    .padding(.horizontal, Layout.horizontalPadding)
+                    .padding(.vertical)
                 } else {
                     // Request form
                     VStack(spacing: Spacing.md) {
@@ -628,7 +624,7 @@ struct RequestCancellationSheet: View {
                             .background(Color.gatherSecondaryBackground)
                             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, Layout.horizontalPadding)
 
                     Spacer()
 
@@ -639,18 +635,17 @@ struct RequestCancellationSheet: View {
                             if isSending {
                                 ProgressView()
                                     .tint(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
+                                    .frame(maxWidth: .infinity, minHeight: 52)
                                     .background(LinearGradient.gatherAccentGradient)
-                                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                    .clipShape(Capsule())
                             } else {
                                 Text("Send Request")
                                     .font(GatherFont.headline)
+                                    .fontWeight(.bold)
                                     .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
+                                    .frame(maxWidth: .infinity, minHeight: 52)
                                     .background(LinearGradient.gatherAccentGradient)
-                                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                    .clipShape(Capsule())
                             }
                         }
                         .disabled(reason.isEmpty || isSending)
@@ -663,9 +658,11 @@ struct RequestCancellationSheet: View {
                                 .foregroundStyle(Color.gatherSecondaryText)
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, Layout.horizontalPadding)
+                    .padding(.vertical)
                 }
             }
+            .background(Color.gatherBackground)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -685,7 +682,7 @@ struct RequestCancellationSheet: View {
             try? await Task.sleep(for: .seconds(1))
             HapticService.success()
 
-            withAnimation {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                 isSending = false
                 showSuccess = true
             }

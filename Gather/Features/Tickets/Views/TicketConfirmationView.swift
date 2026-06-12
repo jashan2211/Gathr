@@ -32,7 +32,8 @@ struct TicketConfirmationView: View {
                     eventSummary
                     doneButton
                 }
-                .padding()
+                .horizontalPadding()
+                .padding(.vertical)
             }
 
             // Confetti overlay
@@ -56,7 +57,7 @@ struct TicketConfirmationView: View {
             TicketShareSheet(items: [ticketShareText])
         }
         .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.2)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75).delay(0.2)) {
                 cardAppeared = true
             }
             Task {
@@ -92,8 +93,7 @@ struct TicketConfirmationView: View {
             .bouncyAppear()
 
             Text("You're Going!")
-                .font(GatherFont.title)
-                .foregroundStyle(Color.gatherPrimaryText)
+                .gatherTitle()
 
             Text("Confirmation #\(ticket.ticketNumber)")
                 .font(GatherFont.callout)
@@ -205,7 +205,7 @@ struct TicketConfirmationView: View {
             .padding(Spacing.lg)
             .frame(maxWidth: .infinity)
         }
-        .glassCard()
+        .surfaceCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Ticket for \(event.title), \(formattedDate) at \(formattedTime), \(ticket.quantity) ticket\(ticket.quantity > 1 ? "s" : ""), \(ticket.guestName)")
     }
@@ -245,7 +245,7 @@ struct TicketConfirmationView: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                         .padding(.horizontal, Spacing.xs)
                         .padding(.vertical, Spacing.xxs)
-                        .background(Color.gatherSecondaryBackground)
+                        .background(Color.gatherTertiaryBackground)
                         .clipShape(Capsule())
                 }
             }
@@ -281,7 +281,7 @@ struct TicketConfirmationView: View {
                         ? AnyShapeStyle(Color.mintGreen.opacity(0.15))
                         : AnyShapeStyle(LinearGradient.gatherAccentGradient)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .clipShape(Capsule())
             }
             .disabled(savedToPhotos)
             .accessibilityHint(savedToPhotos ? "Card already saved" : "Saves a wallet-style card image to your photo library")
@@ -294,7 +294,7 @@ struct TicketConfirmationView: View {
             }
         }
         .padding(Spacing.md)
-        .glassCard(cornerRadius: CornerRadius.card)
+        .surfaceCard()
     }
 
     // MARK: - Event Summary
@@ -368,7 +368,7 @@ struct TicketConfirmationView: View {
                 .font(GatherFont.caption)
             }
             .padding(Spacing.md)
-            .glassCard(cornerRadius: CornerRadius.md)
+            .surfaceCard(cornerRadius: CornerRadius.md)
 
             HStack {
                 Image(systemName: "ticket.fill")
@@ -389,11 +389,11 @@ struct TicketConfirmationView: View {
         } label: {
             Text("Done")
                 .font(GatherFont.headline)
+                .fontWeight(.bold)
                 .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
+                .frame(maxWidth: .infinity, minHeight: 52)
                 .background(LinearGradient.gatherAccentGradient)
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card))
+                .clipShape(Capsule())
         }
         .padding(.top, Spacing.md)
     }
@@ -504,7 +504,7 @@ struct TicketConfirmationView: View {
             let saver = PhotoSaver()
             saver.onSuccess = { [self] in
                 DispatchQueue.main.async {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         savedToPhotos = true
                     }
                     HapticService.success()

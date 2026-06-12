@@ -8,6 +8,7 @@ struct GoingView: View {
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var selectedEvent: Event?
     @State private var filter: TimeFilter = .upcoming
+    @Namespace private var zoomNamespace
 
     enum TimeFilter: String, CaseIterable {
         case upcoming = "Upcoming"
@@ -38,14 +39,16 @@ struct GoingView: View {
                         if heroEvents.count > 1 {
                             TabView {
                                 ForEach(heroEvents, id: \.id) { event in
-                                    nextUpHero(event: event)
+                                    // Only the first hero is a zoom source — the others
+                                    // also appear as rows below and ids must be unique.
+                                    nextUpHero(event: event, isZoomSource: event.id == heroEvents.first?.id)
                                 }
                             }
                             .tabViewStyle(.page(indexDisplayMode: .automatic))
                             .frame(height: Layout.heroHeight + 40)
                             .bouncyAppear()
                         } else if let next = heroEvents.first {
-                            nextUpHero(event: next)
+                            nextUpHero(event: next, isZoomSource: true)
                                 .bouncyAppear()
                         }
                     }
@@ -62,6 +65,7 @@ struct GoingView: View {
                                 GoingEventCard(event: event)
                             }
                             .buttonStyle(CardPressStyle())
+                            .zoomSource(id: event.id, in: zoomNamespace)
                         }
                         if horizontalSizeClass == .regular {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.sm) {
@@ -74,7 +78,8 @@ struct GoingView: View {
                         }
                     }
                 }
-                .padding()
+                .horizontalPadding()
+                .padding(.vertical)
                 .padding(.bottom, 20)
             }
             .refreshable {
@@ -88,6 +93,7 @@ struct GoingView: View {
             }
             .navigationDestination(item: $selectedEvent) { event in
                 EventDetailView(event: event)
+                    .zoomDestination(id: event.id, in: zoomNamespace)
             }
         }
     }
@@ -101,7 +107,7 @@ struct GoingView: View {
                     let count = countForFilter(timeFilter)
                     Button {
                         HapticService.tabSwitch()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             filter = timeFilter
                         }
                     } label: {
@@ -121,7 +127,7 @@ struct GoingView: View {
                                     .background(
                                         filter == timeFilter
                                             ? Color.white.opacity(0.9)
-                                            : Color.accentPurpleFallback.opacity(0.5)
+                                            : Color.accentPurpleFallback.opacity(0.7)
                                     )
                                     .clipShape(Circle())
                                     .contentTransition(.numericText())
@@ -133,28 +139,9 @@ struct GoingView: View {
                         .background(
                             filter == timeFilter
                                 ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                                : AnyShapeStyle(Color.clear)
+                                : AnyShapeStyle(Color.gatherSecondaryBackground)
                         )
                         .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(
-                                    filter == timeFilter
-                                        ? AnyShapeStyle(Color.clear)
-                                        : AnyShapeStyle(LinearGradient(
-                                            colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )),
-                                    lineWidth: 1
-                                )
-                        )
-                        .background(
-                            filter == timeFilter
-                                ? nil
-                                : Capsule()
-                                    .fill(.ultraThinMaterial)
-                        )
                     }
                     .scaleEffect(filter == timeFilter ? 1.03 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: filter == timeFilter)
@@ -167,8 +154,9 @@ struct GoingView: View {
 
     // MARK: - Next Up Hero
 
-    private func nextUpHero(event: Event) -> some View {
-        Button {
+    @ViewBuilder
+    private func nextUpHero(event: Event, isZoomSource: Bool = false) -> some View {
+        let card = Button {
             selectedEvent = event
         } label: {
             ZStack(alignment: .bottomLeading) {
@@ -247,18 +235,15 @@ struct GoingView: View {
             .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
         }
         .buttonStyle(CardPressStyle())
+
+        if isZoomSource {
+            card.zoomSource(id: event.id, in: zoomNamespace)
+        } else {
+            card
+        }
     }
 
     // MARK: - Empty State
-
-    private var emptyStateIcon: String {
-        switch filter {
-        case .upcoming: return "calendar"
-        case .thisWeek: return "calendar.badge.clock"
-        case .thisMonth: return "calendar.circle"
-        case .past: return "clock.arrow.circlepath"
-        }
-    }
 
     private var emptyStateTitle: String {
         switch filter {
@@ -279,56 +264,14 @@ struct GoingView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
-            Spacer()
-                .frame(height: 50)
-
-            ZStack {
-                Circle()
-                    .fill(Color.accentPurpleFallback.opacity(0.08))
-                    .frame(width: 110, height: 110)
-                Circle()
-                    .fill(Color.accentPinkFallback.opacity(0.06))
-                    .frame(width: 80, height: 80)
-                Image(systemName: emptyStateIcon)
-                    .font(.system(size: 36))
-                    .foregroundStyle(
-                        LinearGradient.gatherAccentGradient
-                    )
-            }
-
-            VStack(spacing: Spacing.sm) {
-                Text(emptyStateTitle)
-                    .font(GatherFont.title3)
-                    .foregroundStyle(Color.gatherPrimaryText)
-
-                Text(emptyStateSubtitle)
-                    .font(GatherFont.body)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.xl)
-            }
-
-            if filter == .upcoming {
-                Button {
-                    appState.selectedTab = .explore
-                } label: {
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "magnifyingglass")
-                        Text("Explore Events")
-                    }
-                    .font(GatherFont.callout)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.lg)
-                    .padding(.vertical, Spacing.sm)
-                    .background(LinearGradient.gatherAccentGradient)
-                    .clipShape(Capsule())
-                }
-            }
-
-            Spacer()
-        }
+        GatherEmptyState(
+            icon: "ticket",
+            title: emptyStateTitle,
+            message: emptyStateSubtitle,
+            actionTitle: filter == .upcoming ? "Explore Events" : nil,
+            action: filter == .upcoming ? { appState.selectedTab = .explore } : nil
+        )
+        .padding(.top, Spacing.xl)
     }
 
     // MARK: - Helpers
@@ -398,76 +341,68 @@ struct GoingEventCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Category color strip
-            RoundedRectangle(cornerRadius: 3)
-                .fill(LinearGradient.categoryGradient(for: event.category))
-                .frame(width: 5)
-                .padding(.vertical, 6)
-
-            HStack(spacing: Spacing.sm) {
-                // Date badge with category tint
-                VStack(spacing: 1) {
-                    Text(event.category.emoji)
-                        .font(.callout)
-                    Text(dayNumber)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.gatherPrimaryText)
-                    Text(monthAbbrev)
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.forCategory(event.category))
-                }
-                .frame(width: 48, height: 56)
-                .background(
-                    LinearGradient.cardGradient(for: event.category)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
-
-                // Event Info
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(event.title)
-                        .font(GatherFont.callout)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.gatherPrimaryText)
-                        .lineLimit(1)
-
-                    if let location = event.location {
-                        HStack(spacing: 3) {
-                            Image(systemName: location.isVirtual ? "video" : "mappin")
-                                .font(.system(size: 8))
-                            Text(location.shortLocation ?? location.name)
-                                .lineLimit(1)
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                    }
-
-                    Text(formattedTime)
-                        .font(.caption2)
-                        .foregroundStyle(Color.forCategory(event.category))
-                }
-
-                Spacer()
-
-                // Countdown badge
-                VStack(spacing: 2) {
-                    Text(daysLeft)
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(daysLeftColor)
-                        .contentTransition(.numericText())
-                    Text(daysLeftLabel)
-                        .font(.caption2)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                }
-                .frame(width: 44)
+        HStack(spacing: Spacing.sm) {
+            // Date badge with category tint
+            VStack(spacing: 1) {
+                Text(event.category.emoji)
+                    .font(.callout)
+                Text(dayNumber)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Text(monthAbbrev)
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.forCategory(event.category))
             }
-            .padding(.horizontal, Spacing.sm)
-            .padding(.vertical, Spacing.sm)
+            .frame(width: 48, height: 56)
+            .background(Color.gatherTertiaryBackground)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+
+            // Event Info
+            VStack(alignment: .leading, spacing: 3) {
+                Text(event.title)
+                    .font(GatherFont.callout)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .lineLimit(1)
+
+                if let location = event.location {
+                    HStack(spacing: 3) {
+                        Image(systemName: location.isVirtual ? "video" : "mappin")
+                            .font(.system(size: 8))
+                        Text(location.shortLocation ?? location.name)
+                            .lineLimit(1)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                }
+
+                Text(formattedTime)
+                    .font(.caption2)
+                    .foregroundStyle(Color.forCategory(event.category))
+            }
+
+            Spacer()
+
+            // Countdown badge
+            VStack(spacing: 2) {
+                Text(daysLeft)
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(daysLeftColor)
+                    .contentTransition(.numericText())
+                Text(daysLeftLabel)
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+            .frame(width: 44)
         }
-        .glassCardLite()
+        .padding(.horizontal, Spacing.sm)
+        .padding(.vertical, Spacing.sm)
+        .padding(.top, 3) // clear the accent bar
+        .surfaceCard()
+        .categoryAccentBar(Color.forCategory(event.category))
         .overlay(
             Group {
                 if isHappeningToday {

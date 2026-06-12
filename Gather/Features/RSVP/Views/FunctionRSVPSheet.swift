@@ -49,7 +49,7 @@ struct FunctionRSVPSheet: View {
                         confirmationView
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, Layout.horizontalPadding)
 
                 Spacer()
 
@@ -94,7 +94,7 @@ struct FunctionRSVPSheet: View {
                     response: .yes,
                     isSelected: selectedResponse == .yes
                 ) {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         selectedResponse = .yes
                         hapticFeedback()
                     }
@@ -104,7 +104,7 @@ struct FunctionRSVPSheet: View {
                     response: .maybe,
                     isSelected: selectedResponse == .maybe
                 ) {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         selectedResponse = .maybe
                         hapticFeedback()
                     }
@@ -114,7 +114,7 @@ struct FunctionRSVPSheet: View {
                     response: .no,
                     isSelected: selectedResponse == .no
                 ) {
-                    withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         selectedResponse = .no
                         hapticFeedback()
                     }
@@ -209,10 +209,9 @@ struct FunctionRSVPSheet: View {
                     }
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.accentPurpleFallback)
-                    .padding()
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 52)
                     .background(Color.accentPurpleFallback.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    .clipShape(Capsule())
                 }
                 .accessibilityLabel("Add to Calendar")
                 .accessibilityHint("Adds this function to your device calendar")
@@ -227,33 +226,32 @@ struct FunctionRSVPSheet: View {
             switch step {
             case .response:
                 Button {
-                    withAnimation {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                         step = .details
                     }
                 } label: {
                     Text("Continue")
                         .font(GatherFont.headline)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                 }
 
             case .details:
                 HStack(spacing: Spacing.md) {
                     Button {
-                        withAnimation {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             step = .response
                         }
                     } label: {
                         Text("Back")
                             .font(GatherFont.headline)
                             .foregroundStyle(Color.gatherPrimaryText)
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                            .frame(maxWidth: .infinity, minHeight: 52)
                             .background(Color.gatherSecondaryBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                            .clipShape(Capsule())
                     }
 
                     Button {
@@ -262,18 +260,17 @@ struct FunctionRSVPSheet: View {
                         if isSubmitting {
                             ProgressView()
                                 .tint(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
+                                .frame(maxWidth: .infinity, minHeight: 52)
                                 .background(LinearGradient.gatherAccentGradient)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .clipShape(Capsule())
                         } else {
                             Text("Submit")
                                 .font(GatherFont.headline)
+                                .fontWeight(.bold)
                                 .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
+                                .frame(maxWidth: .infinity, minHeight: 52)
                                 .background(LinearGradient.gatherAccentGradient)
-                                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                                .clipShape(Capsule())
                         }
                     }
                     .disabled(isSubmitting)
@@ -285,15 +282,16 @@ struct FunctionRSVPSheet: View {
                 } label: {
                     Text("Done")
                         .font(GatherFont.headline)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
+                        .frame(maxWidth: .infinity, minHeight: 52)
                         .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                        .clipShape(Capsule())
                 }
             }
         }
-        .padding()
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical)
         .background(Color.gatherBackground)
     }
 
@@ -413,7 +411,7 @@ struct FunctionRSVPSheet: View {
             try? await Task.sleep(for: .seconds(0.5))
             HapticService.success()
 
-            withAnimation(.spring(response: 0.4)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                 step = .confirmation
                 isSubmitting = false
             }
@@ -506,12 +504,13 @@ struct FunctionRSVPOptionCard: View {
                 }
             }
             .padding()
+            // Semantic selected state: response-colored wash + border on a solid row.
             .background(
-                RoundedRectangle(cornerRadius: CornerRadius.lg)
-                    .fill(Color.gatherSecondaryBackground)
+                RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
+                    .fill(isSelected ? responseColor.opacity(0.1) : Color.gatherSecondaryBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: CornerRadius.lg)
-                            .stroke(isSelected ? responseColor : .clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
+                            .strokeBorder(isSelected ? responseColor : .clear, lineWidth: 1.5)
                     )
             )
         }

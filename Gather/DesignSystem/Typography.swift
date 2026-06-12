@@ -13,11 +13,13 @@ enum GatherFont {
     /// 28pt Heavy SF Pro Display - Section headers
     static let title = Font.system(.title, design: .default).weight(.heavy)
 
-    /// 22pt Semibold Rounded - Card titles, prominent labels
-    static let title2 = Font.system(.title2, design: .rounded).weight(.semibold)
+    /// 22pt Bold - Card titles, prominent labels.
+    /// Default (not Rounded) design: Rounded headers read as "toy"; standard
+    /// SF Pro Display at bold keeps the editorial, premium tone (critique §3).
+    static let title2 = Font.system(.title2, design: .default).weight(.bold)
 
-    /// 20pt Semibold Rounded - Subsection headers
-    static let title3 = Font.system(.title3, design: .rounded).weight(.semibold)
+    /// 20pt Semibold - Subsection headers
+    static let title3 = Font.system(.title3, design: .default).weight(.semibold)
 
     // MARK: - Body Styles
 

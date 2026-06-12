@@ -15,19 +15,8 @@ struct BudgetFilterChip: View {
                 .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.xs)
-                .background(isSelected ? AnyShapeStyle(Color.accentPurpleFallback) : AnyShapeStyle(.ultraThinMaterial))
+                .background(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryBackground)
                 .clipShape(Capsule())
-                .overlay(
-                    isSelected ? nil : Capsule()
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 0.5
-                        )
-                )
         }
     }
 }

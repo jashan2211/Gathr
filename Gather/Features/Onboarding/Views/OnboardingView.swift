@@ -13,16 +13,8 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            // Background
-            LinearGradient(
-                colors: [
-                    Color.accentPurpleFallback.opacity(0.05),
-                    Color.gatherBackground
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            Color.gatherBackground
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Content
@@ -33,7 +25,7 @@ struct OnboardingView: View {
                     readyPage.tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentPage)
+                .animation(.spring(response: 0.4, dampingFraction: 0.75), value: currentPage)
 
                 // Bottom section
                 VStack(spacing: Spacing.md) {
@@ -43,7 +35,7 @@ struct OnboardingView: View {
                             Capsule()
                                 .fill(index == currentPage ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.3))
                                 .frame(width: index == currentPage ? 24 : 8, height: 8)
-                                .animation(.spring(response: 0.3), value: currentPage)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: currentPage)
                         }
                     }
 
@@ -51,7 +43,7 @@ struct OnboardingView: View {
                     HStack {
                         if currentPage > 0 {
                             Button {
-                                withAnimation { currentPage -= 1 }
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { currentPage -= 1 }
                             } label: {
                                 Text("Back")
                                     .font(GatherFont.callout)
@@ -63,7 +55,7 @@ struct OnboardingView: View {
 
                         if currentPage < totalPages - 1 {
                             Button {
-                                withAnimation { currentPage += 1 }
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { currentPage += 1 }
                             } label: {
                                 HStack(spacing: Spacing.xs) {
                                     Text("Next")
@@ -116,8 +108,7 @@ struct OnboardingView: View {
 
             VStack(spacing: Spacing.sm) {
                 Text("Welcome to Gather")
-                    .font(GatherFont.title)
-                    .foregroundStyle(Color.gatherPrimaryText)
+                    .gatherTitle()
 
                 Text("Your all-in-one event platform for creating, managing, and discovering amazing events")
                     .font(GatherFont.body)
@@ -205,7 +196,7 @@ struct OnboardingView: View {
             HStack(spacing: Spacing.md) {
                 ZStack {
                     Circle()
-                        .fill(selectedRole == role ? Color.accentPurpleFallback : Color.gatherSecondaryBackground)
+                        .fill(selectedRole == role ? Color.accentPurpleFallback : Color.gatherTertiaryBackground)
                         .frame(width: 48, height: 48)
 
                     Image(systemName: icon)
@@ -229,8 +220,7 @@ struct OnboardingView: View {
                     .foregroundStyle(selectedRole == role ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.3))
             }
             .padding(Spacing.md)
-            .background(Color.gatherSecondaryBackground.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .surfaceCard(cornerRadius: CornerRadius.lg)
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.lg)
                     .stroke(selectedRole == role ? Color.accentPurpleFallback : Color.clear, lineWidth: 2)
@@ -293,7 +283,7 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, Spacing.md)
-            .background(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryBackground.opacity(0.5))
+            .background(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.lg)
@@ -321,8 +311,7 @@ struct OnboardingView: View {
 
             VStack(spacing: Spacing.sm) {
                 Text("You're all set!")
-                    .font(GatherFont.title)
-                    .foregroundStyle(Color.gatherPrimaryText)
+                    .gatherTitle()
 
                 Text("Start exploring events or create your first one")
                     .font(GatherFont.body)
@@ -339,9 +328,10 @@ struct OnboardingView: View {
                     Image(systemName: "arrow.right")
                 }
                 .font(GatherFont.headline)
+                .fontWeight(.bold)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, Spacing.md)
+                .frame(height: 52)
                 .background(LinearGradient.gatherAccentGradient)
                 .clipShape(Capsule())
             }
@@ -358,7 +348,7 @@ struct OnboardingView: View {
         UserDefaults.standard.set(selectedRole.rawValue, forKey: "userRole")
         UserDefaults.standard.set(selectedCategories.map { $0.rawValue }, forKey: "preferredCategories")
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             hasCompletedOnboarding = true
         }
 

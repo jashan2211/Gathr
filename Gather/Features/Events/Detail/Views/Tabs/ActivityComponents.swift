@@ -163,7 +163,7 @@ struct ActivityPostCard: View {
                 // Replies
                 if !replies.isEmpty {
                     Button {
-                        withAnimation(.spring(response: 0.3)) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                             showReplies.toggle()
                         }
                     } label: {
@@ -188,8 +188,7 @@ struct ActivityPostCard: View {
             }
             .padding(Spacing.md)
         }
-        .background(Color.gatherSecondaryBackground.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard()
     }
 
     // MARK: - Post Type Badge
@@ -252,11 +251,11 @@ struct ActivityPostCard: View {
                     .background(
                         GeometryReader { geo in
                             RoundedRectangle(cornerRadius: CornerRadius.sm)
-                                .fill(hasVoted ? Color.accentPurpleFallback.opacity(0.15) : Color.gatherSecondaryBackground)
+                                .fill(Color.accentPurpleFallback.opacity(hasVoted ? 0.35 : 0.18))
                                 .frame(width: geo.size.width * percentage)
                         }
                     )
-                    .background(Color.gatherSecondaryBackground)
+                    .background(Color.gatherTertiaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                     .overlay(
                         RoundedRectangle(cornerRadius: CornerRadius.sm)
@@ -367,7 +366,7 @@ struct ComposePostSheet: View {
                                 .font(GatherFont.caption)
                         }
                         .foregroundStyle(Color.accentPurpleFallback)
-                        .padding(.horizontal, Spacing.md)
+                        .horizontalPadding()
                     }
 
                     // Text input
@@ -377,7 +376,7 @@ struct ComposePostSheet: View {
                         .padding(Spacing.md)
                         .background(Color.gatherSecondaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                        .padding(.horizontal, Spacing.md)
+                        .horizontalPadding()
 
                     // Poll options
                     if postType == .poll && parentPost == nil {
@@ -393,20 +392,43 @@ struct ComposePostSheet: View {
             }
             .navigationTitle(parentPost != nil ? "Reply" : "New \(postType.displayName)")
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                postBar
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Post") {
-                        createPost()
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!isValid)
-                }
             }
         }
+    }
+
+    // MARK: - Primary CTA
+
+    private var postBar: some View {
+        Button {
+            createPost()
+            dismiss()
+        } label: {
+            Text(parentPost != nil ? "Post Reply" : "Post")
+                .font(GatherFont.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(LinearGradient.gatherAccentGradient)
+                .clipShape(Capsule())
+        }
+        .disabled(!isValid)
+        .opacity(isValid ? 1 : 0.5)
+        .horizontalPadding()
+        .padding(.vertical, Spacing.sm)
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+        )
     }
 
     private var placeholderText: String {
@@ -430,13 +452,13 @@ struct ComposePostSheet: View {
                 postTypeChip(.photo)
                 postTypeChip(.question)
             }
-            .padding(.horizontal, Spacing.md)
+            .horizontalPadding()
         }
     }
 
     private func postTypeChip(_ type: ActivityPostType) -> some View {
         Button {
-            withAnimation(.spring(response: 0.3)) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                 postType = type
             }
         } label: {
@@ -462,7 +484,7 @@ struct ComposePostSheet: View {
             Text("Poll Options")
                 .font(GatherFont.callout)
                 .fontWeight(.medium)
-                .padding(.horizontal, Spacing.md)
+                .horizontalPadding()
 
             VStack(spacing: Spacing.xs) {
                 ForEach(pollOptionTexts.indices, id: \.self) { index in
@@ -484,7 +506,7 @@ struct ComposePostSheet: View {
                     }
                 }
             }
-            .padding(.horizontal, Spacing.md)
+            .horizontalPadding()
 
             if pollOptionTexts.count < 6 {
                 Button {
@@ -497,13 +519,13 @@ struct ComposePostSheet: View {
                     .font(GatherFont.callout)
                     .foregroundStyle(Color.accentPurpleFallback)
                 }
-                .padding(.horizontal, Spacing.md)
+                .horizontalPadding()
             }
 
             Toggle("Allow multiple votes", isOn: $allowMultipleVotes)
                 .font(GatherFont.callout)
                 .tint(Color.accentPurpleFallback)
-                .padding(.horizontal, Spacing.md)
+                .horizontalPadding()
         }
     }
 
@@ -517,7 +539,7 @@ struct ComposePostSheet: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(maxHeight: 200)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                    .padding(.horizontal, Spacing.md)
+                    .horizontalPadding()
                     .overlay(alignment: .topTrailing) {
                         Button {
                             selectedImageData = nil
@@ -545,7 +567,7 @@ struct ComposePostSheet: View {
                     .background(Color.gatherSecondaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
-                .padding(.horizontal, Spacing.md)
+                .horizontalPadding()
             }
         }
         .onChange(of: selectedPhoto) { _, newValue in

@@ -38,7 +38,8 @@ struct FunctionDetailSheet: View {
                         detailView
                     }
                 }
-                .padding()
+                .horizontalPadding()
+                .padding(.vertical)
                 .padding(.bottom, isHost ? 0 : 80) // Extra padding for RSVP button
             }
             .safeAreaInset(edge: .bottom) {
@@ -104,9 +105,7 @@ struct FunctionDetailSheet: View {
     // MARK: - RSVP Button Bar
 
     private var rsvpButtonBar: some View {
-        VStack(spacing: 0) {
-            Divider()
-
+        Group {
             if let invite = currentUserInvite, invite.response != nil {
                 // User has already responded - show status with manage button
                 respondedStatusBar(invite: invite)
@@ -115,6 +114,13 @@ struct FunctionDetailSheet: View {
                 standardRSVPBar
             }
         }
+        // Floating bar over scrolling content — glass is intentional here.
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+        )
     }
 
     // Status bar for users who have responded
@@ -159,12 +165,11 @@ struct FunctionDetailSheet: View {
                 .foregroundStyle(Color.accentPurpleFallback)
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.sm)
-                .background(Color.accentPurpleFallback.opacity(0.1))
+                .background(Color.gatherSecondaryBackground)
                 .clipShape(Capsule())
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
     }
 
     // Standard RSVP bar for users who haven't responded
@@ -193,7 +198,6 @@ struct FunctionDetailSheet: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
     }
 
     /// The current user's Guest record on this event, if one exists.
@@ -222,10 +226,10 @@ struct FunctionDetailSheet: View {
 
     private func responseColor(for response: RSVPResponse?) -> Color {
         switch response {
-        case .yes: return .green
-        case .no: return .red
-        case .maybe: return .orange
-        case .none: return .gray
+        case .yes: return .rsvpYesFallback
+        case .no: return .rsvpNoFallback
+        case .maybe: return .rsvpMaybeFallback
+        case .none: return .gatherSecondaryText
         }
     }
 
@@ -250,12 +254,12 @@ struct FunctionDetailSheet: View {
     // MARK: - Detail View
 
     private var detailView: some View {
-        VStack(alignment: .leading, spacing: Spacing.lg) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             // Date & Time
             HStack(spacing: Spacing.md) {
                 ZStack {
                     RoundedRectangle(cornerRadius: CornerRadius.md)
-                        .fill(Color.accentPurpleFallback.opacity(0.1))
+                        .fill(Color.gatherTertiaryBackground)
                         .frame(width: 56, height: 56)
 
                     VStack(spacing: 0) {
@@ -266,7 +270,7 @@ struct FunctionDetailSheet: View {
                         Text(dayNumber)
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundStyle(Color.gatherPrimaryText)
+                            .foregroundStyle(Color.accentPurpleFallback)
                     }
                 }
 
@@ -282,11 +286,11 @@ struct FunctionDetailSheet: View {
 
                 Spacer()
             }
+            .padding()
+            .surfaceCard()
 
             // Location
             if let location = function.location {
-                Divider()
-
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     Label("Location", systemImage: "mappin.circle.fill")
                         .font(GatherFont.headline)
@@ -314,12 +318,13 @@ struct FunctionDetailSheet: View {
                         .disabled(true)
                     }
                 }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .surfaceCard()
             }
 
             // Dress Code
             if let dressCode = function.displayDressCode {
-                Divider()
-
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     Label("Dress Code", systemImage: "tshirt.fill")
                         .font(GatherFont.headline)
@@ -335,12 +340,13 @@ struct FunctionDetailSheet: View {
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
                 }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .surfaceCard()
             }
 
             // Description
             if let description = function.functionDescription, !description.isEmpty {
-                Divider()
-
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     Text("About")
                         .font(GatherFont.headline)
@@ -350,9 +356,10 @@ struct FunctionDetailSheet: View {
                         .font(GatherFont.body)
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .surfaceCard()
             }
-
-            Divider()
 
             // Add to Calendar
             Button {
@@ -381,12 +388,9 @@ struct FunctionDetailSheet: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
                 .padding()
-                .background(Color.accentPurpleFallback.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .surfaceCard()
             }
             .buttonStyle(.plain)
-
-            Divider()
 
             // RSVP Summary
             VStack(alignment: .leading, spacing: Spacing.md) {
@@ -395,12 +399,15 @@ struct FunctionDetailSheet: View {
                     .foregroundStyle(Color.gatherPrimaryText)
 
                 HStack(spacing: Spacing.lg) {
-                    RSVPStatBox(count: function.attendingCount, label: "Attending", color: .green)
-                    RSVPStatBox(count: function.maybeCount, label: "Maybe", color: .orange)
-                    RSVPStatBox(count: function.declinedCount, label: "Declined", color: .red)
-                    RSVPStatBox(count: function.pendingCount, label: "Pending", color: .gray)
+                    RSVPStatBox(count: function.attendingCount, label: "Attending", color: .rsvpYesFallback)
+                    RSVPStatBox(count: function.maybeCount, label: "Maybe", color: .rsvpMaybeFallback)
+                    RSVPStatBox(count: function.declinedCount, label: "Declined", color: .rsvpNoFallback)
+                    RSVPStatBox(count: function.pendingCount, label: "Pending", color: .gatherSecondaryText)
                 }
             }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .surfaceCard()
         }
         .alert("Calendar", isPresented: $showCalendarAlert) {
             Button("OK", role: .cancel) {}
@@ -460,7 +467,7 @@ struct FunctionDetailSheet: View {
                         editEndTime = nil
                     }
                     .font(GatherFont.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.gatherError)
                 } else {
                     Button("Add End Time") {
                         editEndTime = editDate.addingTimeInterval(3600 * 4)

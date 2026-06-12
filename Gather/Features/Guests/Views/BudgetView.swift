@@ -40,8 +40,10 @@ struct BudgetView: View {
                         emptyState
                     }
                 }
-                .padding()
+                .padding(.vertical, Spacing.md)
+                .horizontalPadding()
             }
+            .background(Color.gatherBackground)
             .navigationTitle("Budget")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -92,33 +94,14 @@ struct BudgetView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
-            Image(systemName: "dollarsign.circle")
-                .font(.system(size: 60))
-                .foregroundStyle(Color.accentPurpleFallback)
-
-            Text("No Budget Set")
-                .font(GatherFont.title2)
-
-            Text("Create a budget to track your event expenses")
-                .font(GatherFont.body)
-                .foregroundStyle(Color.gatherSecondaryText)
-                .multilineTextAlignment(.center)
-
-            Button {
-                createBudget()
-            } label: {
-                Text("Create Budget")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, Spacing.xl)
-                    .padding(.vertical, Spacing.md)
-                    .background(LinearGradient.gatherAccentGradient)
-                    .clipShape(Capsule())
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 100)
+        GatherEmptyState(
+            icon: "dollarsign.circle",
+            title: "No Budget Set",
+            message: "Create a budget to track spending across every part of your event.",
+            actionTitle: "Create Budget",
+            action: { createBudget() }
+        )
+        .padding(.top, Spacing.xxl)
     }
 
     // MARK: - Budget Overview Card
@@ -141,7 +124,7 @@ struct BudgetView: View {
                 // Progress ring
                 ZStack {
                     Circle()
-                        .stroke(Color.gatherSecondaryBackground, lineWidth: 8)
+                        .stroke(Color.gatherTertiaryBackground, lineWidth: 8)
                         .frame(width: 60, height: 60)
 
                     Circle()
@@ -187,8 +170,7 @@ struct BudgetView: View {
             }
         }
         .padding()
-        .background(Color.gatherSecondaryBackground.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+        .surfaceCard()
     }
 
     // MARK: - Categories Section
@@ -320,7 +302,7 @@ struct CategoryRow: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.gatherSecondaryBackground)
+                        .fill(Color.gatherTertiaryBackground)
                         .frame(height: 4)
 
                     RoundedRectangle(cornerRadius: 2)
@@ -331,8 +313,7 @@ struct CategoryRow: View {
             .frame(height: 4)
         }
         .padding()
-        .background(Color.gatherSecondaryBackground.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .surfaceCard(cornerRadius: CornerRadius.md)
     }
 }
 
@@ -365,8 +346,7 @@ struct ExpenseRow: View {
             }
         }
         .padding()
-        .background(Color.gatherSecondaryBackground.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .surfaceCard(cornerRadius: CornerRadius.md)
     }
 }
 

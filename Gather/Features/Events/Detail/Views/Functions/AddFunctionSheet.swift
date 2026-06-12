@@ -108,7 +108,7 @@ struct AddFunctionSheet: View {
                                         .foregroundStyle(name == suggestion ? .white : Color.gatherPrimaryText)
                                         .padding(.horizontal, Spacing.md)
                                         .padding(.vertical, Spacing.xs)
-                                        .background(name == suggestion ? Color.accentPurpleFallback : Color.gatherSecondaryBackground)
+                                        .background(name == suggestion ? Color.accentPurpleFallback : Color.gatherTertiaryBackground)
                                         .clipShape(Capsule())
                                 }
                             }
@@ -122,21 +122,44 @@ struct AddFunctionSheet: View {
             }
             .navigationTitle("Add Function")
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                addFunctionBar
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
                 }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        addFunction()
-                    }
-                    .disabled(name.isEmpty)
-                }
             }
         }
+    }
+
+    // MARK: - Primary CTA
+
+    private var addFunctionBar: some View {
+        Button {
+            addFunction()
+        } label: {
+            Text("Add Function")
+                .font(GatherFont.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(LinearGradient.gatherAccentGradient)
+                .clipShape(Capsule())
+        }
+        .disabled(name.isEmpty)
+        .opacity(name.isEmpty ? 0.5 : 1)
+        .horizontalPadding()
+        .padding(.vertical, Spacing.sm)
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+        )
     }
 
     // MARK: - Suggested Names

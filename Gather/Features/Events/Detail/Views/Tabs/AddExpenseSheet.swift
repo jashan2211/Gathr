@@ -28,16 +28,19 @@ struct AddExpenseSheet: View {
                         .keyboardType(.decimalPad)
                         .submitLabel(.done)
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 Section("Vendor (Optional)") {
                     TextField("Vendor name", text: $vendorName)
                         .submitLabel(.done)
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 Section("Who Paid?") {
                     TextField("e.g. You, Aisha, Jordan", text: $paidByName)
                         .submitLabel(.done)
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 Section("Payment") {
                     Toggle("Already Paid", isOn: $isPaid)
@@ -49,6 +52,7 @@ struct AddExpenseSheet: View {
                         }
                     }
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 if !functions.isEmpty {
                     Section("Link to Function") {
@@ -59,37 +63,60 @@ struct AddExpenseSheet: View {
                             }
                         }
                     }
+                    .listRowBackground(Color.gatherSecondaryBackground)
                 }
 
                 Section("Notes (Optional)") {
                     TextField("e.g. 50% deposit, balance on event day", text: $notes, axis: .vertical)
                         .lineLimit(3, reservesSpace: true)
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.gatherBackground)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    let expense = Expense(
+                        name: name,
+                        amount: amount,
+                        isPaid: isPaid,
+                        paidDate: isPaid ? Date() : nil,
+                        dueDate: hasDueDate ? dueDate : nil,
+                        notes: notes.isEmpty ? nil : notes,
+                        vendorName: vendorName.isEmpty ? nil : vendorName,
+                        paidByName: paidByName.isEmpty ? nil : paidByName,
+                        functionId: selectedFunctionId
+                    )
+                    category.expenses.append(expense)
+                    category.spent += amount
+                    dismiss()
+                } label: {
+                    Text("Add Expense")
+                        .font(GatherFont.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(LinearGradient.gatherAccentGradient)
+                        .clipShape(Capsule())
+                }
+                .disabled(name.isEmpty || amount <= 0)
+                .opacity(name.isEmpty || amount <= 0 ? 0.5 : 1)
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.vertical, Spacing.sm)
+                .background(
+                    LinearGradient(
+                        colors: [Color.gatherBackground.opacity(0), Color.gatherBackground],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
             .navigationTitle("Add to \(category.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        let expense = Expense(
-                            name: name,
-                            amount: amount,
-                            isPaid: isPaid,
-                            paidDate: isPaid ? Date() : nil,
-                            dueDate: hasDueDate ? dueDate : nil,
-                            notes: notes.isEmpty ? nil : notes,
-                            vendorName: vendorName.isEmpty ? nil : vendorName,
-                            paidByName: paidByName.isEmpty ? nil : paidByName,
-                            functionId: selectedFunctionId
-                        )
-                        category.expenses.append(expense)
-                        category.spent += amount
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty || amount <= 0)
                 }
             }
         }

@@ -34,7 +34,7 @@ struct OverviewTab: View {
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
                     .padding(Spacing.sm)
-                    .glassCardLite()
+                    .surfaceCard()
                 }
 
                 // Date & Time
@@ -207,7 +207,7 @@ struct OverviewTab: View {
             .padding(.top, Spacing.xs)
         }
         .padding()
-        .glassCard()
+        .surfaceCard()
         .bouncyAppear()
     }
 
@@ -223,7 +223,7 @@ struct OverviewTab: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.xxs)
-                    .background(Color.accentPurpleFallback)
+                    .background(Color.forCategory(event.category))
 
                 Text(dayNumber)
                     .font(.title2)
@@ -233,7 +233,7 @@ struct OverviewTab: View {
                     .padding(.vertical, Spacing.xs)
             }
             .frame(width: 56)
-            .background(.ultraThinMaterial)
+            .background(Color.gatherTertiaryBackground)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
             VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -268,6 +268,8 @@ struct OverviewTab: View {
                     .clipShape(Circle())
             }
         }
+        .padding()
+        .surfaceCard()
     }
 
     // MARK: - Location Section
@@ -327,7 +329,7 @@ struct OverviewTab: View {
             }
         }
         .padding()
-        .glassCard()
+        .surfaceCard()
     }
 
     // MARK: - Description Section
@@ -406,7 +408,7 @@ struct OverviewTab: View {
                 Spacer()
             }
             .padding(Spacing.md)
-            .glassCard()
+            .surfaceCard()
         }
     }
 
@@ -423,16 +425,13 @@ struct OverviewTab: View {
                 .prefix(5)
 
             if recentGuests.isEmpty {
-                HStack {
-                    Image(systemName: "clock")
-                        .foregroundStyle(Color.gatherSecondaryText)
-                    Text("No RSVPs yet")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding()
-                .glassCard()
+                GatherEmptyState(
+                    icon: "envelope.open",
+                    title: "No RSVPs yet",
+                    message: "As guests respond, their RSVPs will show up here.",
+                    accent: Color.forCategory(event.category)
+                )
+                .frame(maxWidth: .infinity)
             } else {
                 VStack(spacing: Spacing.xs) {
                     ForEach(Array(recentGuests)) { guest in
@@ -517,12 +516,12 @@ struct QuickActionCard: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, Spacing.md)
-            .glassCard()
+            .surfaceCard()
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .pressEvents(
-            onPress: { withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) { isPressed = true } },
-            onRelease: { withAnimation(.spring(response: 0.15, dampingFraction: 0.7)) { isPressed = false } }
+            onPress: { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isPressed = true } },
+            onRelease: { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isPressed = false } }
         )
         .accessibilityLabel(title)
     }
@@ -641,7 +640,7 @@ struct FunctionTimelineCard: View {
             }
         }
         .padding(Spacing.sm)
-        .glassCard()
+        .surfaceCard()
     }
 }
 
@@ -681,7 +680,7 @@ struct RecentRSVPRow: View {
             .font(GatherFont.caption)
         }
         .padding(Spacing.sm)
-        .glassCard()
+        .surfaceCard()
     }
 
     private var avatarColor: Color {

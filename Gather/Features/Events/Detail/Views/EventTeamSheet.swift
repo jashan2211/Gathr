@@ -259,36 +259,64 @@ struct AddMemberSheet: View {
             }
             .navigationTitle("Add Team Member")
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                sendInviteBar
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Send Invite") {
-                        let member = EventMember(
-                            eventId: eventId,
-                            name: name,
-                            email: email.isEmpty ? nil : email,
-                            phone: phone.isEmpty ? nil : phone,
-                            role: selectedRole
-                        )
-                        modelContext.insert(member)
-
-                        // Create notification for demo
-                        let notification = AppNotification(
-                            type: .memberInvite,
-                            title: "Invite Sent",
-                            body: "\(name) has been invited as \(selectedRole.rawValue)"
-                        )
-                        modelContext.insert(notification)
-
-                        HapticService.success()
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty)
-                }
             }
         }
+    }
+
+    // MARK: - Primary CTA
+
+    private var sendInviteBar: some View {
+        Button {
+            sendInvite()
+        } label: {
+            Text("Send Invite")
+                .font(GatherFont.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(LinearGradient.gatherAccentGradient)
+                .clipShape(Capsule())
+        }
+        .disabled(name.isEmpty)
+        .opacity(name.isEmpty ? 0.5 : 1)
+        .horizontalPadding()
+        .padding(.vertical, Spacing.sm)
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+        )
+    }
+
+    private func sendInvite() {
+        let member = EventMember(
+            eventId: eventId,
+            name: name,
+            email: email.isEmpty ? nil : email,
+            phone: phone.isEmpty ? nil : phone,
+            role: selectedRole
+        )
+        modelContext.insert(member)
+
+        // Create notification for demo
+        let notification = AppNotification(
+            type: .memberInvite,
+            title: "Invite Sent",
+            body: "\(name) has been invited as \(selectedRole.rawValue)"
+        )
+        modelContext.insert(notification)
+
+        HapticService.success()
+        dismiss()
     }
 }
 
@@ -313,7 +341,7 @@ struct InviteLinkSheet: View {
 
                 VStack(spacing: Spacing.xs) {
                     Text("Share Invite Link")
-                        .font(GatherFont.headline)
+                        .font(GatherFont.title3)
                     Text("Anyone with this link can join \"\(eventTitle)\" as a \(selectedRole.rawValue.lowercased()).")
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
@@ -352,7 +380,11 @@ struct InviteLinkSheet: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(copied ? Color.rsvpYesFallback : Color.accentPurpleFallback)
+                            .background(
+                                copied
+                                    ? AnyShapeStyle(Color.rsvpYesFallback)
+                                    : AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                            )
                             .clipShape(Capsule())
                     }
                 }
@@ -370,7 +402,8 @@ struct InviteLinkSheet: View {
 
                 Spacer()
             }
-            .padding()
+            .horizontalPadding()
+            .padding(.vertical)
             .navigationTitle("Invite Link")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

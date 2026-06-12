@@ -31,12 +31,14 @@ struct AddCategorySheet: View {
                     TextField("e.g. Venue, Catering", text: $name)
                         .submitLabel(.done)
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 Section("Budget Amount") {
                     TextField("Allocated budget", value: $allocated, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
                         .keyboardType(.decimalPad)
                         .submitLabel(.done)
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 Section("Icon") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 12) {
@@ -54,6 +56,7 @@ struct AddCategorySheet: View {
                         }
                     }
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 Section("Color") {
                     HStack(spacing: 12) {
@@ -70,6 +73,7 @@ struct AddCategorySheet: View {
                         }
                     }
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
 
                 if !functions.isEmpty {
                     Section("Link to Function (Optional)") {
@@ -80,28 +84,50 @@ struct AddCategorySheet: View {
                             }
                         }
                     }
+                    .listRowBackground(Color.gatherSecondaryBackground)
                 }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.gatherBackground)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    let category = BudgetCategory(
+                        name: name,
+                        icon: icon,
+                        allocated: allocated,
+                        color: color,
+                        sortOrder: budget.categories.count,
+                        functionId: selectedFunctionId ?? filterFunction?.id
+                    )
+                    budget.categories.append(category)
+                    dismiss()
+                } label: {
+                    Text("Add Category")
+                        .font(GatherFont.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(LinearGradient.gatherAccentGradient)
+                        .clipShape(Capsule())
+                }
+                .disabled(name.isEmpty)
+                .opacity(name.isEmpty ? 0.5 : 1)
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.vertical, Spacing.sm)
+                .background(
+                    LinearGradient(
+                        colors: [Color.gatherBackground.opacity(0), Color.gatherBackground],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
             .navigationTitle("Add Category")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        let category = BudgetCategory(
-                            name: name,
-                            icon: icon,
-                            allocated: allocated,
-                            color: color,
-                            sortOrder: budget.categories.count,
-                            functionId: selectedFunctionId ?? filterFunction?.id
-                        )
-                        budget.categories.append(category)
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty)
                 }
             }
         }

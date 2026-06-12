@@ -42,23 +42,11 @@ struct NotificationsView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
-            Image(systemName: "bell.slash")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.gatherTertiaryText)
-
-            VStack(spacing: Spacing.xs) {
-                Text("No Notifications")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
-
-                Text("You're all caught up! Notifications about RSVPs, payments, and event updates will appear here.")
-                    .font(GatherFont.callout)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .padding(Spacing.xl)
+        GatherEmptyState(
+            icon: "bell",
+            title: "You're all caught up",
+            message: "RSVPs, payments, and event updates will land here as they happen."
+        )
     }
 
     // MARK: - Notification List
@@ -75,6 +63,8 @@ struct NotificationsView: View {
                 } header: {
                     HStack {
                         Text("New")
+                            .font(GatherFont.headline)
+                            .foregroundStyle(Color.gatherPrimaryText)
                         Spacer()
                         Text("\(unread.count)")
                             .font(.caption2)
@@ -85,16 +75,19 @@ struct NotificationsView: View {
                             .background(Color.accentPurpleFallback)
                             .clipShape(Capsule())
                     }
+                    .textCase(nil)
                 }
             }
 
             // Today
             let today = notifications.filter { $0.isRead && Calendar.current.isDateInToday($0.createdAt) }
             if !today.isEmpty {
-                Section("Today") {
+                Section {
                     ForEach(today) { notification in
                         notificationRow(notification)
                     }
+                } header: {
+                    sectionHeader("Today")
                 }
             }
 
@@ -105,10 +98,12 @@ struct NotificationsView: View {
                 n.createdAt > Date().addingTimeInterval(-604800)
             }
             if !thisWeek.isEmpty {
-                Section("This Week") {
+                Section {
                     ForEach(thisWeek) { notification in
                         notificationRow(notification)
                     }
+                } header: {
+                    sectionHeader("This Week")
                 }
             }
 
@@ -117,13 +112,25 @@ struct NotificationsView: View {
                 n.isRead && n.createdAt <= Date().addingTimeInterval(-604800)
             }
             if !older.isEmpty {
-                Section("Earlier") {
+                Section {
                     ForEach(older) { notification in
                         notificationRow(notification)
                     }
+                } header: {
+                    sectionHeader("Earlier")
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.gatherBackground)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(GatherFont.headline)
+            .foregroundStyle(Color.gatherPrimaryText)
+            .textCase(nil)
     }
 
     // MARK: - Notification Row
@@ -136,9 +143,9 @@ struct NotificationsView: View {
                 // Icon
                 Image(systemName: notification.type.icon)
                     .font(.callout)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(iconColor(notification.type.color))
                     .frame(width: 34, height: 34)
-                    .background(iconColor(notification.type.color))
+                    .background(Color.gatherTertiaryBackground)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -176,12 +183,16 @@ struct NotificationsView: View {
                     Circle()
                         .fill(Color.accentPurpleFallback)
                         .frame(width: 8, height: 8)
+                        .padding(.top, Spacing.xxs)
                 }
             }
-            .padding(.vertical, 2)
+            .padding(Spacing.md)
+            .surfaceCard()
         }
         .buttonStyle(.plain)
-        .listRowBackground(isUnread ? Color.accentPurpleFallback.opacity(0.05) : nil)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: Spacing.xxs, leading: Layout.horizontalPadding, bottom: Spacing.xxs, trailing: Layout.horizontalPadding))
     }
 
     // MARK: - Helpers

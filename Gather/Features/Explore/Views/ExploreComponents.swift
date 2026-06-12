@@ -23,7 +23,7 @@ struct HappeningSoonCard: View {
                     HStack {
                         VStack(spacing: 0) {
                             Text(dayOfMonth)
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .font(.system(size: 18, weight: .bold))
                             Text(monthAbbrev)
                                 .font(.caption2)
                                 .fontWeight(.semibold)
@@ -105,7 +105,7 @@ struct HappeningSoonCard: View {
             .padding(Spacing.sm)
         }
         .frame(width: 200)
-        .glassCardLite()
+        .surfaceCard()
         .drawingGroup()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(event.title), \(relativeDay). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending")
@@ -131,7 +131,7 @@ struct HappeningSoonCard: View {
         let calendar = Calendar.current
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: event.startDate)).day ?? 0
         if days <= 1 { return Color.warmCoral }
-        if days <= 3 { return Color.sunshineYellow }
+        if days <= 3 { return Color.sunshineYellowText }
         return Color.accentPurpleFallback
     }
 }
@@ -254,7 +254,7 @@ struct ExploreGridCard: View {
             }
             .padding(Spacing.sm)
         }
-        .glassCardLite()
+        .surfaceCard()
         .drawingGroup()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(event.title). \(priceLabel). \(smartDate). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending")
@@ -269,14 +269,15 @@ struct ExploreGridCard: View {
         return "FREE"
     }
 
+    // Darker fills than the pastel palette — these chips carry white text
     private var priceColor: Color {
-        guard event.hasTicketing else { return Color.softLavender }
+        guard event.hasTicketing else { return Color.customSlateDark }
         let tiers = event.ticketTiers
         if let cheapest = tiers.min(by: { $0.price < $1.price }),
            cheapest.price > 0 {
             return Color.accentPurpleFallback
         }
-        return Color.mintGreen
+        return Color.rsvpYesFallback
     }
 
     /// Smart date: shows "Tomorrow", "This Sat", or "Feb 12"

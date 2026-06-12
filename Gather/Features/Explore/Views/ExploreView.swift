@@ -25,18 +25,18 @@ struct ExploreView: View {
                 VStack(spacing: 0) {
                     // Custom Header
                     greetingHeader
-                        .padding(.horizontal)
+                        .horizontalPadding()
                         .padding(.bottom, Spacing.md)
 
                     // Search + Filter Row
                     searchAndFilterBar
-                        .padding(.horizontal)
+                        .horizontalPadding()
                         .padding(.bottom, Spacing.md)
 
                     // Active Filters
                     if hasActiveFilters {
                         activeFilterChips
-                            .padding(.horizontal)
+                            .horizontalPadding()
                             .padding(.bottom, Spacing.sm)
                     }
 
@@ -47,7 +47,7 @@ struct ExploreView: View {
                     // Featured Event
                     if let featured = result.featuredEvent {
                         featuredCard(event: featured)
-                            .padding(.horizontal)
+                            .horizontalPadding()
                             .padding(.bottom, Spacing.lg)
                             .bouncyAppear()
                     }
@@ -62,23 +62,24 @@ struct ExploreView: View {
                     // Events
                     if result.filteredEvents.isEmpty {
                         emptyState
-                            .padding(.horizontal)
+                            .horizontalPadding()
                             .transition(.opacity)
                     } else {
                         eventsGrid(events: result.nonFeaturedGridEvents)
-                            .padding(.horizontal)
+                            .horizontalPadding()
                             .animation(.easeInOut(duration: 0.2), value: result.filteredEvents.map(\.id))
                     }
 
                     // Create Event CTA
                     createEventCTA
-                        .padding(.horizontal)
+                        .horizontalPadding()
                         .padding(.top, Spacing.lg)
                         .padding(.bottom, Spacing.xl)
                         .bouncyAppear(delay: 0.1)
                 }
                 .padding(.bottom, Layout.tabBarHeight + 20)
             }
+            .background(Color.gatherBackground.ignoresSafeArea())
             .refreshable {
                 try? await Task.sleep(for: .milliseconds(500))
             }
@@ -132,8 +133,7 @@ struct ExploreView: View {
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 Text("Explore")
-                    .font(GatherFont.largeTitle)
-                    .foregroundStyle(Color.gatherPrimaryText)
+                    .gatherLargeTitle()
                     .accessibilityAddTraits(.isHeader)
             }
 
@@ -147,18 +147,7 @@ struct ExploreView: View {
                     .foregroundStyle(Color.accentPurpleFallback)
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, Spacing.xxs)
-                    .background(.ultraThinMaterial)
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 1
-                            )
-                    )
+                    .background(Color.gatherSecondaryBackground)
                     .clipShape(Capsule())
             }
         }
@@ -179,12 +168,12 @@ struct ExploreView: View {
 
     private var searchAndFilterBar: some View {
         HStack(spacing: Spacing.sm) {
-            // Search field - frosted glass
+            // Search field - solid capsule
             HStack(spacing: Spacing.sm) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(isSearchFocused ? Color.accentPurpleFallback : Color.gatherSecondaryText)
                     .fontWeight(.medium)
-                    .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSearchFocused)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSearchFocused)
 
                 TextField("Search events, venues...", text: $searchText)
                     .font(GatherFont.body)
@@ -207,22 +196,16 @@ struct ExploreView: View {
             }
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, Spacing.sm)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+            .background(Color.gatherSecondaryBackground)
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: CornerRadius.lg)
+                Capsule()
                     .strokeBorder(
-                        isSearchFocused
-                            ? AnyShapeStyle(Color.accentPurpleFallback.opacity(0.5))
-                            : AnyShapeStyle(LinearGradient(
-                                colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                startPoint: .top,
-                                endPoint: .bottom
-                              )),
-                        lineWidth: isSearchFocused ? 1.5 : 1
+                        isSearchFocused ? Color.accentPurpleFallback.opacity(0.5) : Color.clear,
+                        lineWidth: 1.5
                     )
             )
-            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSearchFocused)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSearchFocused)
 
             // Filter button
             Button {
@@ -238,22 +221,9 @@ struct ExploreView: View {
                         .background(
                             hasLocationFilter
                                 ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                                : AnyShapeStyle(.ultraThinMaterial)
+                                : AnyShapeStyle(Color.gatherSecondaryBackground)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: CornerRadius.md)
-                                .strokeBorder(
-                                    hasLocationFilter
-                                        ? AnyShapeStyle(Color.clear)
-                                        : AnyShapeStyle(LinearGradient(
-                                            colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )),
-                                    lineWidth: 1
-                                )
-                        )
 
                     if hasLocationFilter {
                         Circle()
@@ -274,28 +244,28 @@ struct ExploreView: View {
             HStack(spacing: Spacing.xs) {
                 if let city = selectedCity {
                     filterChip(label: city, icon: "building.2") {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             selectedCity = nil
                         }
                     }
                 }
                 if let state = selectedState {
                     filterChip(label: state, icon: "map") {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             selectedState = nil
                         }
                     }
                 }
                 if let country = selectedCountry {
                     filterChip(label: country, icon: "globe") {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             selectedCountry = nil
                         }
                     }
                 }
                 if let category = selectedCategory {
                     filterChip(label: category.displayName, icon: category.icon) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             selectedCategory = nil
                         }
                     }
@@ -304,7 +274,7 @@ struct ExploreView: View {
                 // Clear all
                 if activeFilterCount > 1 {
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             selectedCity = nil
                             selectedState = nil
                             selectedCountry = nil
@@ -351,11 +321,11 @@ struct ExploreView: View {
                     title: "All",
                     emoji: "\u{2728}",
                     count: publicEvents.count,
-                    gradient: LinearGradient.gatherAccentGradient,
+                    accent: Color.accentPurpleFallback,
                     isSelected: selectedCategory == nil
                 ) {
                     HapticService.tabSwitch()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                         selectedCategory = nil
                     }
                 }
@@ -366,17 +336,17 @@ struct ExploreView: View {
                         title: category.displayName,
                         emoji: category.emoji,
                         count: count,
-                        gradient: LinearGradient.categoryGradient(for: category),
+                        accent: Color.forCategory(category),
                         isSelected: selectedCategory == category
                     ) {
                         HapticService.tabSwitch()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                             selectedCategory = category
                         }
                     }
                 }
             }
-            .padding(.horizontal)
+            .horizontalPadding()
         }
     }
 
@@ -526,7 +496,7 @@ struct ExploreView: View {
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
-            .padding(.horizontal)
+            .horizontalPadding()
 
             // Horizontal scroll
             ScrollView(.horizontal, showsIndicators: false) {
@@ -543,7 +513,7 @@ struct ExploreView: View {
                         .accessibilityHint("Double tap to view event details")
                     }
                 }
-                .padding(.horizontal)
+                .horizontalPadding()
             }
         }
     }
@@ -618,7 +588,7 @@ struct ExploreView: View {
                     .foregroundStyle(Color.accentPurpleFallback)
             }
             .padding(Spacing.md)
-            .glassCard()
+            .surfaceCard()
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Host your own event. Create and share with friends.")
             .accessibilityAddTraits(.isButton)
@@ -628,63 +598,23 @@ struct ExploreView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.lg) {
-            Spacer()
-                .frame(height: 40)
+        GatherEmptyState(
+            icon: "sparkle.magnifyingglass",
+            title: "No Events Found",
+            message: emptyMessage,
+            actionTitle: hasActiveFilters ? "Clear Filters" : nil,
+            action: hasActiveFilters ? clearAllFilters : nil
+        )
+        .padding(.top, Spacing.xl)
+    }
 
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.accentPurpleFallback.opacity(0.12), Color.accentPinkFallback.opacity(0.08)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 110, height: 110)
-
-                Image(systemName: "sparkle.magnifyingglass")
-                    .font(.system(size: 44))
-                    .foregroundStyle(
-                        LinearGradient.gatherAccentGradient
-                    )
-            }
-
-            VStack(spacing: Spacing.sm) {
-                Text("No Events Found")
-                    .font(GatherFont.title3)
-                    .foregroundStyle(Color.gatherPrimaryText)
-                    .accessibilityAddTraits(.isHeader)
-
-                Text(emptyMessage)
-                    .font(GatherFont.body)
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Spacing.xl)
-            }
-
-            if hasActiveFilters {
-                Button {
-                    withAnimation {
-                        selectedCity = nil
-                        selectedState = nil
-                        selectedCountry = nil
-                        selectedCategory = nil
-                        searchText = ""
-                    }
-                } label: {
-                    Text("Clear Filters")
-                        .font(GatherFont.callout)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, Spacing.lg)
-                        .padding(.vertical, Spacing.sm)
-                        .background(LinearGradient.gatherAccentGradient)
-                        .clipShape(Capsule())
-                }
-            }
-
-            Spacer()
+    private func clearAllFilters() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            selectedCity = nil
+            selectedState = nil
+            selectedCountry = nil
+            selectedCategory = nil
+            searchText = ""
         }
     }
 
@@ -837,9 +767,14 @@ struct ExploreCategoryChip: View {
     let title: String
     let emoji: String
     var count: Int = 0
-    let gradient: LinearGradient
+    let accent: Color
     let isSelected: Bool
     let action: () -> Void
+
+    // Conference/meetup accents are light fills; white text fails contrast on them
+    private var usesDarkText: Bool {
+        accent == .sunshineYellow || accent == .mintGreen
+    }
 
     var body: some View {
         Button(action: action) {
@@ -855,40 +790,31 @@ struct ExploreCategoryChip: View {
                     Text("\(count)")
                         .font(.caption2)
                         .fontWeight(.bold)
-                        .foregroundStyle(isSelected ? .white.opacity(0.8) : Color.gatherSecondaryText)
+                        .foregroundStyle(
+                            isSelected
+                                ? (usesDarkText ? Color.black.opacity(0.7) : Color.white.opacity(0.8))
+                                : Color.gatherSecondaryText
+                        )
                         .contentTransition(.numericText())
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(
                             isSelected
-                                ? .white.opacity(0.2)
+                                ? (usesDarkText ? Color.black.opacity(0.1) : Color.white.opacity(0.2))
                                 : Color.gatherTertiaryBackground
                         )
                         .clipShape(Capsule())
                 }
             }
-            .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
+            .foregroundStyle(
+                isSelected
+                    ? (usesDarkText ? Color.black.opacity(0.85) : Color.white)
+                    : Color.gatherPrimaryText
+            )
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, 10)
-            .background(
-                isSelected
-                    ? AnyShapeStyle(gradient)
-                    : AnyShapeStyle(.ultraThinMaterial)
-            )
+            .background(isSelected ? accent : Color.gatherSecondaryBackground)
             .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(
-                        isSelected
-                            ? AnyShapeStyle(Color.clear)
-                            : AnyShapeStyle(LinearGradient(
-                                colors: [Color.glassBorderTop, Color.glassBorderBottom],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )),
-                        lineWidth: 1
-                    )
-            )
             .scaleEffect(isSelected ? 1.05 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
         }
@@ -917,25 +843,6 @@ extension EventCategory {
 // MARK: - Category Gradients
 
 extension LinearGradient {
-    static func categoryGradient(for category: EventCategory) -> LinearGradient {
-        switch category {
-        case .wedding:
-            return LinearGradient(colors: [.weddingRose, .weddingRoseLight], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .party:
-            return LinearGradient(colors: [.accentPurpleFallback, .accentPinkFallback], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .office:
-            return LinearGradient(colors: [.officeBlue, .officeBlueLight], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .conference:
-            return LinearGradient(colors: [.conferenceAmber, .conferenceGold], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .concert:
-            return LinearGradient(colors: [.concertRed, .concertSalmon], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .meetup:
-            return LinearGradient(colors: [.meetupTeal, .meetupGreenLight], startPoint: .topLeading, endPoint: .bottomTrailing)
-        case .custom:
-            return LinearGradient(colors: [.customSlate, .customSlateLight], startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-    }
-
     static func categoryGradientVibrant(for category: EventCategory) -> LinearGradient {
         switch category {
         case .wedding:

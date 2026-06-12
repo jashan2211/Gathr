@@ -24,13 +24,9 @@ struct LocationFilterSheet: View {
                             icon: "building.2.fill",
                             items: availableCities,
                             selected: selectedCity,
-                            gradient: LinearGradient(
-                                colors: [Color.accentPurpleFallback, Color.accentPurpleFallback.opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            accent: Color.accentPurpleFallback
                         ) { city in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 selectedCity = selectedCity == city ? nil : city
                             }
                         }
@@ -43,13 +39,9 @@ struct LocationFilterSheet: View {
                             icon: "map.fill",
                             items: availableStates,
                             selected: selectedState,
-                            gradient: LinearGradient(
-                                colors: [Color.accentPinkFallback, Color.accentPinkFallback.opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            accent: Color.accentPinkFallback
                         ) { state in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 selectedState = selectedState == state ? nil : state
                             }
                         }
@@ -62,40 +54,34 @@ struct LocationFilterSheet: View {
                             icon: "globe",
                             items: availableCountries,
                             selected: selectedCountry,
-                            gradient: LinearGradient(
-                                colors: [Color.rsvpYesFallback, Color.rsvpYesFallback.opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            accent: Color.rsvpYesFallback
                         ) { country in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 selectedCountry = selectedCountry == country ? nil : country
                             }
                         }
                     }
 
                     if availableCities.isEmpty && availableStates.isEmpty && availableCountries.isEmpty {
-                        VStack(spacing: Spacing.md) {
-                            Image(systemName: "map")
-                                .font(.system(size: 40))
-                                .foregroundStyle(Color.gatherSecondaryText.opacity(0.5))
-                            Text("No location data available")
-                                .font(GatherFont.body)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
+                        GatherEmptyState(
+                            icon: "map",
+                            title: "No Locations Yet",
+                            message: "Events with venue details will show up here so you can filter by place."
+                        )
+                        .padding(.top, Spacing.xl)
                     }
                 }
-                .padding()
+                .horizontalPadding()
+                .padding(.vertical, Spacing.md)
             }
+            .background(Color.gatherBackground.ignoresSafeArea())
             .navigationTitle("Filter by Location")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if selectedCity != nil || selectedState != nil || selectedCountry != nil {
                         Button("Reset") {
-                            withAnimation {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                                 selectedCity = nil
                                 selectedState = nil
                                 selectedCountry = nil
@@ -120,7 +106,7 @@ struct LocationFilterSheet: View {
         icon: String,
         items: [String],
         selected: String?,
-        gradient: LinearGradient,
+        accent: Color,
         onSelect: @escaping (String) -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -128,7 +114,7 @@ struct LocationFilterSheet: View {
             HStack(spacing: Spacing.xs) {
                 Image(systemName: icon)
                     .font(.callout)
-                    .foregroundStyle(Color.accentPurpleFallback)
+                    .foregroundStyle(accent)
                 Text(title)
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.gatherPrimaryText)
@@ -146,19 +132,8 @@ struct LocationFilterSheet: View {
                             .foregroundStyle(selected == item ? .white : Color.gatherPrimaryText)
                             .padding(.horizontal, Spacing.md)
                             .padding(.vertical, Spacing.xs)
-                            .background(
-                                selected == item
-                                    ? AnyShapeStyle(gradient)
-                                    : AnyShapeStyle(Color.gatherSecondaryBackground)
-                            )
+                            .background(selected == item ? accent : Color.gatherSecondaryBackground)
                             .clipShape(Capsule())
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(
-                                        selected == item ? Color.clear : Color.gatherSecondaryText.opacity(0.2),
-                                        lineWidth: 1
-                                    )
-                            )
                     }
                     .scaleEffect(selected == item ? 1.05 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: selected == item)

@@ -5,6 +5,7 @@ import SwiftData
 
 struct QuickAddExpenseSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Bindable var budget: Budget
     let functions: [EventFunction]
 
@@ -12,7 +13,7 @@ struct QuickAddExpenseSheet: View {
     @State private var amount: Double = 0
     @State private var vendorName = ""
     @State private var paidByName = ""
-    @State private var isPaid = false
+    @State private var paidSoFar: Double = 0
     @State private var hasDueDate = false
     @State private var dueDate = Date()
     @State private var notes = ""
@@ -63,11 +64,32 @@ struct QuickAddExpenseSheet: View {
                 .listRowBackground(Color.gatherSecondaryBackground)
 
                 Section("Payment Status") {
-                    Toggle("Already Paid", isOn: $isPaid)
+                    HStack(spacing: Spacing.sm) {
+                        TextField("Paid so far", value: $paidSoFar, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                            .keyboardType(.decimalPad)
+                            .submitLabel(.done)
+                            .accessibilityLabel("Amount paid so far")
 
-                    if isPaid {
-                        // No due date needed
-                    } else {
+                        Button {
+                            HapticService.buttonTap()
+                            paidSoFar = amount
+                        } label: {
+                            Text("Full amount")
+                                .font(GatherFont.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.accentPurpleFallback)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.gatherTertiaryBackground)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(amount <= 0)
+                        .opacity(amount <= 0 ? 0.5 : 1)
+                        .accessibilityLabel("Mark the full amount as paid")
+                    }
+
+                    if paidSoFar < amount || amount <= 0 {
                         Toggle("Has Due Date", isOn: $hasDueDate)
                         if hasDueDate {
                             DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
@@ -88,13 +110,11 @@ struct QuickAddExpenseSheet: View {
                     .listRowBackground(Color.gatherSecondaryBackground)
                 }
 
-                if !isPaid {
-                    Section("Notes (Optional)") {
-                        TextField("e.g. 50% deposit, balance due on event day", text: $notes, axis: .vertical)
-                            .lineLimit(3, reservesSpace: true)
-                    }
-                    .listRowBackground(Color.gatherSecondaryBackground)
+                Section("Notes (Optional)") {
+                    TextField("e.g. 50% deposit, balance due on event day", text: $notes, axis: .vertical)
+                        .lineLimit(3, reservesSpace: true)
                 }
+                .listRowBackground(Color.gatherSecondaryBackground)
             }
             .scrollContentBackground(.hidden)
             .background(Color.gatherBackground)
@@ -106,8 +126,8 @@ struct QuickAddExpenseSheet: View {
                     let expense = Expense(
                         name: name,
                         amount: amount,
-                        isPaid: isPaid,
-                        paidDate: isPaid ? Date() : nil,
+                        isPaid: false,
+                        paidDate: nil,
                         dueDate: hasDueDate ? dueDate : nil,
                         notes: notes.isEmpty ? nil : notes,
                         vendorName: vendorName.isEmpty ? nil : vendorName,
@@ -115,7 +135,11 @@ struct QuickAddExpenseSheet: View {
                         functionId: selectedFunctionId
                     )
                     category.expenses.append(expense)
-                    category.spent += amount
+                    if paidSoFar > 0 {
+                        expense.recordPayment(amount: min(paidSoFar, amount))
+                    }
+                    category.reconcileSpent()
+                    modelContext.safeSave()
                     dismiss()
                 } label: {
                     Text("Add Expense")

@@ -338,10 +338,17 @@ struct ExpenseRow: View {
                 Text(expense.amount.asCurrency)
                     .font(GatherFont.headline)
 
-                if expense.isPaid {
+                switch expense.paymentState {
+                case .paid:
                     Label("Paid", systemImage: "checkmark.circle.fill")
                         .font(.caption2)
                         .foregroundStyle(Color.gatherSuccess)
+                case .partial:
+                    Label("Partial \u{00B7} \(expense.amountRemaining.asCurrency) left", systemImage: "circle.bottomhalf.filled")
+                        .font(.caption2)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                case .unpaid:
+                    EmptyView()
                 }
             }
         }

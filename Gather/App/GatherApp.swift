@@ -158,24 +158,37 @@ struct GatherApp: App {
     // MARK: - Deep Link Handling
 
     private func handleDeepLink(_ url: URL) {
-        // Handle gather://rsvp/{eventId}/{guestId}
-        // Handle gather://event/{eventId}
-        guard url.scheme == "gather" else { return }
+        // Custom scheme:   gather://rsvp/{eventId}/{guestId}
+        //                  gather://event/{eventId}
+        // Universal links: https://thebighead.ca/gathr/rsvp/{eventId}/{guestId}
+        //                  https://thebighead.ca/gathr/event/{eventId}
+        let kind: String
+        let ids: [String]
 
-        let pathComponents = url.pathComponents.filter { $0 != "/" }
+        if url.scheme == "gather" {
+            kind = url.host ?? ""
+            ids = url.pathComponents.filter { $0 != "/" }
+        } else if url.host == "thebighead.ca" || url.host == "www.thebighead.ca" {
+            var parts = url.pathComponents.filter { $0 != "/" }
+            guard parts.first == "gathr", parts.count >= 2 else { return }
+            parts.removeFirst()
+            kind = parts.removeFirst()
+            ids = parts
+        } else {
+            return
+        }
 
-        switch url.host {
+        switch kind {
         case "event":
-            if let eventIdString = pathComponents.first,
+            if let eventIdString = ids.first,
                let eventId = UUID(uuidString: eventIdString) {
                 appState.deepLinkEventId = eventId
             }
         case "rsvp":
-            if pathComponents.count >= 2,
-               let eventIdString = pathComponents.first,
+            if let eventIdString = ids.first,
                let eventId = UUID(uuidString: eventIdString) {
                 appState.deepLinkEventId = eventId
-                if let guestIdString = pathComponents.dropFirst().first,
+                if let guestIdString = ids.dropFirst().first,
                    let guestId = UUID(uuidString: guestIdString) {
                     appState.deepLinkGuestId = guestId
                     appState.showRSVPForDeepLink = true

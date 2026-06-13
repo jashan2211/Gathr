@@ -1,4 +1,6 @@
 import SwiftUI
+import MessageUI
+import CoreImage
 
 // MARK: - Invite Quick Action Pill
 
@@ -81,6 +83,12 @@ struct GuestChip: View {
     let isSelected: Bool
     let onTap: () -> Void
 
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
@@ -99,10 +107,20 @@ struct GuestChip: View {
                             .foregroundStyle(isSelected ? .white : Color.gatherSecondaryText)
                     }
 
-                Text(guest.name)
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(guest.name)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+
+                    // Invite delivery metadata — "Sent · 2 hr. ago"
+                    if let sentAt = guest.inviteSentAt {
+                        Text("Sent · \(Self.relativeFormatter.localizedString(for: sentAt, relativeTo: Date()))")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Color.rsvpYesFallback)
+                            .lineLimit(1)
+                    }
+                }
 
                 if isSelected {
                     Image(systemName: "checkmark")
@@ -122,6 +140,16 @@ struct GuestChip: View {
                     )
             )
         }
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        var label = guest.name
+        label += isSelected ? ", selected" : ", not selected"
+        if let sentAt = guest.inviteSentAt {
+            label += ", invite sent \(Self.relativeFormatter.localizedString(for: sentAt, relativeTo: Date()))"
+        }
+        return label
     }
 }
 
@@ -218,5 +246,170 @@ extension InviteChannel {
         case .copied: return "Copy"
         case .inAppLink: return "Link"
         }
+    }
+}
+
+// MARK: - In-App Message Compose (MessageUI)
+
+/// SwiftUI wrapper around `MFMessageComposeViewController` so SMS invites are
+/// composed in-app instead of bouncing the host out to the Messages app.
+/// The parent owns presentation — on finish it swaps in the next guest's
+/// compose (via `.id`) rather than dismissing.
+struct InviteMessageComposeView: UIViewControllerRepresentable {
+    let recipients: [String]
+    let body: String
+    let onFinish: (MessageComposeResult) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onFinish: onFinish)
+    }
+
+    func makeUIViewController(context: Context) -> MFMessageComposeViewController {
+        let controller = MFMessageComposeViewController()
+        controller.recipients = recipients
+        controller.body = body
+        controller.messageComposeDelegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: MFMessageComposeViewController, context: Context) {}
+
+    final class Coordinator: NSObject, MFMessageComposeViewControllerDelegate {
+        let onFinish: (MessageComposeResult) -> Void
+
+        init(onFinish: @escaping (MessageComposeResult) -> Void) {
+            self.onFinish = onFinish
+        }
+
+        func messageComposeViewController(
+            _ controller: MFMessageComposeViewController,
+            didFinishWith result: MessageComposeResult
+        ) {
+            onFinish(result)
+        }
+    }
+}
+
+// MARK: - In-App Mail Compose (MessageUI)
+
+/// SwiftUI wrapper around `MFMailComposeViewController`. Used both for the
+/// one-tap BCC email blast and the personalized one-by-one email flow.
+struct InviteMailComposeView: UIViewControllerRepresentable {
+    let toRecipients: [String]
+    let bccRecipients: [String]
+    let subject: String
+    let body: String
+    let onFinish: (MFMailComposeResult) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onFinish: onFinish)
+    }
+
+    func makeUIViewController(context: Context) -> MFMailComposeViewController {
+        let controller = MFMailComposeViewController()
+        controller.setToRecipients(toRecipients)
+        controller.setBccRecipients(bccRecipients)
+        controller.setSubject(subject)
+        controller.setMessageBody(body, isHTML: false)
+        controller.mailComposeDelegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) {}
+
+    final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
+        let onFinish: (MFMailComposeResult) -> Void
+
+        init(onFinish: @escaping (MFMailComposeResult) -> Void) {
+            self.onFinish = onFinish
+        }
+
+        func mailComposeController(
+            _ controller: MFMailComposeViewController,
+            didFinishWith result: MFMailComposeResult,
+            error: Error?
+        ) {
+            onFinish(result)
+        }
+    }
+}
+
+// MARK: - Invite QR Code
+
+/// QR code for the event share link, rendered with CoreImage's
+/// `CIQRCodeGenerator`. Images are memoized — body re-evaluations of the
+/// parent sheet shouldn't re-run the CIFilter pipeline.
+struct InviteQRCodeView: View {
+    let urlString: String
+
+    private static let cache = NSCache<NSString, UIImage>()
+
+    var body: some View {
+        if let image = Self.qrImage(for: urlString) {
+            Image(uiImage: image)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
+        } else {
+            Image(systemName: "qrcode")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(Color.gatherSecondaryText.opacity(0.4))
+        }
+    }
+
+    static func qrImage(for string: String) -> UIImage? {
+        if let cached = cache.object(forKey: string as NSString) {
+            return cached
+        }
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(Data(string.utf8), forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        guard let output = filter.outputImage else { return nil }
+
+        // Scale up — the raw output is tiny and would blur when resized.
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 12, y: 12))
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
+
+        let image = UIImage(cgImage: cgImage)
+        cache.setObject(image, forKey: string as NSString)
+        return image
+    }
+}
+
+// MARK: - Delivery Plan Row
+
+/// One line of the smart-routing plan, e.g. "8 via Messages".
+struct InvitePlanRow: View {
+    let icon: String
+    let count: Int
+    let label: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: icon)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(color)
+                .frame(width: 28, height: 28)
+                .background(color.opacity(0.12))
+                .clipShape(Circle())
+
+            Text("\(count)")
+                .font(GatherFont.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.gatherPrimaryText)
+                .monospacedDigit()
+
+            Text(label)
+                .font(GatherFont.callout)
+                .foregroundStyle(Color.gatherSecondaryText)
+
+            Spacer()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(count) \(label)")
     }
 }

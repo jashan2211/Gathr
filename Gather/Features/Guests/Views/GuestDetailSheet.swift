@@ -479,8 +479,12 @@ struct GuestDetailSheet: View {
 
     private func removeGuest() {
         event.guests.removeAll { $0.id == guest.id }
-        // Remove related function invites
+        // Delete related function invites (not just unlink — avoids orphaned rows)
         for function in event.functions {
+            let orphanedInvites = function.invites.filter { $0.guestId == guest.id }
+            for invite in orphanedInvites {
+                modelContext.delete(invite)
+            }
             function.invites.removeAll { $0.guestId == guest.id }
         }
         modelContext.delete(guest)

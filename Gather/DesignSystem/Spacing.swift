@@ -922,6 +922,12 @@ struct CategoryMeshBackground: View {
                 .softLavender.opacity(0.4), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.3), neutralFillMid,
                 neutralFill, .softLavender.opacity(0.3), Color(red: 0.35, green: 0.55, blue: 1.0).opacity(0.2)
             ]
+        case .sports:
+            return [
+                .sportsEmerald, .neonBlue.opacity(0.5), neutralFill,
+                .neonBlue.opacity(0.35), .sportsEmerald.opacity(0.6), neutralFillMid,
+                neutralFill, .sportsEmerald.opacity(0.4), .neonBlue.opacity(0.3)
+            ]
         case .custom:
             return [
                 .accentPurpleFallback.opacity(0.5), .gatherSecondaryBackground, neutralFillMid,

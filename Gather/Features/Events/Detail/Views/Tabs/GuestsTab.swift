@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GuestsTab: View {
     @Bindable var event: Event
+    @Environment(\.modelContext) private var modelContext
     @State private var searchText = ""
     @State private var selectedGuests: Set<UUID> = []
     @State private var isSelectionMode = false
@@ -9,7 +10,22 @@ struct GuestsTab: View {
     @State private var showSendInvites = false
     @State private var selectedGuest: Guest?
     @State private var filterStatus: GuestFilter = .all
+    /// Parallel to `filterStatus` — GuestFilter can't gain a case without
+    /// breaking GuestFilterBar's exhaustive switch, so waitlist is a side filter.
+    @State private var showWaitlistedOnly = false
+    @State private var guestPendingRemoval: Guest?
+    @State private var guestPendingPromotion: Guest?
+    @State private var dietaryExpanded = false
+    @AppStorage("guestSortOrder") private var guestSortOrderRaw = GuestSortOrder.name.rawValue
     @EnvironmentObject var authManager: AuthManager
+
+    private var sortOrder: GuestSortOrder {
+        GuestSortOrder(rawValue: guestSortOrderRaw) ?? .name
+    }
+
+    private var hasWaitlistedGuests: Bool {
+        event.guests.contains { $0.status == .waitlisted }
+    }
 
     private var isHost: Bool {
         event.hostId == authManager.currentUser?.id
@@ -39,6 +55,31 @@ struct GuestsTab: View {
     private var isPrivacyMode: Bool {
         !isHost && event.privacy == .publicEvent &&
         (event.guestListVisibility == .firstNamesOnly || event.guestListVisibility == .visible)
+    }
+
+    enum GuestSortOrder: String, CaseIterable {
+        case name
+        case status
+        case recentlyAdded
+        case partySize
+
+        var displayName: String {
+            switch self {
+            case .name: return "Name"
+            case .status: return "RSVP status"
+            case .recentlyAdded: return "Recently added"
+            case .partySize: return "Party size"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .name: return "textformat"
+            case .status: return "envelope.open"
+            case .recentlyAdded: return "clock"
+            case .partySize: return "person.3"
+            }
+        }
     }
 
     enum GuestFilter: String, CaseIterable {
@@ -81,9 +122,17 @@ struct GuestsTab: View {
                 // Hidden mode
                 hiddenView
             } else {
-                // Full guest management (host view)
+                // Full guest management (host view) or plain list (non-host)
                 // Status Summary Bar
                 statusSummaryBar
+
+                if isHost {
+                    // Headcount summary strip
+                    headcountSummaryStrip
+
+                    // Dietary needs summary
+                    dietarySummaryCard
+                }
 
                 // Header with actions
                 headerSection
@@ -104,7 +153,13 @@ struct GuestsTab: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showSendInvites) {
+        .sheet(isPresented: $showSendInvites, onDismiss: {
+            // Quick-send / single-guest sends borrow the selection set;
+            // clear it so stale picks don't leak into selection mode.
+            if !isSelectionMode {
+                selectedGuests.removeAll()
+            }
+        }) {
             SendInvitesSheet(
                 event: event,
                 preselectedGuests: Array(selectedGuests)
@@ -117,6 +172,46 @@ struct GuestsTab: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .alert(
+            "Remove Guest",
+            isPresented: Binding(
+                get: { guestPendingRemoval != nil },
+                set: { if !$0 { guestPendingRemoval = nil } }
+            )
+        ) {
+            Button("Remove", role: .destructive) {
+                if let guest = guestPendingRemoval {
+                    removeGuest(guest)
+                }
+                guestPendingRemoval = nil
+            }
+            Button("Cancel", role: .cancel) { guestPendingRemoval = nil }
+        } message: {
+            Text("Are you sure you want to remove \(guestPendingRemoval?.name ?? "this guest") from this event? This action cannot be undone.")
+        }
+        .confirmationDialog(
+            "Event is at capacity — promote anyway?",
+            isPresented: Binding(
+                get: { guestPendingPromotion != nil },
+                set: { if !$0 { guestPendingPromotion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Promote") {
+                if let guest = guestPendingPromotion {
+                    applyStatus(.attending, to: guest)
+                }
+                guestPendingPromotion = nil
+            }
+            Button("Cancel", role: .cancel) { guestPendingPromotion = nil }
+        }
+        .onChange(of: hasWaitlistedGuests) { _, stillHasWaitlisted in
+            // If the last waitlisted guest was promoted/removed, fall back to All.
+            if !stillHasWaitlisted && showWaitlistedOnly {
+                showWaitlistedOnly = false
+                filterStatus = .all
+            }
+        }
     }
 
     // MARK: - Status Summary Bar
@@ -128,13 +223,208 @@ struct GuestsTab: View {
                     StatusPill(
                         filter: filter,
                         count: countForFilter(filter),
-                        isSelected: filterStatus == filter,
-                        onTap: { filterStatus = filter }
+                        isSelected: filterStatus == filter && !showWaitlistedOnly,
+                        onTap: {
+                            showWaitlistedOnly = false
+                            filterStatus = filter
+                        }
+                    )
+                }
+
+                if hasWaitlistedGuests {
+                    WaitlistPill(
+                        count: event.guests.filter { $0.status == .waitlisted }.count,
+                        isSelected: showWaitlistedOnly,
+                        onTap: { showWaitlistedOnly = true }
                     )
                 }
             }
             .horizontalPadding()
             .padding(.vertical, Spacing.sm)
+        }
+    }
+
+    // MARK: - Headcount Summary Strip
+
+    /// Expected headcount: everyone going or maybe, including party members.
+    private var expectedHeadcount: Int {
+        event.guests
+            .filter { $0.status == .attending || $0.status == .maybe }
+            .reduce(0) { $0 + $1.totalHeadcount }
+    }
+
+    @ViewBuilder
+    private var headcountSummaryStrip: some View {
+        if !event.guests.isEmpty {
+            HStack(spacing: Spacing.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(event.attendingCount) going · \(event.maybeCount) maybe · \(event.pendingCount) pending")
+                        .font(GatherFont.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .contentTransition(.numericText())
+
+                    Text("\(expectedHeadcount) expected")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .contentTransition(.numericText())
+                }
+
+                Spacer()
+
+                if let capacity = event.capacity, capacity > 0 {
+                    capacityChip(capacity: capacity)
+                }
+            }
+            .padding(Spacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .surfaceCard(cornerRadius: CornerRadius.md)
+            .horizontalPadding()
+            .padding(.bottom, Spacing.sm)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(headcountAccessibilityLabel)
+        }
+    }
+
+    private func capacityChip(capacity: Int) -> some View {
+        let tint: Color = event.isFull
+            ? .rsvpNoFallback
+            : (Double(event.attendingCount) >= Double(capacity) * 0.9
+                ? .rsvpMaybeFallback
+                : .gatherSecondaryText)
+
+        return Text("\(event.attendingCount) of \(capacity) capacity")
+            .font(GatherFont.caption)
+            .fontWeight(.medium)
+            .foregroundStyle(tint)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.xs)
+            .background(tint.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
+    private var headcountAccessibilityLabel: String {
+        var label = "\(event.attendingCount) going, \(event.maybeCount) maybe, \(event.pendingCount) pending. \(expectedHeadcount) expected."
+        if let capacity = event.capacity, capacity > 0 {
+            label += " \(event.attendingCount) of \(capacity) capacity."
+        }
+        return label
+    }
+
+    // MARK: - Dietary Needs Summary
+
+    /// Grouped dietary needs across guests and party members.
+    /// Free-form fields are split on commas and grouped case-insensitively.
+    /// Declined guests are excluded; entries are deduped per restriction by
+    /// guest/member id (not display name, which can collide).
+    private var dietaryNeeds: [(label: String, names: [String])] {
+        var order: [String] = []
+        var groups: [String: (label: String, entries: [(id: UUID, name: String)])] = [:]
+
+        func add(_ raw: String?, id: UUID, name: String) {
+            guard let raw else { return }
+            for part in raw.split(separator: ",") {
+                let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                let key = trimmed.lowercased()
+                if groups[key] == nil {
+                    groups[key] = (label: trimmed, entries: [])
+                    order.append(key)
+                }
+                if groups[key]?.entries.contains(where: { $0.id == id }) == false {
+                    groups[key]?.entries.append((id: id, name: name))
+                }
+            }
+        }
+
+        for guest in event.guests where guest.status != .declined {
+            add(guest.metadata?.dietaryRestrictions, id: guest.id, name: guest.name)
+            add(guest.metadata?.mealChoice, id: guest.id, name: guest.name)
+            for member in guest.partyMembers {
+                add(member.dietaryRestrictions, id: member.id, name: "\(member.name) (\(guest.name)'s party)")
+            }
+        }
+
+        return order
+            .compactMap { groups[$0] }
+            .map { (label: $0.label, names: $0.entries.map { $0.name }) }
+            .sorted { lhs, rhs in
+                if lhs.names.count != rhs.names.count {
+                    return lhs.names.count > rhs.names.count
+                }
+                return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+            }
+    }
+
+    @ViewBuilder
+    private var dietarySummaryCard: some View {
+        let needs = dietaryNeeds
+        if !needs.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        dietaryExpanded.toggle()
+                    }
+                    HapticService.buttonTap()
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: Spacing.xs) {
+                            Image(systemName: "fork.knife")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.accentPurpleFallback)
+
+                            Text("Dietary needs")
+                                .font(GatherFont.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.gatherPrimaryText)
+
+                            Spacer()
+
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.gatherSecondaryText)
+                                .rotationEffect(.degrees(dietaryExpanded ? 180 : 0))
+                        }
+
+                        Text(needs.map { "\($0.names.count) \($0.label)" }.joined(separator: " · "))
+                            .font(GatherFont.caption)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .lineLimit(dietaryExpanded ? nil : 1)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dietary needs: \(needs.map { "\($0.names.count) \($0.label)" }.joined(separator: ", "))")
+                .accessibilityHint(dietaryExpanded ? "Double tap to collapse" : "Double tap to expand and see who")
+                .accessibilityAddTraits(dietaryExpanded ? [.isSelected] : [])
+
+                if dietaryExpanded {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        ForEach(needs, id: \.label) { need in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(need.label)
+                                    .font(GatherFont.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.gatherPrimaryText)
+                                Text(need.names.joined(separator: ", "))
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.gatherSecondaryText)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                    .padding(.top, Spacing.xxs)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            .padding(Spacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .surfaceCard(cornerRadius: CornerRadius.md)
+            .horizontalPadding()
+            .padding(.bottom, Spacing.sm)
         }
     }
 
@@ -151,11 +441,28 @@ struct GuestsTab: View {
                 }
                 .font(GatherFont.callout)
 
+                Button(allFilteredSelected ? "Deselect All" : "Select All") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        if allFilteredSelected {
+                            selectedGuests.subtract(filteredGuests.map { $0.id })
+                        } else {
+                            selectedGuests.formUnion(filteredGuests.map { $0.id })
+                        }
+                    }
+                    HapticService.buttonTap()
+                }
+                .font(GatherFont.callout)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.accentPurpleFallback)
+                .padding(.leading, Spacing.sm)
+                .accessibilityLabel(allFilteredSelected ? "Deselect all filtered guests" : "Select all filtered guests")
+
                 Spacer()
 
                 Text("\(selectedGuests.count) selected")
                     .font(GatherFont.callout)
                     .foregroundStyle(Color.gatherSecondaryText)
+                    .contentTransition(.numericText())
 
                 Spacer()
 
@@ -193,44 +500,67 @@ struct GuestsTab: View {
 
                 Spacer()
 
-                HStack(spacing: Spacing.sm) {
-                    if !event.guests.isEmpty {
-                        // Select button
-                        Button {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { isSelectionMode = true }
-                        } label: {
-                            Image(systemName: "checklist")
-                                .font(.title3)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-                        .accessibilityLabel("Select guests")
-
-                        // Quick send button
-                        Button {
-                            selectedGuests = Set(event.guests.map { $0.id })
-                            showSendInvites = true
-                        } label: {
-                            Image(systemName: "paperplane")
-                                .font(.title3)
-                                .foregroundStyle(Color.accentPurpleFallback)
-                        }
-                        .accessibilityLabel("Send invites")
-                    }
-
-                    // Add button
-                    Button {
-                        showAddGuest = true
-                    } label: {
-                        Image(systemName: "person.badge.plus")
-                            .font(.title3)
-                            .foregroundStyle(Color.accentPurpleFallback)
-                    }
-                    .accessibilityLabel("Add guest")
+                if isHost {
+                    hostActionButtons
                 }
             }
         }
         .horizontalPadding()
         .padding(.vertical, Spacing.sm)
+    }
+
+    /// Sort / select / send / add affordances — host only.
+    private var hostActionButtons: some View {
+        HStack(spacing: Spacing.sm) {
+            if !event.guests.isEmpty {
+                // Sort menu
+                Menu {
+                    Picker("Sort guests", selection: $guestSortOrderRaw) {
+                        ForEach(GuestSortOrder.allCases, id: \.rawValue) { order in
+                            Label(order.displayName, systemImage: order.icon)
+                                .tag(order.rawValue)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.title3)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .accessibilityLabel("Sort guests")
+                .accessibilityValue("Sorted by \(sortOrder.displayName)")
+
+                // Select button
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { isSelectionMode = true }
+                } label: {
+                    Image(systemName: "checklist")
+                        .font(.title3)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .accessibilityLabel("Select guests")
+
+                // Quick send button
+                Button {
+                    selectedGuests = Set(event.guests.map { $0.id })
+                    showSendInvites = true
+                } label: {
+                    Image(systemName: "paperplane")
+                        .font(.title3)
+                        .foregroundStyle(Color.accentPurpleFallback)
+                }
+                .accessibilityLabel("Send invites")
+            }
+
+            // Add button
+            Button {
+                showAddGuest = true
+            } label: {
+                Image(systemName: "person.badge.plus")
+                    .font(.title3)
+                    .foregroundStyle(Color.accentPurpleFallback)
+            }
+            .accessibilityLabel("Add guest")
+        }
     }
 
     // MARK: - Search Bar
@@ -310,7 +640,16 @@ struct GuestsTab: View {
                             } else {
                                 selectedGuest = guest
                             }
-                        }
+                        },
+                        onSetStatus: isHost ? { status in
+                            setStatus(status, for: guest)
+                        } : nil,
+                        onSendInvite: isHost ? {
+                            sendInvite(to: guest)
+                        } : nil,
+                        onRemove: isHost ? {
+                            guestPendingRemoval = guest
+                        } : nil
                     )
                 }
             }
@@ -351,21 +690,70 @@ struct GuestsTab: View {
         }
 
         // Status filter
-        switch filterStatus {
-        case .all:
-            break
-        case .pending:
-            guests = guests.filter { $0.status == .pending }
-        case .sent:
-            let ids = sentGuestIds
-            guests = guests.filter { ids.contains($0.id) }
-        case .confirmed:
-            guests = guests.filter { $0.status == .attending }
-        case .declined:
-            guests = guests.filter { $0.status == .declined }
+        if showWaitlistedOnly {
+            guests = guests.filter { $0.status == .waitlisted }
+        } else {
+            switch filterStatus {
+            case .all:
+                break
+            case .pending:
+                guests = guests.filter { $0.status == .pending }
+            case .sent:
+                let ids = sentGuestIds
+                guests = guests.filter { ids.contains($0.id) }
+            case .confirmed:
+                guests = guests.filter { $0.status == .attending }
+            case .declined:
+                guests = guests.filter { $0.status == .declined }
+            }
         }
 
-        return guests.sorted { $0.name < $1.name }
+        return sorted(guests)
+    }
+
+    private func sorted(_ guests: [Guest]) -> [Guest] {
+        switch sortOrder {
+        case .name:
+            return guests.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        case .status:
+            return guests.sorted {
+                if statusRank($0.status) != statusRank($1.status) {
+                    return statusRank($0.status) < statusRank($1.status)
+                }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        case .recentlyAdded:
+            return guests.sorted {
+                if $0.invitedAt != $1.invitedAt {
+                    return $0.invitedAt > $1.invitedAt
+                }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        case .partySize:
+            return guests.sorted {
+                if $0.totalHeadcount != $1.totalHeadcount {
+                    return $0.totalHeadcount > $1.totalHeadcount
+                }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        }
+    }
+
+    private func statusRank(_ status: RSVPStatus) -> Int {
+        switch status {
+        case .attending: return 0
+        case .maybe: return 1
+        case .pending: return 2
+        case .waitlisted: return 3
+        case .declined: return 4
+        }
+    }
+
+    private var allFilteredSelected: Bool {
+        let guests = filteredGuests
+        return !guests.isEmpty && guests.allSatisfy { selectedGuests.contains($0.id) }
     }
 
     private func toggleSelection(_ guest: Guest) {
@@ -374,6 +762,55 @@ struct GuestsTab: View {
         } else {
             selectedGuests.insert(guest.id)
         }
+    }
+
+    // MARK: - Quick Actions
+
+    /// RSVP change from row menu / context menu. Mirrors GuestDetailSheet:
+    /// any non-pending status stamps respondedAt. Promoting a waitlisted
+    /// guest while the event is full asks for confirmation first.
+    private func setStatus(_ status: RSVPStatus, for guest: Guest) {
+        guard guest.status != status else { return }
+        if status == .attending && guest.status == .waitlisted && event.isFull {
+            guestPendingPromotion = guest
+            return
+        }
+        applyStatus(status, to: guest)
+    }
+
+    private func applyStatus(_ status: RSVPStatus, to guest: Guest) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            guest.status = status
+            if status != .pending {
+                guest.respondedAt = Date()
+            }
+        }
+        modelContext.safeSave()
+        HapticService.buttonTap()
+    }
+
+    /// Single-guest invite via the existing SendInvitesSheet path.
+    private func sendInvite(to guest: Guest) {
+        selectedGuests = [guest.id]
+        showSendInvites = true
+    }
+
+    private func removeGuest(_ guest: Guest) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            event.guests.removeAll { $0.id == guest.id }
+        }
+        // Delete related function invites (not just unlink — avoids orphaned rows)
+        for function in event.functions {
+            let orphanedInvites = function.invites.filter { $0.guestId == guest.id }
+            for invite in orphanedInvites {
+                modelContext.delete(invite)
+            }
+            function.invites.removeAll { $0.guestId == guest.id }
+        }
+        selectedGuests.remove(guest.id)
+        modelContext.delete(guest)
+        modelContext.safeSave()
+        HapticService.success()
     }
 
     // MARK: - Privacy Mode Guest List (first names + avatars)
@@ -537,6 +974,43 @@ struct StatusPill: View {
     }
 }
 
+// MARK: - Waitlist Pill
+
+/// Waitlist filter pill. Lives outside GuestsTab.GuestFilter because that enum
+/// is switched exhaustively in GuestFilterBar and can't gain a case here.
+struct WaitlistPill: View {
+    let count: Int
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "list.bullet")
+                    .font(.caption)
+                Text("Waitlist")
+                    .font(GatherFont.caption)
+                Text("\(count)")
+                    .font(GatherFont.caption)
+                    .fontWeight(.bold)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(isSelected ? .white.opacity(0.3) : Color.rsvpMaybeFallback.opacity(0.2))
+                    .clipShape(Capsule())
+                    .contentTransition(.numericText())
+            }
+            .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.xs)
+            .background(isSelected ? Color.rsvpMaybeFallback : Color.gatherSecondaryBackground)
+            .clipShape(Capsule())
+        }
+        .accessibilityLabel("Waitlist filter, \(count) guests")
+        .accessibilityHint("Double tap to show waitlisted guests")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+}
+
 // MARK: - Improved Guest Card
 
 struct ImprovedGuestCard: View {
@@ -546,6 +1020,13 @@ struct ImprovedGuestCard: View {
     let isSelected: Bool
     let isSelectionMode: Bool
     let onTap: () -> Void
+    var onSetStatus: ((RSVPStatus) -> Void)? = nil
+    var onSendInvite: (() -> Void)? = nil
+    var onRemove: (() -> Void)? = nil
+
+    private var hasQuickActions: Bool {
+        !isSelectionMode && (onSetStatus != nil || onSendInvite != nil || onRemove != nil)
+    }
 
     var body: some View {
         Button(action: onTap) {
@@ -565,10 +1046,93 @@ struct ImprovedGuestCard: View {
             }
         }
         .buttonStyle(CardPressStyle())
+        .contextMenu {
+            if hasQuickActions {
+                quickActionMenuItems
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(guest.name), \(guest.status.displayName)\(guest.totalHeadcount > 1 ? ", plus \(guest.totalHeadcount - 1)" : "")")
         .accessibilityHint(isSelectionMode ? "Double tap to toggle selection" : "Double tap for details")
         .accessibilityValue(isSelectionMode ? (isSelected ? "Selected" : "Not selected") : "")
+        .accessibilityActions {
+            if hasQuickActions {
+                accessibilityQuickActions
+            }
+        }
+    }
+
+    // MARK: - Quick Actions
+
+    /// Shared between the long-press context menu and the inline status menu.
+    @ViewBuilder
+    private var statusMenuItems: some View {
+        if let onSetStatus {
+            Button {
+                onSetStatus(.attending)
+            } label: {
+                Label(guest.status == .waitlisted ? "Promote to Going" : "Mark Going",
+                      systemImage: "checkmark.circle")
+            }
+            Button {
+                onSetStatus(.maybe)
+            } label: {
+                Label("Mark Maybe", systemImage: "questionmark.circle")
+            }
+            Button {
+                onSetStatus(.declined)
+            } label: {
+                Label("Mark Can't Go", systemImage: "xmark.circle")
+            }
+            Button {
+                onSetStatus(.pending)
+            } label: {
+                Label("Mark Pending", systemImage: "clock")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var quickActionMenuItems: some View {
+        statusMenuItems
+
+        if let onSendInvite {
+            Divider()
+            Button {
+                onSendInvite()
+            } label: {
+                Label("Send Invite", systemImage: "paperplane")
+            }
+        }
+
+        if let onRemove {
+            Divider()
+            Button(role: .destructive) {
+                onRemove()
+            } label: {
+                Label("Remove Guest", systemImage: "trash")
+            }
+        }
+    }
+
+    /// VoiceOver equivalents — the card is one combined element, so the inline
+    /// menu and context menu aren't directly reachable.
+    @ViewBuilder
+    private var accessibilityQuickActions: some View {
+        if let onSetStatus {
+            Button(guest.status == .waitlisted ? "Promote to Going" : "Mark Going") {
+                onSetStatus(.attending)
+            }
+            Button("Mark Maybe") { onSetStatus(.maybe) }
+            Button("Mark Can't Go") { onSetStatus(.declined) }
+            Button("Mark Pending") { onSetStatus(.pending) }
+        }
+        if let onSendInvite {
+            Button("Send Invite") { onSendInvite() }
+        }
+        if let onRemove {
+            Button("Remove Guest") { onRemove() }
+        }
     }
 
     private var rowContent: some View {
@@ -646,9 +1210,24 @@ struct ImprovedGuestCard: View {
 
             Spacer()
 
-            // Main status badge
+            // Main status badge — tappable menu for one-tap RSVP changes
             if !isSelectionMode {
-                StatusBadge(status: guest.status)
+                if onSetStatus != nil {
+                    Menu {
+                        statusMenuItems
+                    } label: {
+                        HStack(spacing: 2) {
+                            StatusBadge(status: guest.status)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Color.gatherSecondaryText)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Change RSVP for \(guest.name), currently \(guest.status.displayName)")
+                } else {
+                    StatusBadge(status: guest.status)
+                }
             }
         }
         .padding(Spacing.sm)

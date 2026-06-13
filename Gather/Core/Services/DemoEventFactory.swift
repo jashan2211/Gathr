@@ -907,7 +907,6 @@ extension DemoDataService {
                 color: data.color,
                 sortOrder: index
             )
-            category.spent = data.spent
             categories.append(category)
             budget.categories.append(category)
         }
@@ -931,6 +930,11 @@ extension DemoDataService {
             if expense.categoryIndex < categories.count {
                 categories[expense.categoryIndex].expenses.append(newExpense)
             }
+        }
+
+        // Derive spent from the seeded expenses so the totals never drift.
+        for category in categories {
+            category.reconcileSpent()
         }
 
         // Create splits
@@ -1063,7 +1067,6 @@ extension DemoDataService {
                 color: catColors[ci],
                 sortOrder: ci
             )
-            cat.spent = Double.random(in: 0...perCat)
 
             // Add 1-3 expenses per category
             let demoPayerNames = ["You", "Alex", "Sam", "Jordan", "Taylor"]
@@ -1083,6 +1086,8 @@ extension DemoDataService {
                 cat.expenses.append(expense)
             }
 
+            // Derive spent from the seeded expenses so the totals never drift.
+            cat.reconcileSpent()
             budget.categories.append(cat)
         }
 

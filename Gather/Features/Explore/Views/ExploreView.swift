@@ -835,6 +835,7 @@ extension EventCategory {
         case .conference: return "\u{1F399}"
         case .concert: return "\u{1F3B5}"
         case .meetup: return "\u{1F91D}"
+        case .sports: return "\u{26BD}"
         case .custom: return "\u{2B50}"
         }
     }
@@ -857,6 +858,8 @@ extension LinearGradient {
             return LinearGradient(colors: [.concertRedDeep, .concertCrimson, .warmOrange], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .meetup:
             return LinearGradient(colors: [.meetupTealDeep, .meetupEmerald, .meetupEmeraldLight], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .sports:
+            return LinearGradient(colors: [.sportsEmeraldDeep, .sportsEmerald, .sportsEmeraldLight], startPoint: .topLeading, endPoint: .bottomTrailing)
         case .custom:
             return LinearGradient(colors: [.customSlateDark, .customSlateMid, .customSlatePale], startPoint: .topLeading, endPoint: .bottomTrailing)
         }

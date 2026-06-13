@@ -12,6 +12,10 @@ struct BudgetTab: View {
     @State private var editingExpense: Expense?
     @State private var expandedCategoryId: UUID?
     @State private var showTeam = false
+    @State private var selectedVendor: VendorSummary?
+    @State private var recordingSplit: PaymentSplit?
+    @State private var showSplitPaymentAlert = false
+    @State private var splitPaymentText = ""
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
 
@@ -104,11 +108,18 @@ struct BudgetTab: View {
             }
         }
         .sheet(item: $editingExpense) { expense in
-            ExpenseDetailSheet(expense: expense, functions: event.functions, onDelete: {
+            ExpenseDetailSheet(expense: expense, functions: event.functions, category: owningCategory(of: expense), onDelete: {
                 deleteExpense(expense)
             })
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $selectedVendor) { vendor in
+            if let budget = eventBudget {
+                VendorDetailSheet(budget: budget, vendorName: vendor.name, functions: event.functions)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
         }
         .sheet(isPresented: $showAddExpense) {
             if let budget = eventBudget {
@@ -121,6 +132,16 @@ struct BudgetTab: View {
             EventTeamSheet(event: event)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .alert("Record Payment", isPresented: $showSplitPaymentAlert, presenting: recordingSplit) { split in
+            TextField("Amount", text: $splitPaymentText)
+                .keyboardType(.decimalPad)
+            Button("Record") {
+                recordSplitPayment(split)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { split in
+            Text("\(split.name) still owes \(split.owedAmount.asCurrency).")
         }
     }
 
@@ -152,7 +173,7 @@ struct BudgetTab: View {
     private func alertBanners(_ budget: Budget, expenses: [Expense]) -> some View {
         let overBudgetCategories = filteredCategories(budget).filter { $0.isOverBudget }
         let overdueExpenses = expenses.filter { expense in
-            !expense.isPaid && (expense.dueDate.map { $0 < Date() } ?? false)
+            expense.paymentState != .paid && (expense.dueDate.map { $0 < Date() } ?? false)
         }
 
         if !overdueExpenses.isEmpty {
@@ -164,7 +185,7 @@ struct BudgetTab: View {
                         .font(GatherFont.callout)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
-                    Text(overdueExpenses.reduce(0) { $0 + $1.amount }.asCurrency + " needs attention")
+                    Text(overdueExpenses.reduce(0) { $0 + $1.amountRemaining }.asCurrency + " needs attention")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.85))
                 }
@@ -175,7 +196,7 @@ struct BudgetTab: View {
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             // A11Y-019: Alert banner accessibility
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(overdueExpenses.count) overdue \(overdueExpenses.count == 1 ? "payment" : "payments"). \(overdueExpenses.reduce(0) { $0 + $1.amount }.asCurrency) needs attention")
+            .accessibilityLabel("\(overdueExpenses.count) overdue \(overdueExpenses.count == 1 ? "payment" : "payments"). \(overdueExpenses.reduce(0) { $0 + $1.amountRemaining }.asCurrency) needs attention")
         }
 
         if !overBudgetCategories.isEmpty {
@@ -291,9 +312,11 @@ struct BudgetTab: View {
 
     private func paymentBreakdown(_ budget: Budget, expenses: [Expense]) -> some View {
         let totalAmount = expenses.reduce(0) { $0 + $1.amount }
-        let paidAmount = expenses.filter { $0.isPaid }.reduce(0) { $0 + $1.amount }
-        let pendingAmount = expenses.filter { !$0.isPaid }.reduce(0) { $0 + $1.amount }
-        let overdueAmount = expenses.filter { !$0.isPaid && ($0.dueDate.map { $0 < Date() } ?? false) }.reduce(0) { $0 + $1.amount }
+        // Installment-aware: counts partial payments toward Paid and only
+        // outstanding balances toward Owed/Overdue.
+        let paidAmount = budget.totalPaid
+        let pendingAmount = budget.totalPending
+        let overdueAmount = expenses.filter { $0.paymentState != .paid && ($0.dueDate.map { $0 < Date() } ?? false) }.reduce(0) { $0 + $1.amountRemaining }
 
         return HStack(spacing: Spacing.sm) {
             paymentStatCard(
@@ -384,8 +407,9 @@ struct BudgetTab: View {
 
                 ForEach(grouped.keys.sorted(), id: \.self) { person in
                     let personExpenses = grouped[person] ?? []
-                    let totalPaid = personExpenses.reduce(0) { $0 + $1.amount }
-                    let paidCount = personExpenses.filter { $0.isPaid }.count
+                    let totalCommitted = personExpenses.reduce(0) { $0 + $1.amount }
+                    let totalPaid = personExpenses.reduce(0) { $0 + min($1.amountPaid, $1.amount) }
+                    let paidCount = personExpenses.filter { $0.paymentState == .paid }.count
                     let allPaid = paidCount == personExpenses.count
 
                     HStack(spacing: Spacing.sm) {
@@ -423,7 +447,7 @@ struct BudgetTab: View {
                                     .font(.caption2)
                                     .foregroundStyle(Color.rsvpYesFallback)
                             } else {
-                                Text("\(paidCount)/\(personExpenses.count) paid")
+                                Text("of \(totalCommitted.asCurrency)")
                                     .font(.caption2)
                                     .foregroundStyle(Color.rsvpMaybeFallback)
                             }
@@ -431,6 +455,9 @@ struct BudgetTab: View {
                     }
                     .padding(Spacing.sm)
                     .surfaceCard()
+                    // A11Y: Who-paid-what row grouping
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(person.isEmpty ? "Unknown" : person). Paid \(totalPaid.asCurrency)\(allPaid ? ", all paid" : " of \(totalCommitted.asCurrency)").")
                 }
             }
             .bouncyAppear(delay: 0.08)
@@ -515,7 +542,7 @@ struct BudgetTab: View {
     @ViewBuilder
     private func upcomingPayments(_ budget: Budget, expenses: [Expense], categoryLookup: [UUID: String]) -> some View {
         let upcoming = expenses
-            .filter { !$0.isPaid && $0.dueDate != nil }
+            .filter { $0.paymentState != .paid && $0.dueDate != nil }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
 
         if !upcoming.isEmpty {
@@ -618,26 +645,52 @@ struct BudgetTab: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(expense.amount.asCurrency)
+                Text(expense.amountRemaining.asCurrency)
                     .font(GatherFont.callout)
                     .fontWeight(.bold)
                     .foregroundStyle(isOverdue ? Color.rsvpNoFallback : Color.gatherPrimaryText)
 
-                Button {
-                    markAsPaid(expense, in: budget)
-                } label: {
-                    Text("Pay")
+                if expense.paymentState == .partial {
+                    Text("of \(expense.amount.asCurrency)")
                         .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, Spacing.xxs)
-                        .background(Color.rsvpYesFallback)
-                        .clipShape(Capsule())
+                        .foregroundStyle(Color.gatherSecondaryText)
                 }
-                // A11Y-008: Pay button touch target
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
+
+                HStack(spacing: 6) {
+                    Button {
+                        editingExpense = expense
+                    } label: {
+                        Text("Partial")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, Spacing.xxs)
+                            .background(Color.gatherTertiaryBackground)
+                            .clipShape(Capsule())
+                    }
+                    // A11Y: Partial payment button
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Record a partial payment for \(expense.name)")
+
+                    Button {
+                        markAsPaid(expense, in: budget)
+                    } label: {
+                        Text("Pay")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, Spacing.xxs)
+                            .background(Color.rsvpYesFallback)
+                            .clipShape(Capsule())
+                    }
+                    // A11Y-008: Pay button touch target
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Pay remaining \(expense.amountRemaining.asCurrency) for \(expense.name)")
+                }
             }
         }
         .padding(.vertical, Spacing.xxs)
@@ -710,9 +763,9 @@ struct BudgetTab: View {
 
                     Spacer()
 
-                    // Paid / Owed mini indicator
-                    let catPaid = category.expenses.filter { $0.isPaid }.reduce(0) { $0 + $1.amount }
-                    let catOwed = category.expenses.filter { !$0.isPaid }.reduce(0) { $0 + $1.amount }
+                    // Paid / Owed mini indicator (installment-aware)
+                    let catPaid = category.totalPaidAmount
+                    let catOwed = category.expenses.reduce(0) { $0 + $1.amountRemaining }
 
                     VStack(alignment: .trailing, spacing: 1) {
                         if category.isOverBudget {
@@ -810,15 +863,34 @@ struct BudgetTab: View {
         .surfaceCard()
     }
 
+    /// Payment-aware presentation (icon, tint, a11y text) for an expense row.
+    private func expenseRowStatus(_ expense: Expense, isOverdue: Bool) -> (icon: String, color: Color, text: String) {
+        switch expense.paymentState {
+        case .paid:
+            return ("checkmark.circle.fill", Color.rsvpYesFallback, "Paid")
+        case .partial:
+            return ("circle.bottomhalf.filled", Color.rsvpMaybeFallback, "Partially paid, \(expense.amountRemaining.asCurrency) left")
+        case .unpaid:
+            if isOverdue {
+                return ("exclamationmark.circle.fill", Color.rsvpNoFallback, "Overdue")
+            }
+            return ("circle", Color.gatherTertiaryText, "Unpaid")
+        }
+    }
+
     private func expenseRow(_ expense: Expense) -> some View {
-        let isOverdue = !expense.isPaid && (expense.dueDate.map { $0 < Date() } ?? false)
-        let statusText = expense.isPaid ? "Paid" : (isOverdue ? "Overdue" : "Unpaid")
+        let state = expense.paymentState
+        let isOverdue = state != .paid && (expense.dueDate.map { $0 < Date() } ?? false)
+        let status = expenseRowStatus(expense, isOverdue: isOverdue)
+        let statusText = status.text
+        let iconName = status.icon
+        let iconColor = status.color
 
         return HStack(spacing: Spacing.sm) {
             // Status icon
-            Image(systemName: expense.isPaid ? "checkmark.circle.fill" : (isOverdue ? "exclamationmark.circle.fill" : "circle"))
+            Image(systemName: iconName)
                 .font(.callout)
-                .foregroundStyle(expense.isPaid ? Color.rsvpYesFallback : (isOverdue ? Color.rsvpNoFallback : Color.gatherTertiaryText))
+                .foregroundStyle(iconColor)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(expense.name)
@@ -833,7 +905,7 @@ struct BudgetTab: View {
                     if let vendor = expense.vendorName {
                         Text(vendor)
                     }
-                    if expense.isPaid, let paidDate = expense.paidDate {
+                    if state == .paid, let paidDate = expense.paidDate {
                         if expense.vendorName != nil || expense.paidByName != nil { Text("\u{00B7}") }
                         Text("Paid \(paidDate.formatted(date: .abbreviated, time: .omitted))")
                     } else if let dueDate = expense.dueDate {
@@ -843,6 +915,26 @@ struct BudgetTab: View {
                 }
                 .font(.caption2)
                 .foregroundStyle(isOverdue ? Color.rsvpNoFallback : Color.gatherTertiaryText)
+
+                // Partial payment progress
+                if state == .partial {
+                    HStack(spacing: 6) {
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.gatherTertiaryBackground)
+                            Capsule()
+                                .fill(Color.rsvpMaybeFallback)
+                                .frame(width: max(2, 56 * expense.percentPaid / 100))
+                        }
+                        .frame(width: 56, height: 3)
+
+                        Text("\(expense.amountRemaining.asCurrency) left")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.rsvpMaybeFallback)
+                    }
+                    .padding(.top, 1)
+                }
             }
 
             Spacer()
@@ -866,9 +958,9 @@ struct BudgetTab: View {
 
     @ViewBuilder
     private func vendorSection(_ budget: Budget, expenses: [Expense]) -> some View {
-        let vendorExpenses = Dictionary(grouping: expenses.filter { $0.vendorName != nil }) { $0.vendorName! }
+        let vendors = budget.vendorSummaries
 
-        if !vendorExpenses.isEmpty {
+        if !vendors.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 Text("Vendors")
                     .font(GatherFont.headline)
@@ -876,70 +968,95 @@ struct BudgetTab: View {
                     // A11Y-007: Section header trait
                     .accessibilityAddTraits(.isHeader)
 
-                ForEach(vendorExpenses.keys.sorted(), id: \.self) { vendor in
-                    let vExpenses = vendorExpenses[vendor] ?? []
-                    let totalOwed = vExpenses.reduce(0) { $0 + $1.amount }
-                    let totalPaid = vExpenses.filter { $0.isPaid }.reduce(0) { $0 + $1.amount }
-                    let unpaidCount = vExpenses.filter { !$0.isPaid }.count
-
-                    HStack(spacing: Spacing.sm) {
-                        Circle()
-                            .fill(avatarColor(for: vendor))
-                            .frame(width: 36, height: 36)
-                            .overlay {
-                                Text(vendor.isEmpty ? "?" : vendor.prefix(1).uppercased())
-                                    .font(GatherFont.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                            }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(vendor.isEmpty ? "Unknown" : vendor)
-                                .font(GatherFont.callout)
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.gatherPrimaryText)
-
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(Color.gatherTertiaryBackground)
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(Color.rsvpYesFallback)
-                                        .frame(width: totalOwed > 0 ? min(geometry.size.width, geometry.size.width * (totalPaid / totalOwed)) : 0)
-                                }
-                            }
-                            .frame(height: 4)
-
-                            Text("\(vExpenses.count) expense\(vExpenses.count == 1 ? "" : "s")\(unpaidCount > 0 ? " \u{00B7} \(unpaidCount) unpaid" : "")")
-                                .font(.caption2)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(totalOwed.asCurrency)
-                                .font(GatherFont.callout)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Color.gatherPrimaryText)
-
-                            if totalPaid >= totalOwed {
-                                Label("Paid", systemImage: "checkmark.circle.fill")
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.rsvpYesFallback)
-                            } else {
-                                Text("\((totalOwed - totalPaid).asCurrency) owed")
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.rsvpMaybeFallback)
-                            }
-                        }
+                ForEach(vendors) { vendor in
+                    Button {
+                        HapticService.buttonTap()
+                        selectedVendor = vendor
+                    } label: {
+                        vendorCard(vendor)
                     }
-                    .padding(Spacing.sm)
-                    .surfaceCard()
+                    .buttonStyle(CardPressStyle())
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(vendor.name). \(vendor.expenseCount) \(vendor.expenseCount == 1 ? "expense" : "expenses"). \(vendor.paid.asCurrency) paid of \(vendor.total.asCurrency). \(vendor.isSettled ? "Settled" : "\(vendor.remaining.asCurrency) remaining")")
+                    .accessibilityHint("Double tap to view vendor details")
                 }
             }
             .bouncyAppear(delay: 0.2)
         }
+    }
+
+    private func vendorCard(_ vendor: VendorSummary) -> some View {
+        HStack(spacing: Spacing.sm) {
+            ZStack(alignment: .bottomTrailing) {
+                Circle()
+                    .fill(avatarColor(for: vendor.name))
+                    .frame(width: 36, height: 36)
+                    .overlay {
+                        Text(vendor.name.prefix(1).uppercased())
+                            .font(GatherFont.caption)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                    }
+
+                if vendor.isSettled {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.rsvpYesFallback)
+                        .background(Circle().fill(Color.gatherSecondaryBackground))
+                        .offset(x: 3, y: 3)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(vendor.name)
+                    .font(GatherFont.callout)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.gatherTertiaryBackground)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.rsvpYesFallback)
+                            .frame(width: max(0, min(geometry.size.width, geometry.size.width * vendor.percentPaid / 100)))
+                    }
+                }
+                .frame(height: 4)
+
+                Text("\(vendor.expenseCount) expense\(vendor.expenseCount == 1 ? "" : "s") \u{00B7} \(vendor.paid.asCurrency) paid of \(vendor.total.asCurrency)")
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                if vendor.isSettled {
+                    Label("Settled", systemImage: "checkmark.circle.fill")
+                        .font(GatherFont.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.rsvpYesFallback)
+                    Text(vendor.total.asCurrency)
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                } else {
+                    Text(vendor.remaining.asCurrency)
+                        .font(GatherFont.callout)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                    Text("left to pay")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(Color.gatherTertiaryText)
+        }
+        .padding(Spacing.sm)
+        .surfaceCard()
     }
 
     // MARK: - Splits Section
@@ -970,59 +1087,128 @@ struct BudgetTab: View {
                     .padding(.vertical, Spacing.sm)
             } else {
                 ForEach(budget.splits) { split in
-                    HStack {
-                        Circle()
-                            .fill(avatarColor(for: split.name))
-                            .frame(width: 36, height: 36)
-                            .overlay {
-                                Text(split.name.prefix(1).uppercased())
-                                    .font(GatherFont.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                            }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(split.name)
-                                .font(GatherFont.callout)
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.gatherPrimaryText)
-
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(Color.gatherTertiaryBackground)
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(split.isPaidUp ? Color.rsvpYesFallback : Color.accentPurpleFallback)
-                                        .frame(width: split.shareAmount > 0 ? min(geometry.size.width, geometry.size.width * (split.paidAmount / split.shareAmount)) : 0)
-                                }
-                            }
-                            .frame(height: 4)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 2) {
-                            if split.isPaidUp {
-                                Label("Paid", systemImage: "checkmark.circle.fill")
-                                    .font(GatherFont.caption)
-                                    .foregroundStyle(Color.rsvpYesFallback)
-                            } else {
-                                Text(split.owedAmount.asCurrency)
-                                    .font(GatherFont.callout)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color.rsvpMaybeFallback)
-                                Text("of \(split.shareAmount.asCurrency)")
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.gatherSecondaryText)
-                            }
-                        }
-                    }
-                    .padding(Spacing.sm)
-                    .surfaceCard()
+                    splitRow(split)
                 }
             }
         }
         .bouncyAppear(delay: 0.25)
+    }
+
+    private func splitRow(_ split: PaymentSplit) -> some View {
+        // Cap displayed progress/amounts at the share, even if overpaid.
+        let paidDisplay = min(split.paidAmount, split.shareAmount)
+
+        return HStack {
+            Circle()
+                .fill(avatarColor(for: split.name))
+                .frame(width: 36, height: 36)
+                .overlay {
+                    Text(split.name.prefix(1).uppercased())
+                        .font(GatherFont.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(split.name)
+                    .font(GatherFont.callout)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.gatherTertiaryBackground)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(split.isPaidUp ? Color.rsvpYesFallback : Color.accentPurpleFallback)
+                            .frame(width: split.shareAmount > 0 ? min(geometry.size.width, geometry.size.width * (paidDisplay / split.shareAmount)) : 0)
+                    }
+                }
+                .frame(height: 4)
+
+                if !split.isPaidUp, split.paidAmount > 0 {
+                    Text("\(paidDisplay.asCurrency) paid so far")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                if split.isPaidUp {
+                    Label("Paid", systemImage: "checkmark.circle.fill")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.rsvpYesFallback)
+                } else {
+                    Text(split.owedAmount.asCurrency)
+                        .font(GatherFont.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                    Text("of \(split.shareAmount.asCurrency)")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+
+                    Button {
+                        HapticService.buttonTap()
+                        splitPaymentText = String(format: "%.2f", split.owedAmount)
+                        recordingSplit = split
+                        showSplitPaymentAlert = true
+                    } label: {
+                        Text("Record payment")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, Spacing.xxs)
+                            .background(Color.gatherTertiaryBackground)
+                            .clipShape(Capsule())
+                    }
+                    // A11Y: Record split payment touch target
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Record a payment from \(split.name), \(split.owedAmount.asCurrency) remaining")
+                }
+            }
+        }
+        .padding(Spacing.sm)
+        .surfaceCard()
+    }
+
+    private func recordSplitPayment(_ split: PaymentSplit) {
+        guard let value = parseSplitPaymentAmount(splitPaymentText), value > 0 else {
+            // Invalid entry: give feedback and re-present the alert.
+            HapticService.warning()
+            DispatchQueue.main.async {
+                recordingSplit = split
+                showSplitPaymentAlert = true
+            }
+            return
+        }
+        // Never record more than what's still owed.
+        split.paidAmount += min(value, split.owedAmount)
+        modelContext.safeSave()
+        HapticService.success()
+    }
+
+    /// Locale-aware amount parsing (handles "1,234.56" and "1.234,56"),
+    /// falling back to a digits-and-single-dot cleanup.
+    private func parseSplitPaymentAmount(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        if let number = formatter.number(from: trimmed) {
+            return number.doubleValue
+        }
+
+        var cleaned = trimmed.filter { "0123456789.".contains($0) }
+        if let firstDot = cleaned.firstIndex(of: ".") {
+            let afterDot = cleaned.index(after: firstDot)
+            cleaned = String(cleaned[..<afterDot]) + cleaned[afterDot...].replacingOccurrences(of: ".", with: "")
+        }
+        return Double(cleaned)
     }
 
     // MARK: - All Transactions
@@ -1048,9 +1234,9 @@ struct BudgetTab: View {
                         editingExpense = expense
                     } label: {
                         HStack(spacing: Spacing.sm) {
-                            Image(systemName: expense.isPaid ? "checkmark.circle.fill" : "circle")
+                            Image(systemName: expense.paymentState == .paid ? "checkmark.circle.fill" : (expense.paymentState == .partial ? "circle.bottomhalf.filled" : "circle"))
                                 .font(.callout)
-                                .foregroundStyle(expense.isPaid ? Color.rsvpYesFallback : Color.gatherTertiaryText)
+                                .foregroundStyle(expense.paymentState == .paid ? Color.rsvpYesFallback : (expense.paymentState == .partial ? Color.rsvpMaybeFallback : Color.gatherTertiaryText))
 
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(expense.name)
@@ -1078,9 +1264,9 @@ struct BudgetTab: View {
                                     .font(GatherFont.callout)
                                     .fontWeight(.semibold)
                                     .foregroundStyle(Color.gatherPrimaryText)
-                                Text(expense.isPaid ? "Paid" : "Pending")
+                                Text(expense.paymentState == .paid ? "Paid" : (expense.paymentState == .partial ? "\(expense.amountRemaining.asCurrency) left" : "Pending"))
                                     .font(.caption2)
-                                    .foregroundStyle(expense.isPaid ? Color.rsvpYesFallback : Color.rsvpMaybeFallback)
+                                    .foregroundStyle(expense.paymentState == .paid ? Color.rsvpYesFallback : Color.rsvpMaybeFallback)
                             }
                         }
                         .padding(.vertical, Spacing.xxs)
@@ -1196,9 +1382,17 @@ struct BudgetTab: View {
         }?.name
     }
 
+    private func owningCategory(of expense: Expense) -> BudgetCategory? {
+        eventBudget?.categories.first { category in
+            category.expenses.contains { $0.id == expense.id }
+        }
+    }
+
     private func markAsPaid(_ expense: Expense, in budget: Budget) {
-        expense.isPaid = true
-        expense.paidDate = Date()
+        // Settles the outstanding balance as an installment, keeping the
+        // legacy isPaid/paidDate flags in sync.
+        expense.markFullyPaid()
+        owningCategory(of: expense)?.reconcileSpent()
         modelContext.safeSave()
         HapticService.success()
     }
@@ -1207,8 +1401,8 @@ struct BudgetTab: View {
         guard let budget = eventBudget else { return }
         for category in budget.categories {
             if let index = category.expenses.firstIndex(where: { $0.id == expense.id }) {
-                category.spent = max(0, category.spent - expense.amount)
                 category.expenses.remove(at: index)
+                category.reconcileSpent()
                 break
             }
         }
@@ -1231,6 +1425,204 @@ struct BudgetTab: View {
             if days <= 7 { return "Due in \(days) days" }
             return "Due \(date.formatted(date: .abbreviated, time: .omitted))"
         }
+    }
+}
+
+// MARK: - Vendor Detail Sheet
+
+struct VendorDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Bindable var budget: Budget
+    let vendorName: String
+    let functions: [EventFunction]
+
+    @State private var editingExpense: Expense?
+
+    private var vendorExpenses: [Expense] {
+        budget.categories.flatMap { $0.expenses }
+            .filter { $0.vendorName == vendorName }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var totalAmount: Double {
+        vendorExpenses.reduce(0) { $0 + $1.amount }
+    }
+
+    private var totalPaid: Double {
+        vendorExpenses.reduce(0) { $0 + min($1.amountPaid, $1.amount) }
+    }
+
+    private var totalRemaining: Double {
+        max(0, totalAmount - totalPaid)
+    }
+
+    private var isSettled: Bool {
+        totalRemaining <= 0.009 && totalAmount > 0
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: Spacing.lg) {
+                    vendorHeader
+
+                    if vendorExpenses.isEmpty {
+                        GatherEmptyState(
+                            icon: "tray",
+                            title: "No expenses",
+                            message: "Expenses for this vendor will show up here."
+                        )
+                        .padding(.vertical, Spacing.xxl)
+                    } else {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Text("Expenses")
+                                .font(GatherFont.headline)
+                                .foregroundStyle(Color.gatherPrimaryText)
+                                .accessibilityAddTraits(.isHeader)
+
+                            ForEach(vendorExpenses) { expense in
+                                Button {
+                                    HapticService.buttonTap()
+                                    editingExpense = expense
+                                } label: {
+                                    vendorExpenseRow(expense)
+                                }
+                                .buttonStyle(CardPressStyle())
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("\(expense.name). \(min(expense.amountPaid, expense.amount).asCurrency) paid of \(expense.amount.asCurrency). \(expense.paymentState.displayName)")
+                                .accessibilityHint("Double tap to edit and record payments")
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical)
+                .horizontalPadding()
+                .padding(.bottom, Spacing.xl)
+            }
+            .background(Color.gatherBackground)
+            .navigationTitle(vendorName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .accessibilityLabel("Close vendor details")
+                }
+            }
+            .sheet(item: $editingExpense) { expense in
+                ExpenseDetailSheet(expense: expense, functions: functions, category: owningCategory(of: expense), onDelete: {
+                    delete(expense)
+                })
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    private var vendorHeader: some View {
+        VStack(spacing: Spacing.sm) {
+            ExpensePaymentStatusPill(state: isSettled ? .paid : (totalPaid > 0 ? .partial : .unpaid))
+
+            if isSettled {
+                Text(totalAmount.asCurrency)
+                    .font(GatherFont.largeTitle)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Text("Settled up")
+                    .font(GatherFont.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.rsvpYesFallback)
+            } else {
+                Text(totalRemaining.asCurrency)
+                    .font(GatherFont.largeTitle)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Text("left to pay")
+                    .font(GatherFont.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.gatherTertiaryBackground)
+                    Capsule()
+                        .fill(Color.rsvpYesFallback)
+                        .frame(width: totalAmount > 0 ? max(0, min(geometry.size.width, geometry.size.width * (totalPaid / totalAmount))) : 0)
+                }
+            }
+            .frame(height: 8)
+
+            Text("\(totalPaid.asCurrency) paid of \(totalAmount.asCurrency) \u{00B7} \(vendorExpenses.count) expense\(vendorExpenses.count == 1 ? "" : "s")")
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .surfaceCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(vendorName). \(totalPaid.asCurrency) paid of \(totalAmount.asCurrency). \(isSettled ? "Settled up" : "\(totalRemaining.asCurrency) left to pay")")
+        .bouncyAppear()
+    }
+
+    private func vendorExpenseRow(_ expense: Expense) -> some View {
+        let state = expense.paymentState
+
+        return HStack(spacing: Spacing.sm) {
+            Image(systemName: state == .paid ? "checkmark.circle.fill" : (state == .partial ? "circle.bottomhalf.filled" : "circle"))
+                .font(.callout)
+                .foregroundStyle(state == .paid ? Color.rsvpYesFallback : (state == .partial ? Color.rsvpMaybeFallback : Color.gatherTertiaryText))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(expense.name)
+                    .font(GatherFont.callout)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                Text("\(min(expense.amountPaid, expense.amount).asCurrency) paid of \(expense.amount.asCurrency)")
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                if state == .paid {
+                    Label("Paid", systemImage: "checkmark.circle.fill")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.rsvpYesFallback)
+                } else {
+                    Text(expense.amountRemaining.asCurrency)
+                        .font(GatherFont.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                    Text("left")
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .foregroundStyle(Color.gatherTertiaryText)
+        }
+        .padding(Spacing.sm)
+        .surfaceCard()
+    }
+
+    private func owningCategory(of expense: Expense) -> BudgetCategory? {
+        budget.categories.first { category in
+            category.expenses.contains { $0.id == expense.id }
+        }
+    }
+
+    private func delete(_ expense: Expense) {
+        for category in budget.categories {
+            if let index = category.expenses.firstIndex(where: { $0.id == expense.id }) {
+                category.expenses.remove(at: index)
+                category.reconcileSpent()
+                break
+            }
+        }
+        modelContext.safeSave()
     }
 }
 

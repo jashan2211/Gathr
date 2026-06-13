@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>You're invited — Gathr</title>
+  <meta property="og:title" content="You're invited!">
+  <meta property="og:description" content="Open your invitation in Gathr to RSVP.">
+  <style>
+    :root { color-scheme: light dark; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #fff; color: #111;
+      padding: 24px;
+    }
+    @media (prefers-color-scheme: dark) { body { background: #000; color: #f5f5f7; } }
+    .card { max-width: 420px; width: 100%; text-align: center; }
+    .badge {
+      width: 96px; height: 96px; margin: 0 auto 28px; border-radius: 28px;
+      background: linear-gradient(135deg, #7C3AED, #EC4899);
+      display: flex; align-items: center; justify-content: center; font-size: 48px;
+    }
+    h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 12px; }
+    p { font-size: 17px; line-height: 1.45; opacity: 0.65; margin-bottom: 32px; }
+    .btn {
+      display: block; width: 100%; padding: 16px; border-radius: 999px;
+      font-size: 17px; font-weight: 700; text-decoration: none; margin-bottom: 12px;
+    }
+    .btn-primary { background: linear-gradient(135deg, #7C3AED, #EC4899); color: #fff; }
+    .btn-secondary { background: rgba(120,120,128,0.12); color: inherit; }
+    .fine { font-size: 13px; opacity: 0.45; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">&#10024;</div>
+    <h1 id="headline">You're invited!</h1>
+    <p>Open your invitation in the Gathr app to see the details and RSVP in one tap.</p>
+    <a class="btn btn-primary" id="openApp" href="#">Open in Gathr</a>
+    <a class="btn btn-secondary" href="https://apps.apple.com/app/gathr-event-party-manager/id6758989661">Get Gathr on the App&nbsp;Store</a>
+    <div class="fine">Gathr — Plan events. Share moments.</div>
+  </div>
+  <script>
+    // Rebuild the in-app deep link from this page's path:
+    //   /gathr/rsvp/{eventId}/{guestId}  ->  gather://rsvp/{eventId}/{guestId}
+    //   /gathr/event/{eventId}           ->  gather://event/{eventId}
+    (function () {
+      var parts = location.pathname.split('/').filter(Boolean); // ["gathr","rsvp",ids...]
+      var link = 'gather://';
+      if (parts.length >= 2 && parts[0] === 'gathr') {
+        link += parts.slice(1).join('/');
+      }
+      var btn = document.getElementById('openApp');
+      btn.href = link;
+      if (parts[1] === 'event') {
+        document.getElementById('headline').textContent = "Join this event!";
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -22,8 +22,13 @@ enum AppConfig {
     /// Contact Email
     static let contactEmail = "info@thebighead.ca"
 
-    /// App Store URL (placeholder until live)
-    static let appStoreURL = URL(string: "https://apps.apple.com/app/gathr/id939330451")!
+    /// App Store URL (real listing — id 6758989661)
+    static let appStoreURL = URL(string: "https://apps.apple.com/app/gathr-event-party-manager/id6758989661")!
+
+    /// Web base for universal links (RSVP/event landing pages live here).
+    /// Must stay in sync with the apple-app-site-association file hosted at
+    /// https://thebighead.ca/.well-known/apple-app-site-association
+    static let webBaseURL = URL(string: "https://thebighead.ca/gathr")!
 
     /// Whether real Apple Wallet pass generation is enabled.
     /// Requires an Apple Developer signing certificate + server-side .pkpass creation.

@@ -147,6 +147,11 @@ extension Color {
     static let meetupEmerald = Color(red: 0.2, green: 0.8, blue: 0.55)
     static let meetupEmeraldLight = Color(red: 0.4, green: 0.95, blue: 0.7)
 
+    // Sports
+    static let sportsEmerald = Color(red: 0.05, green: 0.6, blue: 0.42)
+    static let sportsEmeraldDeep = Color(red: 0.0, green: 0.45, blue: 0.32)
+    static let sportsEmeraldLight = Color(red: 0.25, green: 0.78, blue: 0.55)
+
     // Custom
     static let customSlate = Color(red: 0.5, green: 0.5, blue: 0.6)
     static let customSlateLight = Color(red: 0.7, green: 0.7, blue: 0.8)
@@ -198,6 +203,8 @@ extension Color {
         case .conference: return .sunshineYellow
         case .concert: return .warmCoral
         case .meetup: return .mintGreen
+        // Deep emerald — mintGreen is taken by meetup.
+        case .sports: return .sportsEmerald
         // Brand purple, not gray — as an accent bar gray reads like a glitch.
         case .custom: return .accentPurpleFallback
         }
@@ -317,6 +324,11 @@ extension LinearGradient {
             endPoint: .bottomTrailing
         )
         case .meetup: return cardGradientGreen
+        case .sports: return LinearGradient(
+            colors: [Color.sportsEmerald.opacity(0.15), Color.sportsEmerald.opacity(0.05)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
         case .custom: return LinearGradient(
             colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.03)],
             startPoint: .topLeading,

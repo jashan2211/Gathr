@@ -46,19 +46,50 @@ final class Budget {
         return (totalSpent / totalBudget) * 100
     }
 
+    /// Money actually handed over, including partial installments.
     var totalPaid: Double {
-        categories.flatMap { $0.expenses }.filter { $0.isPaid }.reduce(0) { $0 + $1.amount }
+        categories.flatMap { $0.expenses }.reduce(0) { $0 + $1.amountPaid }
     }
 
+    /// Money still owed across all expenses (remaining balances).
     var totalPending: Double {
-        categories.flatMap { $0.expenses }.filter { !$0.isPaid }.reduce(0) { $0 + $1.amount }
+        categories.flatMap { $0.expenses }.reduce(0) { $0 + $1.amountRemaining }
     }
 
     var upcomingPayments: [Expense] {
         categories.flatMap { $0.expenses }
-            .filter { !$0.isPaid && $0.dueDate != nil }
+            .filter { $0.paymentState != .paid && $0.dueDate != nil }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
+
+    /// Per-vendor rollup: every expense with a vendor name, grouped with
+    /// paid/owed totals — supports paying one vendor in small installments.
+    var vendorSummaries: [VendorSummary] {
+        let vendorExpenses = categories.flatMap { $0.expenses }.filter { ($0.vendorName ?? "").isEmpty == false }
+        let grouped = Dictionary(grouping: vendorExpenses) { $0.vendorName ?? "" }
+        return grouped.map { name, expenses in
+            VendorSummary(
+                name: name,
+                total: expenses.reduce(0) { $0 + $1.amount },
+                paid: expenses.reduce(0) { $0 + $1.amountPaid },
+                expenseCount: expenses.count
+            )
+        }
+        .sorted { $0.remaining > $1.remaining }
+    }
+}
+
+/// Aggregated paid/owed standing with a single vendor.
+struct VendorSummary: Identifiable {
+    var name: String
+    var total: Double
+    var paid: Double
+    var expenseCount: Int
+
+    var id: String { name }
+    var remaining: Double { max(0, total - paid) }
+    var percentPaid: Double { total > 0 ? min(100, (paid / total) * 100) : 0 }
+    var isSettled: Bool { remaining <= 0.009 }
 }
 
 // MARK: - Budget Category Model
@@ -108,6 +139,21 @@ final class BudgetCategory {
     var isOverBudget: Bool {
         allocated > 0 && spent > allocated
     }
+
+    /// Source-of-truth spend, derived from the expenses themselves. The
+    /// stored `spent` counter drifts when expenses are edited — call
+    /// `reconcileSpent()` after any expense mutation to keep it honest.
+    var totalExpensed: Double {
+        expenses.reduce(0) { $0 + $1.amount }
+    }
+
+    var totalPaidAmount: Double {
+        expenses.reduce(0) { $0 + $1.amountPaid }
+    }
+
+    func reconcileSpent() {
+        spent = totalExpensed
+    }
 }
 
 // MARK: - Expense Model
@@ -125,6 +171,11 @@ final class Expense {
     var paidByName: String?
     var functionId: UUID?
     var createdAt: Date
+
+    /// Individual payments toward this expense (installments to a vendor).
+    /// Stored as an optional Codable array — an additive optional property,
+    /// so existing stores lightweight-migrate without a new schema version.
+    var payments: [ExpensePayment]?
 
     init(
         id: UUID = UUID(),
@@ -152,6 +203,137 @@ final class Expense {
     }
 }
 
+// MARK: - Expense Payment (installments)
+
+/// One payment toward an expense — e.g. a deposit, then the balance later.
+struct ExpensePayment: Codable, Equatable, Hashable, Identifiable {
+    var id: UUID
+    var amount: Double
+    var date: Date
+    var method: String?
+    var note: String?
+
+    init(id: UUID = UUID(), amount: Double, date: Date = Date(), method: String? = nil, note: String? = nil) {
+        self.id = id
+        self.amount = amount
+        self.date = date
+        self.method = method
+        self.note = note
+    }
+}
+
+/// Payment progress of an expense.
+enum ExpensePaymentState {
+    case unpaid
+    case partial
+    case paid
+
+    var displayName: String {
+        switch self {
+        case .unpaid: return "Unpaid"
+        case .partial: return "Partially Paid"
+        case .paid: return "Paid"
+        }
+    }
+}
+
+extension Expense {
+    /// Half a cent — Double money sums leave ~1e-16 residues (e.g. 0.40 + 1.44
+    /// vs 1.84), which would strand an expense at "Partially Paid, $0.00 left".
+    private static let centTolerance = 0.005
+
+    /// Recorded installment payments, oldest first. Legacy expenses marked
+    /// paid before installments existed count as one full payment with an id
+    /// derived from the expense so SwiftUI row identity stays stable.
+    var recordedPayments: [ExpensePayment] {
+        if let payments, !payments.isEmpty {
+            return payments.sorted { $0.date < $1.date }
+        }
+        if isPaid {
+            return [ExpensePayment(id: id, amount: amount, date: paidDate ?? createdAt, note: nil)]
+        }
+        return []
+    }
+
+    /// Total recorded so far. Not capped — overpayment is prevented at the
+    /// recording UI, and an honest sum keeps the ledger auditable.
+    var amountPaid: Double {
+        if let payments, !payments.isEmpty {
+            return payments.reduce(0) { $0 + $1.amount }
+        }
+        return isPaid ? amount : 0
+    }
+
+    var amountRemaining: Double {
+        let remaining = amount - amountPaid
+        return remaining < Self.centTolerance ? 0 : remaining
+    }
+
+    var paymentState: ExpensePaymentState {
+        if amountPaid < Self.centTolerance { return .unpaid }
+        return (amount - amountPaid) < Self.centTolerance ? .paid : .partial
+    }
+
+    var percentPaid: Double {
+        guard amount > 0 else { return 0 }
+        return min(100, (amountPaid / amount) * 100)
+    }
+
+    /// Records an installment and keeps the legacy `isPaid`/`paidDate`
+    /// fields in sync so older UI and Firestore sync stay correct.
+    func recordPayment(amount paymentAmount: Double, date: Date = Date(), method: String? = nil, note: String? = nil) {
+        var list = payments ?? []
+        // Migrate a legacy full payment into the list before appending.
+        if list.isEmpty && isPaid {
+            list.append(ExpensePayment(amount: amount, date: paidDate ?? createdAt))
+        }
+        list.append(ExpensePayment(amount: paymentAmount, date: date, method: method, note: note))
+        payments = list
+        syncLegacyPaidFlags()
+    }
+
+    func removePayment(id paymentId: UUID) {
+        guard var list = payments else { return }
+        list.removeAll { $0.id == paymentId }
+        payments = list
+        syncLegacyPaidFlags()
+    }
+
+    /// One-tap full settle: records the outstanding balance as a payment.
+    func markFullyPaid(date: Date = Date()) {
+        if amountRemaining >= Self.centTolerance {
+            recordPayment(amount: amountRemaining, date: date)
+        } else {
+            resyncPaidFlags()
+        }
+    }
+
+    func markUnpaid() {
+        payments = []
+        isPaid = false
+        paidDate = nil
+    }
+
+    /// Re-derives the legacy `isPaid`/`paidDate` flags. Must read the STORED
+    /// payments list, not `amountPaid` — after removing the last payment,
+    /// `amountPaid`'s legacy fallback would consult the stale `isPaid` flag
+    /// and resurrect a phantom full payment.
+    func resyncPaidFlags() {
+        let paid = (payments ?? []).reduce(0) { $0 + $1.amount }
+        if payments == nil {
+            // No installment list — legacy flags stay authoritative.
+            paidDate = isPaid ? (paidDate ?? createdAt) : nil
+            return
+        }
+        isPaid = amount > 0 && (amount - paid) < Self.centTolerance
+        paidDate = isPaid ? recordedPayments.last?.date : nil
+    }
+
+    private func syncLegacyPaidFlags() {
+        resyncPaidFlags()
+    }
+}
+
 // MARK: - Default Categories
 
 extension BudgetCategory {
@@ -174,6 +356,15 @@ extension BudgetCategory {
         ("Decorations", "sparkles", "yellow"),
         ("Entertainment", "music.note", "orange"),
         ("Favors", "gift", "teal")
+    ]
+
+    static let sportsDefaults: [(name: String, icon: String, color: String)] = [
+        ("Venue/Field", "sportscourt", "green"),
+        ("Equipment", "duffle.bag", "blue"),
+        ("Food & Drinks", "fork.knife", "pink"),
+        ("Uniforms/Gear", "tshirt", "indigo"),
+        ("Transportation", "car", "gray"),
+        ("Miscellaneous", "ellipsis.circle", "secondary")
     ]
 
     static let casualDefaults: [(name: String, icon: String, color: String)] = [
@@ -201,6 +392,8 @@ extension BudgetCategory {
             defaults = weddingDefaults
         case .party:
             defaults = partyDefaults
+        case .sports:
+            defaults = sportsDefaults
         default:
             defaults = casualDefaults
         }

@@ -65,6 +65,16 @@ struct EventTemplate: Identifiable {
             suggestedPrivacy: .publicEvent
         ),
         EventTemplate(
+            name: "Game Day",
+            icon: "sportscourt.fill",
+            category: .sports,
+            description: "A sports match or game-day gathering",
+            suggestedFeatures: [.guestManagement, .ticketing, .budget, .activity],
+            suggestedFunctions: [],
+            suggestedDescription: "Match day! Bring your energy and cheer us on to victory.",
+            suggestedPrivacy: .publicEvent
+        ),
+        EventTemplate(
             name: "Dinner Party",
             icon: "fork.knife",
             category: .party,

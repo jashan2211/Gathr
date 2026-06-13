@@ -9,6 +9,7 @@ enum EventCategory: String, Codable, CaseIterable {
     case conference
     case concert
     case meetup
+    case sports
     case custom
 
     var displayName: String {
@@ -19,6 +20,7 @@ enum EventCategory: String, Codable, CaseIterable {
         case .conference: return "Conference"
         case .concert: return "Concert"
         case .meetup: return "Meetup"
+        case .sports: return "Sports"
         case .custom: return "Other"
         }
     }
@@ -31,6 +33,7 @@ enum EventCategory: String, Codable, CaseIterable {
         case .conference: return "person.3.fill"
         case .concert: return "music.mic"
         case .meetup: return "person.2.fill"
+        case .sports: return "sportscourt.fill"
         case .custom: return "star.fill"
         }
     }
@@ -50,6 +53,8 @@ enum EventCategory: String, Codable, CaseIterable {
             defaults = [.ticketing, .activity]
         case .meetup:
             defaults = [.guestManagement, .activity]
+        case .sports:
+            defaults = [.guestManagement, .ticketing, .budget, .activity]
         case .custom:
             defaults = [.guestManagement, .activity]
         }
@@ -65,6 +70,7 @@ enum EventCategory: String, Codable, CaseIterable {
         case .conference: return "orange"
         case .concert: return "red"
         case .meetup: return "green"
+        case .sports: return "green"
         case .custom: return "gray"
         }
     }

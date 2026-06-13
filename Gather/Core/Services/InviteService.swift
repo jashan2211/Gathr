@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 import SwiftData
-import MessageUI
 
 @MainActor
 class InviteService: ObservableObject {
@@ -34,16 +33,15 @@ class InviteService: ObservableObject {
 
     // MARK: - Generate Invite Link
 
+    /// Universal link — a real https URL so WhatsApp/SMS/email render it
+    /// tappable. Opens the app directly when installed (Associated Domains);
+    /// otherwise lands on thebighead.ca which offers the App Store.
     func generateInviteLink(guest: Guest, event: Event) -> URL? {
-        // Format: gather://rsvp/{eventId}/{guestId}
-        let urlString = "gather://rsvp/\(event.id.uuidString)/\(guest.id.uuidString)"
-        return URL(string: urlString)
+        URL(string: "\(AppConfig.webBaseURL.absoluteString)/rsvp/\(event.id.uuidString)/\(guest.id.uuidString)")
     }
 
     func generateShareableLink(event: Event) -> URL? {
-        // Custom URL scheme — will be replaced with Universal Links when domain is configured
-        let urlString = "gather://event/\(event.id.uuidString)"
-        return URL(string: urlString)
+        URL(string: "\(AppConfig.webBaseURL.absoluteString)/event/\(event.id.uuidString)")
     }
 
     // MARK: - Generate Invite Message
@@ -76,13 +74,81 @@ class InviteService: ObservableObject {
             message += "\n"
         }
 
-        message += "Please RSVP in the Gather app to let us know if you can make it!\n\n"
-
+        // One clickable link only — the universal link opens the app when
+        // installed and falls back to a web page with the App Store link.
         if let inviteLink = generateInviteLink(guest: guest, event: event) {
-            message += "RSVP here: \(inviteLink.absoluteString)\n\n"
+            message += "Tap here to RSVP:\n\(inviteLink.absoluteString)"
         }
 
-        message += "Download Gather: \(AppConfig.appStoreURL.absoluteString)"
+        return message
+    }
+
+    // MARK: - Generate Reminder Message
+
+    /// Shorter, friendly nudge for guests who already received an invite.
+    /// Reuses the same per-guest RSVP link so responses are still tracked.
+    func generateReminderMessage(
+        guest: Guest,
+        event: Event,
+        functions: [EventFunction]
+    ) -> String {
+        let firstName = guest.name.split(separator: " ").first.map(String.init) ?? "there"
+        var message = "Hi \(firstName)! Just a friendly nudge about \(event.title)"
+
+        if let nextFunction = functions.min(by: { $0.date < $1.date }) {
+            message += " — \(nextFunction.name) is on \(GatherDateFormatter.fullWeekdayDateTime.string(from: nextFunction.date))"
+        } else {
+            message += " on \(GatherDateFormatter.fullWeekdayDateTimeYear.string(from: event.startDate))"
+        }
+        message += ".\n\n"
+        message += "We'd love to know if you can make it!"
+
+        if let inviteLink = generateInviteLink(guest: guest, event: event) {
+            message += "\n\nRSVP here: \(inviteLink.absoluteString)"
+        }
+
+        return message
+    }
+
+    // MARK: - Generate Email Blast Body
+
+    /// Generic (non-personalized) body for a single BCC email blast.
+    /// Per-guest RSVP links can't go in one shared email, so the shareable
+    /// event link is used instead.
+    func generateEmailBlastBody(
+        event: Event,
+        functions: [EventFunction],
+        isReminder: Bool = false
+    ) -> String {
+        var message = isReminder
+            ? "Hi! Just a friendly reminder about \(event.title).\n\n"
+            : "Hi!\n\nYou're invited to \(event.title)!\n\n"
+
+        if !functions.isEmpty {
+            message += "Functions:\n"
+            for function in functions.sorted(by: { $0.date < $1.date }) {
+                message += "- \(function.name): \(GatherDateFormatter.fullWeekdayDateTime.string(from: function.date))"
+                if let location = function.location {
+                    message += " at \(location.name)"
+                }
+                message += "\n"
+            }
+            message += "\n"
+        } else {
+            message += "Date: \(GatherDateFormatter.fullWeekdayDateTimeYear.string(from: event.startDate))\n"
+            if let location = event.location {
+                message += "Location: \(location.name)\n"
+            }
+            message += "\n"
+        }
+
+        message += isReminder
+            ? "We'd love to know if you can make it!\n\n"
+            : "We'd love to see you there!\n\n"
+
+        if let shareLink = generateShareableLink(event: event) {
+            message += "Tap here to RSVP:\n\(shareLink.absoluteString)"
+        }
 
         return message
     }
@@ -90,12 +156,19 @@ class InviteService: ObservableObject {
     // MARK: - Send via WhatsApp
 
     func sendViaWhatsApp(guest: Guest, event: Event, functions: [EventFunction]) -> Bool {
+        sendViaWhatsApp(
+            guest: guest,
+            message: generateInviteMessage(guest: guest, event: event, functions: functions)
+        )
+    }
+
+    /// Opens WhatsApp with an arbitrary prefilled message (invite or reminder).
+    func sendViaWhatsApp(guest: Guest, message: String) -> Bool {
         guard let rawPhone = guest.phone, !rawPhone.isEmpty else { return false }
         // WhatsApp's phone parameter expects digits only — no `+`, no spaces.
         let phone = sanitizedPhone(rawPhone).replacingOccurrences(of: "+", with: "")
         guard !phone.isEmpty else { return false }
 
-        let message = generateInviteMessage(guest: guest, event: event, functions: functions)
         let encodedMessage = message.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let urlString = "whatsapp://send?phone=\(phone)&text=\(encodedMessage)"
 
@@ -111,12 +184,20 @@ class InviteService: ObservableObject {
     // MARK: - Send via SMS
 
     func sendViaSMS(guest: Guest, event: Event, functions: [EventFunction]) -> Bool {
+        sendViaSMS(
+            guest: guest,
+            message: generateInviteMessage(guest: guest, event: event, functions: functions)
+        )
+    }
+
+    /// Opens the external Messages app via an `sms:` URL with an arbitrary
+    /// body. Fallback path for devices where in-app compose is unavailable.
+    func sendViaSMS(guest: Guest, message: String) -> Bool {
         guard let rawPhone = guest.phone, !rawPhone.isEmpty else { return false }
         // Strip formatting — spaces/parens/dashes make URL(string:) return nil.
         let phone = sanitizedPhone(rawPhone)
         guard !phone.isEmpty else { return false }
 
-        let message = generateInviteMessage(guest: guest, event: event, functions: functions)
         let encodedMessage = message.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let urlString = "sms:\(phone)&body=\(encodedMessage)"
 
@@ -133,13 +214,37 @@ class InviteService: ObservableObject {
 
     func sendViaEmail(guest: Guest, event: Event, functions: [EventFunction]) -> Bool {
         guard let email = guest.email else { return false }
+        return sendViaEmail(
+            to: [email],
+            bcc: [],
+            subject: "You're Invited to \(event.title)!",
+            body: generateInviteMessage(guest: guest, event: event, functions: functions)
+        )
+    }
 
-        let subject = "You're Invited to \(event.title)!"
-        let body = generateInviteMessage(guest: guest, event: event, functions: functions)
+    /// Opens the external mail client via a `mailto:` URL. Supports BCC so
+    /// the email-blast flow has a fallback when in-app mail compose is
+    /// unavailable (no mail account configured).
+    func sendViaEmail(to: [String], bcc: [String], subject: String, body: String) -> Bool {
+        guard !to.isEmpty || !bcc.isEmpty else { return false }
+
+        // Addresses must be percent-encoded individually: `urlQueryAllowed`
+        // leaves `+ & , ; = ?` intact, so a gmail alias like "a+b@x" decodes
+        // as "a b@x" and raw separators can split or inject parameters.
+        var addressAllowed = CharacterSet.urlQueryAllowed
+        addressAllowed.remove(charactersIn: "+&,;=?")
+        func encodeAddresses(_ addresses: [String]) -> String {
+            addresses
+                .compactMap { $0.addingPercentEncoding(withAllowedCharacters: addressAllowed) }
+                .joined(separator: ",")
+        }
 
         let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         let encodedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "mailto:\(email)?subject=\(encodedSubject)&body=\(encodedBody)"
+        var urlString = "mailto:\(encodeAddresses(to))?subject=\(encodedSubject)&body=\(encodedBody)"
+        if !bcc.isEmpty {
+            urlString += "&bcc=\(encodeAddresses(bcc))"
+        }
 
         guard let url = URL(string: urlString) else { return false }
 

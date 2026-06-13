@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["F385ZL83XQ.ca.thebighead.gathr"],
+        "components": [
+          { "/": "/gathr/rsvp/*", "comment": "Per-guest RSVP invite links" },
+          { "/": "/gathr/event/*", "comment": "Shareable event links" }
+        ]
+      }
+    ]
+  }
+}

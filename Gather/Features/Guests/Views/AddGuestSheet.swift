@@ -16,6 +16,8 @@ struct AddGuestSheet: View {
     @State private var selectedContacts: [CNContact] = []
     @State private var isImporting = false
     @State private var showSuccess = false
+    @State private var successMessage = "Guest added!"
+    @State private var importSummary: String?
 
     private var isEmailValid: Bool {
         email.isEmpty || (email.contains("@") && email.split(separator: "@").last?.contains(".") == true)
@@ -23,6 +25,48 @@ struct AddGuestSheet: View {
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && isEmailValid
+    }
+
+    /// Single source of truth for duplicate-confirm UI: the warning card and
+    /// the CTA's "Add Anyway" label/icon/accessibility must flip together.
+    private var showDuplicateConfirm: Bool {
+        possibleDuplicate != nil && canSave
+    }
+
+    // MARK: - Duplicate Detection
+
+    private func digitsOnly(_ value: String) -> String {
+        value.filter { $0.isNumber }
+    }
+
+    /// Existing event guest that likely matches the manual-entry fields:
+    /// case-insensitive email, digits-only phone, or case-insensitive exact name.
+    private var possibleDuplicate: Guest? {
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+        let phoneDigits = digitsOnly(phone)
+
+        guard !trimmedName.isEmpty || !trimmedEmail.isEmpty || !phoneDigits.isEmpty else {
+            return nil
+        }
+
+        return event.guests.first { guest in
+            if !trimmedEmail.isEmpty,
+               let guestEmail = guest.email,
+               guestEmail.caseInsensitiveCompare(trimmedEmail) == .orderedSame {
+                return true
+            }
+            if !phoneDigits.isEmpty,
+               let guestPhone = guest.phone,
+               digitsOnly(guestPhone) == phoneDigits {
+                return true
+            }
+            if !trimmedName.isEmpty,
+               guest.name.caseInsensitiveCompare(trimmedName) == .orderedSame {
+                return true
+            }
+            return false
+        }
     }
 
     var body: some View {
@@ -72,6 +116,40 @@ struct AddGuestSheet: View {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
+            .alert(
+                "Import Complete",
+                isPresented: Binding(
+                    get: { importSummary != nil },
+                    set: { if !$0 { importSummary = nil; dismiss() } }
+                )
+            ) {
+                Button("OK") { }
+            } message: {
+                Text(importSummary ?? "")
+            }
+        }
+    }
+
+    // MARK: - Capacity Banner
+
+    @ViewBuilder
+    private var capacityBanner: some View {
+        if event.isFull {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "person.3.sequence.fill")
+                    .font(.caption)
+                    .foregroundStyle(Color.rsvpMaybeFallback)
+                Text("Event is at capacity — new guests join the waitlist")
+                    .font(GatherFont.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gatherPrimaryText)
+            }
+            .padding(Spacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.rsvpMaybeFallback.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Event is at capacity. New guests join the waitlist.")
         }
     }
 
@@ -81,12 +159,15 @@ struct AddGuestSheet: View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
 
+                // Capacity banner
+                capacityBanner
+
                 // Success banner
                 if showSuccess {
                     HStack(spacing: Spacing.xs) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(Color.rsvpYesFallback)
-                        Text("Guest added!")
+                        Text(successMessage)
                             .font(GatherFont.callout)
                             .fontWeight(.semibold)
                     }
@@ -233,14 +314,41 @@ struct AddGuestSheet: View {
                 .padding(Spacing.md)
                 .surfaceCard()
 
-                // Add button
+                // Duplicate warning
+                if showDuplicateConfirm, let duplicate = possibleDuplicate {
+                    HStack(alignment: .top, spacing: Spacing.xs) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.rsvpMaybeFallback)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(duplicate.name) may already be on the list")
+                                .font(GatherFont.callout)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.gatherPrimaryText)
+                            Text("Tap Add Anyway if this is a different person.")
+                                .font(GatherFont.caption)
+                                .foregroundStyle(Color.gatherSecondaryText)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(Spacing.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.rsvpMaybeFallback.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Warning: \(duplicate.name) may already be on the list. Tap Add Anyway if this is a different person.")
+                }
+
+                // Add button — becomes an explicit "Add Anyway" confirm
+                // when a possible duplicate is detected.
                 Button {
                     addGuest()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "plus.circle.fill")
+                        Image(systemName: showDuplicateConfirm ? "exclamationmark.triangle.fill" : "plus.circle.fill")
                             .font(.callout)
-                        Text("Add Guest")
+                        Text(showDuplicateConfirm ? "Add Anyway" : "Add Guest")
                             .font(GatherFont.callout)
                             .fontWeight(.bold)
                     }
@@ -257,6 +365,7 @@ struct AddGuestSheet: View {
                 .disabled(!canSave)
                 .scaleEffect(canSave ? 1.0 : 0.97)
                 .animation(.spring(response: 0.3, dampingFraction: 0.6), value: canSave)
+                .accessibilityLabel(showDuplicateConfirm ? "Add anyway, possible duplicate" : "Add guest")
             }
             .padding(.vertical, Spacing.md)
             .horizontalPadding()
@@ -268,6 +377,10 @@ struct AddGuestSheet: View {
 
     private var contactsImportView: some View {
         VStack(spacing: Spacing.lg) {
+            capacityBanner
+                .horizontalPadding()
+                .padding(.top, Spacing.xs)
+
             if selectedContacts.isEmpty {
                 VStack {
                     Spacer()
@@ -386,10 +499,18 @@ struct AddGuestSheet: View {
     // MARK: - Actions
 
     private func addGuest() {
+        // At capacity, new guests join the waitlist instead of pending.
+        let joinedWaitlist = event.isFull
+
+        // Trim before storing so duplicate detection keys stay reliable.
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+        let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
+
         let guest = Guest(
             name: name.trimmingCharacters(in: .whitespaces),
-            email: email.isEmpty ? nil : email,
-            phone: phone.isEmpty ? nil : phone,
+            email: trimmedEmail.isEmpty ? nil : trimmedEmail,
+            phone: trimmedPhone.isEmpty ? nil : trimmedPhone,
+            status: joinedWaitlist ? .waitlisted : .pending,
             role: role
         )
 
@@ -399,6 +520,7 @@ struct AddGuestSheet: View {
         HapticService.success()
 
         // Show success briefly
+        successMessage = joinedWaitlist ? "Added to waitlist!" : "Guest added!"
         withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showSuccess = true }
         Task {
             try? await Task.sleep(for: .seconds(2))
@@ -415,25 +537,67 @@ struct AddGuestSheet: View {
     private func importSelectedContacts() {
         isImporting = true
 
+        // Existing-guest keys for duplicate skipping (also catches dupes
+        // within the selected batch as new guests are added).
+        var existingEmails = Set(
+            event.guests.compactMap { $0.email?.trimmingCharacters(in: .whitespaces).lowercased() }
+        )
+        var existingPhones = Set(
+            event.guests.compactMap { $0.phone.map(digitsOnly) }.filter { !$0.isEmpty }
+        )
+        var existingNames = Set(event.guests.map { $0.name.lowercased() })
+
+        var importedCount = 0
+        var skippedCount = 0
+
         for contact in selectedContacts {
             let fullName = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
             let emailValue = contact.emailAddresses.first?.value as String?
             let phoneValue = contact.phoneNumbers.first?.value.stringValue
 
+            let emailKey = emailValue?.trimmingCharacters(in: .whitespaces).lowercased()
+            let phoneKey = phoneValue.map(digitsOnly)
+
+            let isDuplicate =
+                (emailKey.map { existingEmails.contains($0) } ?? false) ||
+                (phoneKey.map { !$0.isEmpty && existingPhones.contains($0) } ?? false) ||
+                (!fullName.isEmpty && existingNames.contains(fullName.lowercased()))
+
+            if isDuplicate {
+                skippedCount += 1
+                continue
+            }
+
             let guest = Guest(
                 name: fullName.isEmpty ? "Guest" : fullName,
                 email: emailValue,
-                phone: phoneValue
+                phone: phoneValue,
+                status: event.isFull ? .waitlisted : .pending
             )
 
             event.guests.append(guest)
+            importedCount += 1
+
+            if let emailKey { existingEmails.insert(emailKey) }
+            if let phoneKey, !phoneKey.isEmpty { existingPhones.insert(phoneKey) }
+            if !fullName.isEmpty { existingNames.insert(fullName.lowercased()) }
         }
         modelContext.safeSave()
 
-        HapticService.success()
-
         isImporting = false
-        dismiss()
+
+        if importedCount == 0 {
+            // Nothing was added — warn instead of celebrating.
+            HapticService.warning()
+            importSummary = "No new guests — all \(skippedCount) were already on the list."
+        } else if skippedCount > 0 {
+            HapticService.success()
+            // Report skips; sheet dismisses when the alert is confirmed.
+            importSummary = "Imported \(importedCount) guest\(importedCount == 1 ? "" : "s"). Skipped \(skippedCount) already added."
+        } else {
+            HapticService.success()
+            dismiss()
+        }
     }
 }
 

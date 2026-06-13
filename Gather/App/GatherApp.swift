@@ -158,13 +158,29 @@ struct GatherApp: App {
     // MARK: - Deep Link Handling
 
     private func handleDeepLink(_ url: URL) {
-        // Custom scheme:   gather://rsvp/{eventId}/{guestId}
-        //                  gather://event/{eventId}
-        // Universal links: https://thebighead.ca/gathr/rsvp/{eventId}/{guestId}
-        //                  https://thebighead.ca/gathr/event/{eventId}
+        // Current form (query string):
+        //   https://thebighead.ca/gathr/invite?e={eventId}&g={guestId}
+        //   gather://invite?e={eventId}&g={guestId}   (web "Open in app" button)
+        // Legacy path forms still accepted:
+        //   gather://rsvp/{eventId}/{guestId}, gather://event/{eventId}
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let queryItems = components?.queryItems ?? []
+        let eventParam = queryItems.first(where: { $0.name == "e" })?.value
+        let guestParam = queryItems.first(where: { $0.name == "g" })?.value
+
+        // Preferred: explicit e/g query parameters.
+        if let eventParam, let eventId = UUID(uuidString: eventParam) {
+            appState.deepLinkEventId = eventId
+            if let guestParam, let guestId = UUID(uuidString: guestParam) {
+                appState.deepLinkGuestId = guestId
+                appState.showRSVPForDeepLink = true
+            }
+            return
+        }
+
+        // Legacy path-based parsing (older links already sent out).
         let kind: String
         let ids: [String]
-
         if url.scheme == "gather" {
             kind = url.host ?? ""
             ids = url.pathComponents.filter { $0 != "/" }
@@ -179,14 +195,12 @@ struct GatherApp: App {
         }
 
         switch kind {
-        case "event":
-            if let eventIdString = ids.first,
-               let eventId = UUID(uuidString: eventIdString) {
+        case "event", "invite":
+            if let eventIdString = ids.first, let eventId = UUID(uuidString: eventIdString) {
                 appState.deepLinkEventId = eventId
             }
         case "rsvp":
-            if let eventIdString = ids.first,
-               let eventId = UUID(uuidString: eventIdString) {
+            if let eventIdString = ids.first, let eventId = UUID(uuidString: eventIdString) {
                 appState.deepLinkEventId = eventId
                 if let guestIdString = ids.dropFirst().first,
                    let guestId = UUID(uuidString: guestIdString) {

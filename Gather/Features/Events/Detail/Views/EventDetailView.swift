@@ -100,6 +100,13 @@ struct EventDetailView: View {
                 .padding(.top, 24)
         }
         .ignoresSafeArea(edges: .top)
+        .task {
+            // Host opens the event — pull any RSVPs guests submitted from the
+            // web invite page or their own app and merge them into the list.
+            if isHost {
+                await FirestoreService.shared.fetchRSVPs(for: event, into: modelContext)
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             if isHost && event.isDraft {
                 draftPublishBar

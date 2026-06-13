@@ -52,9 +52,81 @@ final class FirestoreService {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         let document = EventDocument(event: event, ownerUid: uid)
         do {
+            // Full event (owner-readable only) — carries guest contact info.
             try eventsCollection.document(document.id).setData(from: document, merge: true)
+            // Sanitized public projection for invitees (web + non-host app):
+            // title/date/location only — no guest list, no contact info. This
+            // is what an invite link reads, so PII never leaves the owner.
+            let hostName = Auth.auth().currentUser?.displayName
+            let publicDoc = EventPublicDocument(event: event, ownerUid: uid, hostName: hostName)
+            try eventsCollection.document(document.id)
+                .collection("public").document("info")
+                .setData(from: publicDoc, merge: true)
         } catch {
             logger.error("Event push failed: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - RSVPs (cross-user)
+
+    /// Writes a guest's RSVP to `events/{eventId}/rsvps/{guestId}`. This is the
+    /// one channel a guest can write to — the event doc itself is owner-only.
+    /// Called both from the in-app RSVP sheet and (in JS) from the web invite
+    /// page, so an invited guest can respond with or without the app.
+    func submitRSVP(eventId: UUID, guestId: UUID, status: RSVPStatus, partySize: Int, name: String, note: String?) {
+        let data: [String: Any] = [
+            "guestId": guestId.uuidString,
+            "status": status.rawValue,
+            "partySize": max(0, partySize),
+            "name": name,
+            "note": note ?? "",
+            "respondedAt": FieldValue.serverTimestamp(),
+            "source": "app"
+        ]
+        eventsCollection.document(eventId.uuidString)
+            .collection("rsvps").document(guestId.uuidString)
+            .setData(data, merge: true) { error in
+                if let error {
+                    logger.error("RSVP submit failed: \(error.localizedDescription)")
+                }
+            }
+    }
+
+    /// Pulls guest responses for a hosted event and merges them into the local
+    /// guest list. A remote response wins only when it's newer than the local
+    /// one, so a host's manual edit isn't clobbered by a stale web RSVP.
+    func fetchRSVPs(for event: Event, into modelContext: ModelContext) async {
+        guard Auth.auth().currentUser != nil else { return }
+        do {
+            let snapshot = try await eventsCollection.document(event.id.uuidString)
+                .collection("rsvps").getDocuments()
+            var changed = false
+            for doc in snapshot.documents {
+                let data = doc.data()
+                guard let guestIdStr = data["guestId"] as? String,
+                      let guestId = UUID(uuidString: guestIdStr),
+                      let statusStr = data["status"] as? String,
+                      let status = RSVPStatus(rawValue: statusStr),
+                      let guest = event.guests.first(where: { $0.id == guestId }) else { continue }
+
+                let remoteDate = (data["respondedAt"] as? Timestamp)?.dateValue() ?? Date()
+                if let localDate = guest.respondedAt, localDate >= remoteDate { continue }
+
+                guest.status = status
+                guest.plusOneCount = data["partySize"] as? Int ?? guest.plusOneCount
+                guest.respondedAt = remoteDate
+                if let note = data["note"] as? String, !note.isEmpty {
+                    if guest.metadata != nil { guest.metadata?.notes = note }
+                    else { guest.metadata = GuestMetadata(notes: note) }
+                }
+                changed = true
+            }
+            if changed {
+                modelContext.safeSave()
+                logger.info("Merged guest RSVPs from the cloud.")
+            }
+        } catch {
+            logger.error("RSVP fetch failed: \(error.localizedDescription)")
         }
     }
 
@@ -110,18 +182,19 @@ final class FirestoreService {
         }
     }
 
-    /// Fetches a single event by id from Firestore — used when someone opens a
-    /// shared invite link to an event they don't host. Inserts it into the
-    /// local store so it persists, and returns it.
+    /// Fetches a single event by id for someone opening a shared invite link to
+    /// an event they don't host. Reads the sanitized public projection (no other
+    /// guests' contact info), inserts it locally so it persists, and returns it.
     func fetchEvent(id: UUID, into modelContext: ModelContext) async -> Event? {
         let descriptor = FetchDescriptor<Event>(predicate: #Predicate { $0.id == id })
         if let existing = try? modelContext.fetch(descriptor).first {
             return existing
         }
         do {
-            let snapshot = try await eventsCollection.document(id.uuidString).getDocument()
+            let snapshot = try await eventsCollection.document(id.uuidString)
+                .collection("public").document("info").getDocument()
             guard snapshot.exists,
-                  let document = try? snapshot.data(as: EventDocument.self) else {
+                  let document = try? snapshot.data(as: EventPublicDocument.self) else {
                 return nil
             }
             let event = document.makeEvent()
@@ -132,6 +205,89 @@ final class FirestoreService {
             logger.error("Shared event fetch failed: \(error.localizedDescription)")
             return nil
         }
+    }
+}
+
+// MARK: - Public Event Projection
+
+/// The slice of an event that's safe for invitees to read — no guest list and
+/// no contact info. Lives at `events/{id}/public/info`, readable by any signed-in
+/// user (including anonymous web visitors); the full `EventDocument` stays
+/// owner-only.
+struct EventPublicDocument: Codable {
+    var id: String
+    var ownerUid: String
+    var title: String
+    var eventDescription: String?
+    var startDate: Date
+    var endDate: Date?
+    var location: EventLocation?
+    var category: EventCategory
+    var capacity: Int?
+    var hostName: String?
+    var isDraft: Bool
+    var functions: [PublicFunctionDocument]
+
+    init(event: Event, ownerUid: String, hostName: String?) {
+        self.id = event.id.uuidString
+        self.ownerUid = ownerUid
+        self.title = event.title
+        self.eventDescription = event.eventDescription
+        self.startDate = event.startDate
+        self.endDate = event.endDate
+        self.location = event.location
+        self.category = event.category
+        self.capacity = event.capacity
+        self.hostName = hostName
+        self.isDraft = event.isDraft
+        self.functions = event.functions
+            .sorted { $0.date < $1.date }
+            .map { PublicFunctionDocument(function: $0) }
+    }
+
+    func makeEvent() -> Event {
+        let event = Event(
+            id: UUID(uuidString: id) ?? UUID(),
+            title: title,
+            eventDescription: eventDescription,
+            startDate: startDate,
+            endDate: endDate,
+            location: location,
+            capacity: capacity,
+            category: category
+        )
+        event.functions = functions.map { $0.makeFunction(eventId: event.id) }
+        return event
+    }
+}
+
+struct PublicFunctionDocument: Codable {
+    var id: String
+    var name: String
+    var functionDescription: String?
+    var date: Date
+    var endTime: Date?
+    var location: EventLocation?
+
+    init(function: EventFunction) {
+        self.id = function.id.uuidString
+        self.name = function.name
+        self.functionDescription = function.functionDescription
+        self.date = function.date
+        self.endTime = function.endTime
+        self.location = function.location
+    }
+
+    func makeFunction(eventId: UUID) -> EventFunction {
+        EventFunction(
+            id: UUID(uuidString: id) ?? UUID(),
+            name: name,
+            functionDescription: functionDescription,
+            date: date,
+            endTime: endTime,
+            location: location,
+            eventId: eventId
+        )
     }
 }
 

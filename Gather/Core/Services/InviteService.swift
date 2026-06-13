@@ -33,15 +33,17 @@ class InviteService: ObservableObject {
 
     // MARK: - Generate Invite Link
 
-    /// Universal link — a real https URL so WhatsApp/SMS/email render it
-    /// tappable. Opens the app directly when installed (Associated Domains);
-    /// otherwise lands on thebighead.ca which offers the App Store.
+    /// Invite link — a real https URL that always resolves to the web RSVP page
+    /// (`/gathr/invite`, a real file, so it can never 404). The guest can RSVP
+    /// right there with no app. On iPhones with Gathr installed, iOS opens the
+    /// app directly via Associated Domains instead. IDs only — no event title or
+    /// guest details in the URL.
     func generateInviteLink(guest: Guest, event: Event) -> URL? {
-        URL(string: "\(AppConfig.webBaseURL.absoluteString)/rsvp/\(event.id.uuidString)/\(guest.id.uuidString)")
+        URL(string: "\(AppConfig.webBaseURL.absoluteString)/invite?e=\(event.id.uuidString)&g=\(guest.id.uuidString)")
     }
 
     func generateShareableLink(event: Event) -> URL? {
-        URL(string: "\(AppConfig.webBaseURL.absoluteString)/event/\(event.id.uuidString)")
+        URL(string: "\(AppConfig.webBaseURL.absoluteString)/invite?e=\(event.id.uuidString)")
     }
 
     // MARK: - Generate Invite Message

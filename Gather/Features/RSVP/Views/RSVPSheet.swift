@@ -2,6 +2,10 @@ import SwiftUI
 
 struct RSVPSheet: View {
     let event: Event
+    /// When opened from an invite link, the host-created guest this RSVP is for.
+    /// Takes priority over matching by signed-in user, so the response updates
+    /// the host's existing guest entry instead of creating a duplicate.
+    var invitedGuestId: UUID? = nil
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
@@ -20,8 +24,13 @@ struct RSVPSheet: View {
         case confirmation
     }
 
-    // Check for existing guest entry
+    // Check for existing guest entry — the invited guest (from the link) first,
+    // then a guest matched to the signed-in user.
     private var existingGuest: Guest? {
+        if let invitedGuestId,
+           let invited = event.guests.first(where: { $0.id == invitedGuestId }) {
+            return invited
+        }
         guard let currentUser = authManager.currentUser else { return nil }
         return event.guests.first(where: { $0.userId == currentUser.id })
     }
@@ -363,14 +372,12 @@ struct RSVPSheet: View {
     private func submitRSVP() {
         isSubmitting = true
 
-        guard let currentUser = authManager.currentUser else {
-            isSubmitting = false
-            return
-        }
+        // Resolve which guest this response belongs to, then record it.
+        let guestId: UUID
+        let guestName: String
 
-        // Find or create guest entry
         if let existingGuest = existingGuest {
-            // Update existing
+            // Update the invited / matched guest in place.
             existingGuest.status = selectedStatus
             existingGuest.plusOneCount = plusOnes
             existingGuest.respondedAt = Date()
@@ -381,8 +388,15 @@ struct RSVPSheet: View {
                     existingGuest.metadata = GuestMetadata(notes: comment)
                 }
             }
-        } else {
-            // Create new guest
+            guestId = existingGuest.id
+            guestName = existingGuest.name
+        } else if let invitedGuestId {
+            // Shared event fetched without its guest list — still report the
+            // response to the cloud under the invited guest id so the host gets it.
+            guestId = invitedGuestId
+            guestName = authManager.currentUser?.name ?? "Guest"
+        } else if let currentUser = authManager.currentUser {
+            // Self-RSVP: create a guest entry tied to the signed-in user.
             let newGuest = Guest(
                 name: currentUser.name,
                 email: currentUser.email,
@@ -393,13 +407,28 @@ struct RSVPSheet: View {
             )
             newGuest.respondedAt = Date()
             event.guests.append(newGuest)
+            guestId = newGuest.id
+            guestName = newGuest.name
+        } else {
+            isSubmitting = false
+            return
         }
 
         modelContext.safeSave()
 
+        // Push to the cloud so the host receives the response (cross-user RSVP).
+        FirestoreService.shared.submitRSVP(
+            eventId: event.id,
+            guestId: guestId,
+            status: selectedStatus,
+            partySize: plusOnes,
+            name: guestName,
+            note: comment.isEmpty ? nil : comment
+        )
+
         // Send notification to host
         NotificationService.shared.scheduleRSVPNotification(
-            guestName: currentUser.name,
+            guestName: guestName,
             eventTitle: event.title,
             functionName: nil,
             response: rsvpResponseFromStatus(selectedStatus)

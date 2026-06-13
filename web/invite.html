@@ -1,63 +1,323 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>You're invited — Gathr</title>
-  <meta property="og:title" content="You're invited!">
-  <meta property="og:description" content="Open your invitation in Gathr to RSVP.">
-  <style>
-    :root { color-scheme: light dark; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      background: #fff; color: #111;
-      padding: 24px;
-    }
-    @media (prefers-color-scheme: dark) { body { background: #000; color: #f5f5f7; } }
-    .card { max-width: 420px; width: 100%; text-align: center; }
-    .badge {
-      width: 96px; height: 96px; margin: 0 auto 28px; border-radius: 28px;
-      background: linear-gradient(135deg, #7C3AED, #EC4899);
-      display: flex; align-items: center; justify-content: center; font-size: 48px;
-    }
-    h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 12px; }
-    p { font-size: 17px; line-height: 1.45; opacity: 0.65; margin-bottom: 32px; }
-    .btn {
-      display: block; width: 100%; padding: 16px; border-radius: 999px;
-      font-size: 17px; font-weight: 700; text-decoration: none; margin-bottom: 12px;
-    }
-    .btn-primary { background: linear-gradient(135deg, #7C3AED, #EC4899); color: #fff; }
-    .btn-secondary { background: rgba(120,120,128,0.12); color: inherit; }
-    .fine { font-size: 13px; opacity: 0.45; margin-top: 24px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You're Invited &mdash; Gathr</title>
+    <meta name="description" content="Open your invitation in Gathr to RSVP.">
+    <meta name="robots" content="noindex, follow">
+    <meta property="og:title" content="You're invited! &mdash; Gathr">
+    <meta property="og:description" content="Tap to RSVP.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #1d1d1f;
+            background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        .card {
+            background: #fff; border-radius: 28px; max-width: 460px; width: 100%;
+            padding: 40px 32px 32px; box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+        }
+        .badge {
+            width: 84px; height: 84px; margin: 0 auto 22px; border-radius: 24px;
+            background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+            display: flex; align-items: center; justify-content: center; font-size: 40px;
+            box-shadow: 0 12px 28px rgba(139,92,246,0.4);
+        }
+        .eyebrow { text-align: center; font-size: 0.8em; font-weight: 700; letter-spacing: 1px;
+            text-transform: uppercase; color: #8B5CF6; margin-bottom: 8px; }
+        h1 { text-align: center; font-size: 1.7em; font-weight: 800; margin-bottom: 18px; letter-spacing: -0.5px; }
+        .detail-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+            background: #f5f5f7; border-radius: 12px; margin-bottom: 8px; font-size: 0.95em; }
+        .detail-row .ico { font-size: 1.1em; line-height: 1.4; }
+        .detail-row .txt { color: #333; line-height: 1.4; }
+        .detail-row .txt b { display: block; color: #1d1d1f; }
+        .section-label { font-size: 0.8em; font-weight: 700; color: #6B7280; margin: 22px 0 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .rsvp-options { display: flex; gap: 8px; margin-bottom: 16px; }
+        .rsvp-btn {
+            flex: 1; padding: 14px 6px; border-radius: 14px; border: 2px solid #e5e5ea;
+            background: #fff; font-family: inherit; font-size: 0.92em; font-weight: 700; color: #1d1d1f;
+            cursor: pointer; transition: all 0.15s; text-align: center;
+        }
+        .rsvp-btn .emoji { display: block; font-size: 1.5em; margin-bottom: 4px; }
+        .rsvp-btn.sel-yes { border-color: #10B981; background: rgba(16,185,129,0.1); color: #047857; }
+        .rsvp-btn.sel-maybe { border-color: #F59E0B; background: rgba(245,158,11,0.1); color: #B45309; }
+        .rsvp-btn.sel-no { border-color: #EF4444; background: rgba(239,68,68,0.1); color: #B91C1C; }
+        .party { display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 16px; background: #f5f5f7; border-radius: 12px; margin-bottom: 14px; }
+        .party label { font-weight: 600; font-size: 0.95em; }
+        .stepper { display: flex; align-items: center; gap: 14px; }
+        .stepper button { width: 32px; height: 32px; border-radius: 50%; border: none;
+            background: #8B5CF6; color: #fff; font-size: 1.2em; font-weight: 700; cursor: pointer; line-height: 1; }
+        .stepper button:disabled { background: #d1d1d6; cursor: default; }
+        .stepper span { font-weight: 700; min-width: 18px; text-align: center; }
+        textarea {
+            width: 100%; font-family: inherit; font-size: 0.95em; padding: 12px 14px;
+            border: 1px solid #e5e5ea; border-radius: 12px; resize: vertical; min-height: 64px; margin-bottom: 16px;
+        }
+        .btn-primary {
+            display: block; width: 100%; border: none; cursor: pointer;
+            background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+            color: #fff; font-family: inherit; font-weight: 700; font-size: 1.05em;
+            padding: 16px; border-radius: 999px; text-align: center; text-decoration: none;
+            transition: transform 0.15s, box-shadow 0.15s; box-shadow: 0 8px 20px rgba(139,92,246,0.35);
+        }
+        .btn-primary:hover { transform: scale(1.02); }
+        .btn-primary:disabled { opacity: 0.6; cursor: default; transform: none; }
+        .divider { text-align: center; color: #aaa; font-size: 0.82em; margin: 18px 0 14px; }
+        .app-store-btn { display: block; text-align: center; }
+        .app-store-btn img { height: 46px; }
+        .fine { text-align: center; font-size: 0.78em; color: #999; margin-top: 24px; }
+        .fine a { color: #8B5CF6; text-decoration: none; }
+        .center { text-align: center; }
+        .muted { color: #6B7280; font-size: 0.95em; line-height: 1.5; }
+        .spinner { width: 36px; height: 36px; border: 3px solid #e5e5ea; border-top-color: #8B5CF6;
+            border-radius: 50%; margin: 30px auto; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none; }
+        .confirm-icon { font-size: 3em; text-align: center; margin-bottom: 12px; }
+    </style>
 </head>
 <body>
-  <div class="card">
-    <div class="badge">&#10024;</div>
-    <h1 id="headline">You're invited!</h1>
-    <p>Open your invitation in the Gathr app to see the details and RSVP in one tap.</p>
-    <a class="btn btn-primary" id="openApp" href="#">Open in Gathr</a>
-    <a class="btn btn-secondary" href="https://apps.apple.com/app/gathr-event-party-manager/id6758989661">Get Gathr on the App&nbsp;Store</a>
-    <div class="fine">Gathr — Plan events. Share moments.</div>
-  </div>
-  <script>
-    // Rebuild the in-app deep link from this page's path:
-    //   /gathr/rsvp/{eventId}/{guestId}  ->  gather://rsvp/{eventId}/{guestId}
-    //   /gathr/event/{eventId}           ->  gather://event/{eventId}
-    (function () {
-      var parts = location.pathname.split('/').filter(Boolean); // ["gathr","rsvp",ids...]
-      var link = 'gather://';
-      if (parts.length >= 2 && parts[0] === 'gathr') {
-        link += parts.slice(1).join('/');
-      }
-      var btn = document.getElementById('openApp');
-      btn.href = link;
-      if (parts[1] === 'event') {
-        document.getElementById('headline').textContent = "Join this event!";
-      }
-    })();
-  </script>
+    <div class="card">
+        <div class="badge">&#10024;</div>
+
+        <!-- Loading -->
+        <div id="loading">
+            <div class="spinner"></div>
+            <p class="center muted">Loading your invitation&hellip;</p>
+        </div>
+
+        <!-- Not found / error -->
+        <div id="error" class="hidden">
+            <div class="eyebrow">Gathr</div>
+            <h1>Invitation unavailable</h1>
+            <p class="center muted" id="errorMsg">We couldn't load this invitation. It may have been removed, or the link may be incomplete.</p>
+            <a class="app-store-btn" style="margin-top:24px" href="https://apps.apple.com/us/app/gathr-event-party-manager/id6758989661">
+                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download Gathr on the App Store">
+            </a>
+        </div>
+
+        <!-- Invitation -->
+        <div id="invite" class="hidden">
+            <div class="eyebrow">You're invited</div>
+            <h1 id="eventTitle">&nbsp;</h1>
+
+            <div id="eventDetails"></div>
+
+            <!-- RSVP (only when a guest id is present) -->
+            <div id="rsvpBlock">
+                <div class="section-label" id="rsvpGreeting">Will you be there?</div>
+                <div class="rsvp-options">
+                    <button class="rsvp-btn" data-status="attending" onclick="selectStatus('attending')">
+                        <span class="emoji">&#127881;</span>Going
+                    </button>
+                    <button class="rsvp-btn" data-status="maybe" onclick="selectStatus('maybe')">
+                        <span class="emoji">&#129300;</span>Maybe
+                    </button>
+                    <button class="rsvp-btn" data-status="declined" onclick="selectStatus('declined')">
+                        <span class="emoji">&#128542;</span>Can't go
+                    </button>
+                </div>
+
+                <div class="party" id="partyRow">
+                    <label>Bringing guests?</label>
+                    <div class="stepper">
+                        <button id="partyMinus" onclick="changeParty(-1)" disabled>&minus;</button>
+                        <span id="partyCount">0</span>
+                        <button id="partyPlus" onclick="changeParty(1)">+</button>
+                    </div>
+                </div>
+
+                <textarea id="note" placeholder="Add a note for the host (optional)"></textarea>
+
+                <button class="btn-primary" id="submitBtn" onclick="submitRsvp()" disabled>Send RSVP</button>
+            </div>
+
+            <!-- Share-only (no guest id) -->
+            <div id="shareBlock" class="hidden">
+                <a class="btn-primary" id="openAppBtn" href="#">Open in Gathr to RSVP</a>
+            </div>
+
+            <div class="divider">Have the app? It opens automatically. Otherwise:</div>
+            <a class="app-store-btn" href="https://apps.apple.com/us/app/gathr-event-party-manager/id6758989661">
+                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download Gathr on the App Store">
+            </a>
+        </div>
+
+        <!-- Confirmation -->
+        <div id="done" class="hidden">
+            <div class="confirm-icon" id="doneIcon">&#127881;</div>
+            <h1 id="doneTitle">You're going!</h1>
+            <p class="center muted" id="doneMsg">Your RSVP has been sent to the host. You can change it anytime by reopening this link.</p>
+            <a class="app-store-btn" style="margin-top:24px" href="https://apps.apple.com/us/app/gathr-event-party-manager/id6758989661">
+                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Get Gathr on the App Store">
+            </a>
+        </div>
+
+        <p class="fine">Gathr by <a href="/">thebighead apps</a> &mdash; Plan events. Share moments.</p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp }
+            from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Gathr Firebase project (gathr-event). These values are safe to ship in
+        // a web page — access is governed by Firestore security rules.
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvPeGGzr3wEhRJCq02v9n5mDCVIt6wKDg",
+            authDomain: "gathr-event.firebaseapp.com",
+            projectId: "gathr-event",
+            storageBucket: "gathr-event.firebasestorage.app",
+            messagingSenderId: "898036981980",
+            appId: "1:898036981980:ios:e5a4c01683522e341e9419"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- Parse the link: /gathr/invite?e={eventId}&g={guestId} ---
+        const params = new URLSearchParams(location.search);
+        const eventId = params.get('e');
+        const guestId = params.get('g');
+
+        // App deep link for "Open in Gathr"
+        const appLink = guestId
+            ? `gather://invite?e=${eventId}&g=${guestId}`
+            : `gather://invite?e=${eventId}`;
+
+        let selectedStatus = null;
+        let partyCount = 0;
+        const MAX_PARTY = 20;
+
+        const $ = (id) => document.getElementById(id);
+        function show(id) {
+            ['loading', 'error', 'invite', 'done'].forEach(s => $(s).classList.add('hidden'));
+            $(id).classList.remove('hidden');
+        }
+        function fail(msg) {
+            if (msg) $('errorMsg').textContent = msg;
+            show('error');
+        }
+        function esc(s) {
+            const d = document.createElement('div'); d.textContent = s == null ? '' : String(s);
+            return d.innerHTML;
+        }
+        function fmtDate(d) {
+            try {
+                return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+                    + ' at ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            } catch (e) { return ''; }
+        }
+
+        // Expose handlers for inline onclick
+        window.selectStatus = function (status) {
+            selectedStatus = status;
+            document.querySelectorAll('.rsvp-btn').forEach(b => {
+                b.classList.remove('sel-yes', 'sel-maybe', 'sel-no');
+            });
+            const map = { attending: 'sel-yes', maybe: 'sel-maybe', declined: 'sel-no' };
+            document.querySelector(`.rsvp-btn[data-status="${status}"]`).classList.add(map[status]);
+            $('partyRow').style.display = status === 'declined' ? 'none' : 'flex';
+            $('submitBtn').disabled = false;
+        };
+        window.changeParty = function (delta) {
+            partyCount = Math.max(0, Math.min(MAX_PARTY, partyCount + delta));
+            $('partyCount').textContent = partyCount;
+            $('partyMinus').disabled = partyCount === 0;
+            $('partyPlus').disabled = partyCount === MAX_PARTY;
+        };
+
+        let guestNameForWrite = 'Guest';
+
+        window.submitRsvp = async function () {
+            if (!selectedStatus || !eventId || !guestId) return;
+            const btn = $('submitBtn');
+            btn.disabled = true; btn.textContent = 'Sending…';
+            try {
+                await setDoc(
+                    doc(db, 'events', eventId, 'rsvps', guestId),
+                    {
+                        guestId: guestId,
+                        status: selectedStatus,
+                        partySize: selectedStatus === 'declined' ? 0 : partyCount,
+                        name: guestNameForWrite.slice(0, 120),
+                        note: ($('note').value || '').slice(0, 500),
+                        respondedAt: serverTimestamp(),
+                        source: 'web'
+                    },
+                    { merge: true }
+                );
+                const t = { attending: ['\u{1F389}', "You're going!"], maybe: ['\u{1F914}', 'Marked as maybe'], declined: ['\u{1F622}', "Can't make it"] };
+                $('doneIcon').textContent = t[selectedStatus][0];
+                $('doneTitle').textContent = t[selectedStatus][1];
+                show('done');
+            } catch (e) {
+                btn.disabled = false; btn.textContent = 'Send RSVP';
+                fail('We couldn’t send your RSVP. Please check your connection and try again. If this keeps happening, the host may not have finished setting up online RSVPs yet.');
+            }
+        };
+
+        async function start() {
+            if (!eventId) { fail('This invitation link is missing its event. Please ask the host to resend it.'); return; }
+
+            // Anonymous sign-in so Firestore rules (which require auth) allow the read/write.
+            try {
+                await signInAnonymously(auth);
+            } catch (e) {
+                fail('Online RSVP isn’t available right now. You can still RSVP by opening the event in the Gathr app.');
+                return;
+            }
+
+            // Read the sanitized public projection of the event.
+            let data;
+            try {
+                const snap = await getDoc(doc(db, 'events', eventId, 'public', 'info'));
+                if (!snap.exists()) { fail('This event isn’t available. The host may not have shared it online yet, or it was removed.'); return; }
+                data = snap.data();
+            } catch (e) {
+                fail('We couldn’t load this invitation. Please try again, or open it in the Gathr app.'); return;
+            }
+
+            // Populate event details
+            $('eventTitle').textContent = data.title || 'You’re invited!';
+            const rows = [];
+            if (data.startDate && data.startDate.toDate) {
+                rows.push(['\u{1F4C5}', '', fmtDate(data.startDate.toDate())]);
+            }
+            if (data.location && data.location.name) {
+                let where = data.location.name;
+                if (data.location.city) where += ', ' + data.location.city;
+                rows.push(['\u{1F4CD}', '', where]);
+            }
+            if (data.hostName) {
+                rows.push(['\u{1F464}', 'Hosted by', data.hostName]);
+            }
+            $('eventDetails').innerHTML = rows.map(r =>
+                `<div class="detail-row"><span class="ico">${r[0]}</span><span class="txt">${r[1] ? '<b>' + esc(r[1]) + '</b>' : ''}${esc(r[2])}</span></div>`
+            ).join('');
+
+            // Show RSVP controls only when we have a guest id; otherwise share-only.
+            if (guestId) {
+                $('rsvpBlock').classList.remove('hidden');
+                $('shareBlock').classList.add('hidden');
+            } else {
+                $('rsvpBlock').classList.add('hidden');
+                $('shareBlock').classList.remove('hidden');
+                $('openAppBtn').href = appLink;
+            }
+
+            show('invite');
+        }
+
+        start();
+    </script>
 </body>
 </html>

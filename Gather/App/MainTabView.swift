@@ -62,7 +62,7 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $showDeepLinkRSVP) {
             if let event = deepLinkEvent {
-                RSVPSheet(event: event)
+                RSVPSheet(event: event, invitedGuestId: appState.deepLinkGuestId)
                     .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)
                     .onDisappear {

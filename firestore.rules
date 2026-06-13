@@ -1,12 +1,17 @@
 rules_version = '2';
 
-// Cloud Firestore security rules for Gather.
+// Cloud Firestore security rules for Gathr.
 // Paste this into Firebase Console -> Firestore Database -> Rules -> Publish.
 //
-// Phase 2 migrates data to Firestore one stage at a time. These rules are
-// expanded as each feature lands. Anything not explicitly matched below is
-// denied by default — so collections that haven't been migrated yet stay
-// locked, which is intentional.
+// Security model for invites/RSVPs:
+//  - The full event doc holds guest contact info and is OWNER-ONLY.
+//  - A sanitized public projection (events/{id}/public/info) holds only
+//    title/date/location and is readable by any signed-in user, including the
+//    anonymous web visitors who open an invite link.
+//  - A guest writes their response to events/{id}/rsvps/{guestId} and nothing
+//    else; the host reads them back. Guest ids are unguessable UUIDs, so only
+//    someone holding the actual invite link can write a meaningful response.
+// Anything not matched below is denied by default.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -18,14 +23,44 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Events: any signed-in user can read (needed for shared events and
-    // discovery); only the owner can create, change, or delete their event.
+    // Events: the full document carries guest contact info, so only the owner
+    // can read or write it.
     match /events/{eventId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null
+                  && resource.data.ownerUid == request.auth.uid;
       allow create: if request.auth != null
                     && request.resource.data.ownerUid == request.auth.uid;
       allow update, delete: if request.auth != null
                             && resource.data.ownerUid == request.auth.uid;
+
+      // Public projection: safe-to-share event details (no guest list). Any
+      // signed-in user (incl. anonymous web visitors) can read it; only the
+      // event owner can write it. The owner is checked against the doc's own
+      // ownerUid field (no parent read — avoids a create-time race).
+      match /public/{doc} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null
+                     && request.resource.data.ownerUid == request.auth.uid;
+      }
+
+      // RSVPs: a guest writes ONLY the document keyed by their own guest id,
+      // with a validated shape. The event owner reads them all.
+      match /rsvps/{guestId} {
+        allow read: if request.auth != null
+                    && get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid == request.auth.uid;
+        allow create, update: if request.auth != null
+                    && guestId == request.resource.data.guestId
+                    && request.resource.data.status in ['attending', 'maybe', 'declined']
+                    && request.resource.data.partySize is int
+                    && request.resource.data.partySize >= 0
+                    && request.resource.data.partySize <= 20
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() <= 120
+                    && request.resource.data.keys().hasOnly(
+                         ['guestId', 'status', 'partySize', 'name', 'note', 'respondedAt', 'source']
+                       );
+        allow delete: if false;
+      }
     }
   }
 }

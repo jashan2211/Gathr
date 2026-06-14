@@ -90,7 +90,8 @@ struct GatherApp: App {
 
     // MARK: - Body
 
-    @AppStorage("colorScheme") private var colorSchemeSetting = "system"
+    // Dark is the signature look of the 2026 redesign; new installs start dark.
+    @AppStorage("colorScheme") private var colorSchemeSetting = "dark"
 
     private var preferredColorScheme: ColorScheme? {
         switch colorSchemeSetting {
@@ -139,22 +140,22 @@ struct GatherApp: App {
                 .keyboardShortcut("n", modifiers: .command)
             }
             CommandMenu("Navigate") {
-                Button("Going") {
-                    appState.selectedTab = .going
+                Button("Home") {
+                    appState.selectedTab = .home
                 }
                 .keyboardShortcut("1", modifiers: .command)
-
-                Button("My Events") {
-                    appState.selectedTab = .myEvents
-                }
-                .keyboardShortcut("2", modifiers: .command)
 
                 Button("Explore") {
                     appState.selectedTab = .explore
                 }
+                .keyboardShortcut("2", modifiers: .command)
+
+                Button("Calendar") {
+                    appState.selectedTab = .calendar
+                }
                 .keyboardShortcut("3", modifiers: .command)
 
-                Button("Profile") {
+                Button("You") {
                     appState.selectedTab = .profile
                 }
                 .keyboardShortcut("4", modifiers: .command)
@@ -246,41 +247,43 @@ struct RootView: View {
 
 @MainActor
 class AppState: ObservableObject {
-    @Published var selectedTab: Tab = .going
+    @Published var selectedTab: Tab = .home
     @Published var isShowingCreateEvent: Bool = false
     @Published var deepLinkEventId: UUID?
     @Published var deepLinkGuestId: UUID?
     @Published var showRSVPForDeepLink: Bool = false
 
+    /// The four destination tabs. Create is a center action button in the tab
+    /// bar, not a destination, so it isn't a case here.
     enum Tab: Int, CaseIterable {
-        case going
-        case myEvents
+        case home
         case explore
+        case calendar
         case profile
 
         var title: String {
             switch self {
-            case .going: return "Going"
-            case .myEvents: return "My Events"
+            case .home: return "Home"
             case .explore: return "Explore"
-            case .profile: return "Profile"
+            case .calendar: return "Calendar"
+            case .profile: return "You"
             }
         }
 
         var icon: String {
             switch self {
-            case .going: return "ticket"
-            case .myEvents: return "calendar"
-            case .explore: return "magnifyingglass"
+            case .home: return "house"
+            case .explore: return "safari"
+            case .calendar: return "calendar"
             case .profile: return "person.circle"
             }
         }
 
         var selectedIcon: String {
             switch self {
-            case .going: return "ticket.fill"
-            case .myEvents: return "calendar"
-            case .explore: return "magnifyingglass"
+            case .home: return "house.fill"
+            case .explore: return "safari.fill"
+            case .calendar: return "calendar"
             case .profile: return "person.circle.fill"
             }
         }

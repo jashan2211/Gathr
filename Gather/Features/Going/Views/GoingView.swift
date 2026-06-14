@@ -477,3 +477,418 @@ struct GoingEventCard: View {
         .environmentObject(AuthManager())
         .modelContainer(for: Event.self, inMemory: true)
 }
+
+// MARK: - Home (2026 redesign)
+
+/// The unified landing screen: your next event as a poster hero, invites
+/// waiting on a reply, everything else upcoming, and your drafts. Replaces the
+/// old split between Going and My Events.
+struct HomeView: View {
+    @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var appState: AppState
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @State private var selectedEvent: Event?
+    @State private var showCreate = false
+
+    private var myId: UUID? { authManager.currentUser?.id }
+    private var horizon: Date { Date().addingTimeInterval(-3600) }
+
+    private func isHost(_ e: Event) -> Bool { e.hostId != nil && e.hostId == myId }
+    private func isGuest(_ e: Event) -> Bool {
+        guard let myId else { return false }
+        return e.guests.contains { $0.userId == myId }
+    }
+    private func mine(_ e: Event) -> Bool { isHost(e) || isGuest(e) }
+
+    private var upcoming: [Event] {
+        allEvents.filter { !$0.isDraft && $0.startDate >= horizon && mine($0) }
+    }
+    private var nextEvent: Event? { upcoming.first }
+    private var laterEvents: [Event] { Array(upcoming.dropFirst()) }
+
+    private var invitesWaiting: [Event] {
+        guard let myId else { return [] }
+        return allEvents.filter { e in
+            !e.isDraft && e.startDate >= horizon &&
+            e.guests.contains { $0.userId == myId && $0.status == .pending }
+        }
+    }
+
+    private var drafts: [Event] {
+        allEvents.filter { $0.isDraft && isHost($0) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    header
+
+                    if let nextEvent {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            sectionLabel(isHost(nextEvent) ? "You're hosting next" : "Your next event")
+                            HomePosterHero(event: nextEvent, hosting: isHost(nextEvent)) {
+                                selectedEvent = nextEvent
+                            }
+                        }
+                    }
+
+                    if !invitesWaiting.isEmpty {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            sectionLabel("Invites waiting", badge: invitesWaiting.count)
+                            ForEach(invitesWaiting, id: \.id) { event in
+                                HomeInviteCard(
+                                    event: event,
+                                    onRespond: { respond(to: event, status: $0) },
+                                    onOpen: { selectedEvent = event }
+                                )
+                            }
+                        }
+                    }
+
+                    if !laterEvents.isEmpty {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            sectionLabel("Upcoming")
+                            ForEach(laterEvents, id: \.id) { event in
+                                Button { selectedEvent = event } label: {
+                                    HomeUpcomingRow(event: event, hosting: isHost(event))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    if !drafts.isEmpty {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            sectionLabel("Drafts")
+                            ForEach(drafts, id: \.id) { event in
+                                Button { selectedEvent = event } label: {
+                                    HomeUpcomingRow(event: event, hosting: true, isDraft: true)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    if upcoming.isEmpty && invitesWaiting.isEmpty && drafts.isEmpty {
+                        emptyState
+                    }
+                }
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.top, Spacing.xs)
+                .padding(.bottom, 120)
+            }
+            .background(Color.gatherCanvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(item: $selectedEvent) { EventDetailView(event: $0) }
+            .sheet(isPresented: $showCreate) {
+                CreateEventView().presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(greeting)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                Text("Home")
+                    .font(.system(size: 34, weight: .heavy))
+                    .kerning(-1)
+                    .foregroundStyle(Color.gatherPrimaryText)
+            }
+            Spacer()
+            Button { appState.selectedTab = .profile } label: {
+                Image(systemName: "bell")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .frame(width: 44, height: 44)
+                    .background(Color.gatherSurface, in: Circle())
+            }
+            .accessibilityLabel("Notifications")
+        }
+    }
+
+    private func sectionLabel(_ text: String, badge: Int? = nil) -> some View {
+        HStack(spacing: Spacing.xs) {
+            Text(text)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Color.gatherPrimaryText)
+            if let badge, badge > 0 {
+                Text("\(badge)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.accentPinkFallback, in: Capsule())
+            }
+            Spacer()
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: Spacing.md) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 44))
+                .foregroundStyle(LinearGradient.gatherAccentGradient)
+            Text("Nothing on the calendar")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(Color.gatherPrimaryText)
+            Text("Create your first event, or explore what's happening near you.")
+                .font(.subheadline)
+                .foregroundStyle(Color.gatherSecondaryText)
+                .multilineTextAlignment(.center)
+            Button { showCreate = true } label: {
+                Text("Create event")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .background(LinearGradient.gatherAccentGradient, in: Capsule())
+            }
+            .padding(.top, Spacing.xs)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.xxl)
+    }
+
+    private var greeting: String {
+        let h = Calendar.current.component(.hour, from: Date())
+        let part = h < 12 ? "Good morning" : (h < 18 ? "Good afternoon" : "Good evening")
+        if let name = authManager.currentUser?.name.split(separator: " ").first {
+            return "\(part), \(name)"
+        }
+        return part
+    }
+
+    private func respond(to event: Event, status: RSVPStatus) {
+        guard let myId, let guest = event.guests.first(where: { $0.userId == myId }) else { return }
+        guest.status = status
+        guest.respondedAt = Date()
+        modelContext.safeSave()
+        FirestoreService.shared.submitRSVP(
+            eventId: event.id, guestId: guest.id, status: status,
+            partySize: guest.plusOneCount, name: guest.name, note: nil
+        )
+        HapticService.success()
+    }
+}
+
+// MARK: - Home poster hero
+
+struct HomePosterHero: View {
+    let event: Event
+    let hosting: Bool
+    let onTap: () -> Void
+
+    private var attendingCount: Int {
+        event.guests.filter { $0.status == .attending }.count + (hosting ? 1 : 0)
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            ZStack {
+                LinearGradient.categoryGradientVibrant(for: event.category)
+
+                Text(event.category.emoji)
+                    .font(.system(size: 130))
+                    .opacity(0.16)
+                    .rotationEffect(.degrees(-12))
+                    .offset(x: 110, y: -34)
+
+                LinearGradient(colors: [.clear, .black.opacity(0.5)], startPoint: .center, endPoint: .bottom)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Text(countdown)
+                            .font(.system(size: 11, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(.white.opacity(0.22), in: Capsule())
+                        Spacer()
+                        Text(hosting ? "HOSTING" : "GOING")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(.black.opacity(0.25), in: Capsule())
+                    }
+                    Spacer()
+                    Text(event.title)
+                        .font(.system(size: 26, weight: .heavy))
+                        .kerning(-0.5)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .padding(.bottom, 6)
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                        Text(dateString)
+                        if let loc = event.location?.name {
+                            Text("·")
+                            Image(systemName: "mappin")
+                            Text(loc).lineLimit(1)
+                        }
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .padding(.bottom, 12)
+                    HStack {
+                        Text("\(attendingCount) going")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 30, height: 30)
+                            .background(.white.opacity(0.2), in: Circle())
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .frame(height: 240)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(event.title), \(dateString), \(attendingCount) going")
+    }
+
+    private var countdown: String {
+        let interval = event.startDate.timeIntervalSinceNow
+        if interval < 0 { return "HAPPENING NOW" }
+        let hours = interval / 3600
+        if hours < 1 { return "IN \(max(1, Int(interval / 60))) MIN" }
+        if hours < 24 { return "IN \(Int(hours)) HOURS" }
+        let days = Int(hours / 24)
+        if days == 1 { return "TOMORROW" }
+        if days < 7 { return "IN \(days) DAYS" }
+        return event.startDate.formatted(.dateTime.month(.abbreviated).day()).uppercased()
+    }
+
+    private var dateString: String {
+        event.startDate.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+    }
+}
+
+// MARK: - Home compact row
+
+struct HomeUpcomingRow: View {
+    let event: Event
+    let hosting: Bool
+    var isDraft: Bool = false
+
+    private var tagColor: Color {
+        isDraft ? Color.gatherSecondaryText : (hosting ? Color.accentPurpleFallback : Color.rsvpYesFallback)
+    }
+
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            VStack(spacing: 0) {
+                Text(event.startDate.formatted(.dateTime.month(.abbreviated)).uppercased())
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color.forCategory(event.category))
+                Text(event.startDate.formatted(.dateTime.day()))
+                    .font(.system(size: 20, weight: .heavy))
+                    .foregroundStyle(Color.gatherPrimaryText)
+            }
+            .frame(width: 52, height: 52)
+            .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(event.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(event.startDate.formatted(.dateTime.hour().minute()))
+                    if let loc = event.location?.name {
+                        Text("· \(loc)").lineLimit(1)
+                    }
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(Color.gatherSecondaryText)
+            }
+            Spacer()
+            Text(isDraft ? "Draft" : (hosting ? "Hosting" : "Going"))
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(tagColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(tagColor.opacity(0.15), in: Capsule())
+        }
+        .padding(12)
+        .background(Color.gatherSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+// MARK: - Home invite card
+
+struct HomeInviteCard: View {
+    let event: Event
+    let onRespond: (RSVPStatus) -> Void
+    let onOpen: () -> Void
+
+    private var subtitle: String {
+        var s = event.startDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        if let loc = event.location?.city ?? event.location?.name {
+            s += " · \(loc)"
+        }
+        return s
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: onOpen) {
+                HStack(spacing: 12) {
+                    Text(event.category.emoji).font(.system(size: 30))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(event.title)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.gatherPrimaryText)
+                            .lineLimit(1)
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 8) {
+                respondButton("Going", .attending, Color.rsvpYesFallback)
+                respondButton("Maybe", .maybe, Color.rsvpMaybeFallback)
+                respondButton("Can't", .declined, Color.rsvpNoFallback)
+            }
+        }
+        .padding(14)
+        .background(Color.gatherSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.accentPinkFallback.opacity(0.4), lineWidth: 1)
+        )
+    }
+
+    private func respondButton(_ label: String, _ status: RSVPStatus, _ color: Color) -> some View {
+        Button { onRespond(status) } label: {
+            Text(label)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(color)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(color.opacity(0.15), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("RSVP \(label) to \(event.title)")
+    }
+}

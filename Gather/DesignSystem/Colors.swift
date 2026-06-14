@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - App Colors
 
@@ -44,6 +45,30 @@ extension Color {
 
     /// Separator color
     static let gatherSeparator = Color(.separator)
+
+    // MARK: - Dark-First Canvas (2026 poster identity)
+
+    /// App canvas — a premium near-black (#0B0B12) in dark, white in light.
+    /// The signature surface of the redesign; richer than pure systemBackground.
+    static let gatherCanvas = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.043, green: 0.043, blue: 0.071, alpha: 1)
+            : UIColor.systemBackground
+    })
+
+    /// Card surface that sits on the canvas (#16161F dark / grouped light).
+    static let gatherSurface = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.086, green: 0.086, blue: 0.122, alpha: 1)
+            : UIColor.secondarySystemBackground
+    })
+
+    /// Elevated surface for nested fills (#1F1F2B dark / white light).
+    static let gatherElevated = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.122, green: 0.122, blue: 0.169, alpha: 1)
+            : UIColor(white: 1, alpha: 1)
+    })
 
     // MARK: - Fallback Colors (if asset catalog not set up)
 

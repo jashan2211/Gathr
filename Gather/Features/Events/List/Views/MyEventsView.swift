@@ -468,3 +468,92 @@ struct EventStatPill: View {
         .environmentObject(AuthManager())
         .modelContainer(for: Event.self, inMemory: true)
 }
+
+// MARK: - Calendar (2026 redesign)
+
+/// An agenda of every event you host or attend, grouped by month. Reuses the
+/// Home compact row for a consistent look.
+struct CalendarView: View {
+    @EnvironmentObject var authManager: AuthManager
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @State private var selectedEvent: Event?
+
+    private var myId: UUID? { authManager.currentUser?.id }
+    private func mine(_ e: Event) -> Bool {
+        e.hostId == myId || (myId != nil && e.guests.contains { $0.userId == myId })
+    }
+    private var events: [Event] {
+        allEvents.filter { !$0.isDraft && mine($0) }
+    }
+
+    private var grouped: [(title: String, key: Int, events: [Event])] {
+        let cal = Calendar.current
+        let groups = Dictionary(grouping: events) { event -> Int in
+            let c = cal.dateComponents([.year, .month], from: event.startDate)
+            return (c.year ?? 0) * 100 + (c.month ?? 0)
+        }
+        return groups
+            .sorted { $0.key < $1.key }
+            .map { (title: monthTitle($0.value.first?.startDate ?? Date()), key: $0.key, events: $0.value.sorted { $0.startDate < $1.startDate }) }
+    }
+
+    private func monthTitle(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.wide).year())
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
+                    Text("Calendar")
+                        .font(.system(size: 34, weight: .heavy))
+                        .kerning(-1)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .padding(.top, Spacing.xs)
+
+                    if events.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach(grouped, id: \.key) { group in
+                            VStack(alignment: .leading, spacing: Spacing.sm) {
+                                Text(group.title.uppercased())
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.gatherSecondaryText)
+                                ForEach(group.events, id: \.id) { event in
+                                    Button { selectedEvent = event } label: {
+                                        HomeUpcomingRow(event: event, hosting: event.hostId == myId)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.top, Spacing.xs)
+                .padding(.bottom, 120)
+            }
+            .background(Color.gatherCanvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(item: $selectedEvent) { EventDetailView(event: $0) }
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: Spacing.sm) {
+            Image(systemName: "calendar")
+                .font(.system(size: 40))
+                .foregroundStyle(Color.gatherSecondaryText)
+            Text("No events yet")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.gatherPrimaryText)
+            Text("Events you host or join show up here, organized by month.")
+                .font(.subheadline)
+                .foregroundStyle(Color.gatherSecondaryText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.xxl)
+    }
+}

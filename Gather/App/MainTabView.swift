@@ -92,20 +92,26 @@ struct MainTabView: View {
 
     private var iPhoneLayout: some View {
         Group {
-            switch appState.selectedTab {
-            case .going:
-                GoingView()
-            case .myEvents:
-                MyEventsView()
-            case .explore:
-                ExploreView()
-            case .profile:
-                ProfileView()
-            }
+            selectedTabView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.gatherCanvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             floatingTabBar
+        }
+    }
+
+    @ViewBuilder
+    private var selectedTabView: some View {
+        switch appState.selectedTab {
+        case .home:
+            HomeView()
+        case .explore:
+            ExploreView()
+        case .calendar:
+            CalendarView()
+        case .profile:
+            ProfileView()
         }
     }
 
@@ -119,18 +125,9 @@ struct MainTabView: View {
             )) { tab in
                 Label(tab.title, systemImage: tab.icon)
             }
-            .navigationTitle("Gather")
+            .navigationTitle("Gathr")
         } detail: {
-            switch appState.selectedTab {
-            case .going:
-                GoingView()
-            case .myEvents:
-                MyEventsView()
-            case .explore:
-                ExploreView()
-            case .profile:
-                ProfileView()
-            }
+            selectedTabView
         }
         .navigationSplitViewStyle(.balanced)
     }
@@ -139,58 +136,73 @@ struct MainTabView: View {
 
     private var floatingTabBar: some View {
         HStack(spacing: 0) {
-            ForEach(AppState.Tab.allCases, id: \.self) { tab in
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        appState.selectedTab = tab
-                    }
-                } label: {
-                    VStack(spacing: 4) {
-                        ZStack {
-                            // Glow behind selected icon
-                            if appState.selectedTab == tab {
-                                Circle()
-                                    .fill(Color.accentPurpleFallback.opacity(0.15))
-                                    .frame(width: 44, height: 44)
-                            }
-
-                            Image(systemName: appState.selectedTab == tab ? tab.selectedIcon : tab.icon)
-                                .font(.system(size: 20, weight: appState.selectedTab == tab ? .semibold : .regular))
-                                .foregroundStyle(
-                                    appState.selectedTab == tab
-                                        ? Color.accentPurpleFallback
-                                        : Color.gatherSecondaryText
-                                )
-                                .scaleEffect(appState.selectedTab == tab ? 1.1 : 1.0)
-                        }
-                        .frame(height: 36)
-
-                        Text(tab.title)
-                            .font(.caption2)
-                            .fontWeight(appState.selectedTab == tab ? .bold : .medium)
-                            .foregroundStyle(
-                                appState.selectedTab == tab
-                                    ? Color.accentPurpleFallback
-                                    : Color.gatherSecondaryText
-                            )
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .accessibilityLabel(tab.title)
-                .accessibilityAddTraits(appState.selectedTab == tab ? [.isSelected] : [])
-                .accessibilityHint(appState.selectedTab == tab ? "Currently selected" : "Double tap to switch")
-            }
+            tabButton(.home)
+            tabButton(.explore)
+            createButton
+            tabButton(.calendar)
+            tabButton(.profile)
         }
         .accessibilityElement(children: .contain)
         .padding(.top, Spacing.sm)
         .padding(.bottom, Spacing.xs)
         .background(
-            // Glass stays here by design: a floating bar hovering over scrolling content.
+            // Glass floating bar hovering over scrolling content.
             Rectangle()
                 .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+                .shadow(color: .black.opacity(0.25), radius: 15, y: -6)
                 .ignoresSafeArea(edges: .bottom)
         )
+    }
+
+    private func tabButton(_ tab: AppState.Tab) -> some View {
+        let isSelected = appState.selectedTab == tab
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                appState.selectedTab = tab
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
+                    .font(.system(size: 21, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryText)
+                    .frame(height: 28)
+                    .scaleEffect(isSelected ? 1.08 : 1.0)
+
+                Text(tab.title)
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                    .foregroundStyle(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryText)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityHint(isSelected ? "Currently selected" : "Double tap to switch")
+    }
+
+    private var createButton: some View {
+        Button {
+            HapticService.mediumImpact()
+            showCreateSheet = true
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient.gatherAccentGradient)
+                        .frame(width: 50, height: 50)
+                        .shadow(color: Color.accentPurpleFallback.opacity(0.5), radius: 10, y: 4)
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .offset(y: -14)
+                Text("Create")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .offset(y: -10)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .accessibilityLabel("Create event")
     }
 }
 

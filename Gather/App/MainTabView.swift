@@ -3,6 +3,7 @@ import SwiftData
 
 struct MainTabView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var authManager: AuthManager
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var showCreateSheet = false
@@ -26,8 +27,10 @@ struct MainTabView: View {
                 .presentationDragIndicator(.visible)
         }
         .task {
-            // Pull the signed-in user's events down from the cloud on launch.
+            // Pull the signed-in user's hosted events and their invitations
+            // down from the cloud on launch.
             await FirestoreService.shared.mergeRemoteEvents(into: modelContext)
+            await FirestoreService.shared.fetchInvitedEvents(into: modelContext)
         }
         .fullScreenCover(item: $deepLinkEvent, onDismiss: {
             pendingRSVP = false
@@ -76,16 +79,32 @@ struct MainTabView: View {
         guard let eventId = appState.deepLinkEventId else { return }
         appState.deepLinkEventId = nil
         pendingRSVP = appState.showRSVPForDeepLink
+        let guestId = appState.deepLinkGuestId
 
         let descriptor = FetchDescriptor<Event>(predicate: #Predicate { $0.id == eventId })
         if let event = try? modelContext.fetch(descriptor).first {
             deepLinkEvent = event
+            bindInvitedGuest(to: event, guestId: guestId)
         } else {
             // Not on this device — load the shared event from the cloud.
             Task { @MainActor in
-                deepLinkEvent = await FirestoreService.shared.fetchEvent(id: eventId, into: modelContext)
+                if let event = await FirestoreService.shared.fetchEvent(id: eventId, into: modelContext) {
+                    deepLinkEvent = event
+                    bindInvitedGuest(to: event, guestId: guestId)
+                }
             }
         }
+    }
+
+    /// When the deep link is an invite, tie this account to the event so it
+    /// shows in Home/Calendar (even before they RSVP) and follows their account.
+    private func bindInvitedGuest(to event: Event, guestId: UUID?) {
+        guard let guestId, let user = authManager.currentUser else { return }
+        FirestoreService.shared.ensureInvitedGuest(
+            on: event, guestId: guestId, userId: user.id, name: user.name, status: .pending
+        )
+        FirestoreService.shared.recordInvitedEvent(event, guestId: guestId, status: .pending)
+        modelContext.safeSave()
     }
 
     // MARK: - iPhone Layout

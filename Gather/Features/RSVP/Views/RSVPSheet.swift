@@ -430,6 +430,10 @@ struct RSVPSheet: View {
             name: guestName,
             note: comment.isEmpty ? nil : comment
         )
+        // Keep this event in the guest's own "invited" index (cross-device).
+        if invitedGuestId != nil || existingGuest?.userId == authManager.currentUser?.id {
+            FirestoreService.shared.recordInvitedEvent(event, guestId: guestId, status: selectedStatus)
+        }
 
         // Send notification to host
         NotificationService.shared.scheduleRSVPNotification(

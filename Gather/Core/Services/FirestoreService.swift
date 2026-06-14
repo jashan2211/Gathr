@@ -130,6 +130,79 @@ final class FirestoreService {
         }
     }
 
+    // MARK: - Invited Events (a guest's personal index)
+
+    /// Records, under `users/{uid}/invitedEvents/{eventId}`, that the signed-in
+    /// user is invited to an event — so their invitations follow their account
+    /// across devices and reinstalls, not just the device that opened the link.
+    func recordInvitedEvent(_ event: Event, guestId: UUID, status: RSVPStatus) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let data: [String: Any] = [
+            "eventId": event.id.uuidString,
+            "guestId": guestId.uuidString,
+            "title": event.title,
+            "startDate": event.startDate,
+            "status": status.rawValue,
+            "updatedAt": FieldValue.serverTimestamp()
+        ]
+        usersCollection.document(uid).collection("invitedEvents")
+            .document(event.id.uuidString)
+            .setData(data, merge: true) { error in
+                if let error {
+                    logger.error("Invited-event index write failed: \(error.localizedDescription)")
+                }
+            }
+    }
+
+    /// Pulls the user's invited-events index and makes sure each event exists
+    /// locally with a guest entry tied to this account, so invitations show up
+    /// in Home and Calendar on any device they sign in to.
+    func fetchInvitedEvents(into modelContext: ModelContext) async {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let myUserId = AuthManager.deterministicUUID(from: uid)
+        let myName = Auth.auth().currentUser?.displayName ?? "You"
+        do {
+            let snapshot = try await usersCollection.document(uid).collection("invitedEvents").getDocuments()
+            var changed = false
+            for doc in snapshot.documents {
+                let data = doc.data()
+                guard let eventIdStr = data["eventId"] as? String, let eventId = UUID(uuidString: eventIdStr),
+                      let guestIdStr = data["guestId"] as? String, let guestId = UUID(uuidString: guestIdStr) else { continue }
+                let status = (data["status"] as? String).flatMap(RSVPStatus.init(rawValue:)) ?? .pending
+
+                var event = (try? modelContext.fetch(FetchDescriptor<Event>(predicate: #Predicate { $0.id == eventId })))?.first
+                if event == nil {
+                    event = await fetchEvent(id: eventId, into: modelContext)
+                }
+                guard let event else { continue }
+
+                if ensureInvitedGuest(on: event, guestId: guestId, userId: myUserId, name: myName, status: status) {
+                    changed = true
+                }
+            }
+            if changed { modelContext.safeSave() }
+        } catch {
+            logger.error("Invited-events pull failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Ensures a local guest entry exists on `event` for this account, so the
+    /// event shows in the signed-in user's Home/Calendar. Returns whether it
+    /// changed anything.
+    @discardableResult
+    func ensureInvitedGuest(on event: Event, guestId: UUID, userId: UUID, name: String, status: RSVPStatus) -> Bool {
+        if let existing = event.guests.first(where: { $0.id == guestId }) {
+            if existing.userId == nil {
+                existing.userId = userId
+                return true
+            }
+            return false
+        }
+        let guest = Guest(id: guestId, name: name, status: status, userId: userId)
+        event.guests.append(guest)
+        return true
+    }
+
     /// Pushes every event hosted by the signed-in user. Called when the app
     /// goes to the background so guest/RSVP changes made anywhere in the app
     /// reach the cloud without having to instrument every screen.

@@ -672,6 +672,7 @@ struct HomeView: View {
             eventId: event.id, guestId: guest.id, status: status,
             partySize: guest.plusOneCount, name: guest.name, note: nil
         )
+        FirestoreService.shared.recordInvitedEvent(event, guestId: guest.id, status: status)
         HapticService.success()
     }
 }

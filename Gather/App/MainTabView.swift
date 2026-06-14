@@ -8,6 +8,7 @@ struct MainTabView: View {
     @State private var showCreateSheet = false
     @State private var deepLinkEvent: Event?
     @State private var showDeepLinkRSVP = false
+    @State private var pendingRSVP = false
 
     var body: some View {
         Group {
@@ -28,7 +29,10 @@ struct MainTabView: View {
             // Pull the signed-in user's events down from the cloud on launch.
             await FirestoreService.shared.mergeRemoteEvents(into: modelContext)
         }
-        .fullScreenCover(item: $deepLinkEvent) { event in
+        .fullScreenCover(item: $deepLinkEvent, onDismiss: {
+            pendingRSVP = false
+            appState.showRSVPForDeepLink = false
+        }) { event in
             NavigationStack {
                 EventDetailView(event: event)
                     .toolbar {
@@ -39,36 +43,47 @@ struct MainTabView: View {
                         }
                     }
             }
-        }
-        .onChange(of: appState.deepLinkEventId) { _, eventId in
-            guard let eventId else { return }
-            let wantsRSVP = appState.showRSVPForDeepLink
-            let descriptor = FetchDescriptor<Event>(
-                predicate: #Predicate { $0.id == eventId }
-            )
-            if let event = try? modelContext.fetch(descriptor).first {
-                deepLinkEvent = event
-                if wantsRSVP { showDeepLinkRSVP = true }
-            } else {
-                // Not on this device — load the shared event from the cloud.
-                Task { @MainActor in
-                    if let event = await FirestoreService.shared.fetchEvent(id: eventId, into: modelContext) {
-                        deepLinkEvent = event
-                        if wantsRSVP { showDeepLinkRSVP = true }
+            // The RSVP sheet lives INSIDE the cover so it presents on top of the
+            // event, not in conflict with it (presenting both from MainTabView
+            // silently dropped the sheet). A short delay lets the cover settle.
+            .sheet(isPresented: $showDeepLinkRSVP) {
+                RSVPSheet(event: event, invitedGuestId: appState.deepLinkGuestId)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .onDisappear { appState.deepLinkGuestId = nil }
+            }
+            .onAppear {
+                if pendingRSVP {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        showDeepLinkRSVP = true
                     }
                 }
             }
-            appState.deepLinkEventId = nil
         }
-        .sheet(isPresented: $showDeepLinkRSVP) {
-            if let event = deepLinkEvent {
-                RSVPSheet(event: event, invitedGuestId: appState.deepLinkGuestId)
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-                    .onDisappear {
-                        appState.showRSVPForDeepLink = false
-                        appState.deepLinkGuestId = nil
-                    }
+        .onChange(of: appState.deepLinkEventId) { _, _ in
+            processPendingDeepLink()
+        }
+        .onAppear {
+            // Cold launch: a link parsed before this view existed wouldn't fire
+            // onChange, so process whatever is already pending.
+            processPendingDeepLink()
+        }
+    }
+
+    /// Opens the deep-linked event (local or fetched from the cloud) and, when
+    /// the link is an invite, queues the RSVP sheet to appear over it.
+    private func processPendingDeepLink() {
+        guard let eventId = appState.deepLinkEventId else { return }
+        appState.deepLinkEventId = nil
+        pendingRSVP = appState.showRSVPForDeepLink
+
+        let descriptor = FetchDescriptor<Event>(predicate: #Predicate { $0.id == eventId })
+        if let event = try? modelContext.fetch(descriptor).first {
+            deepLinkEvent = event
+        } else {
+            // Not on this device — load the shared event from the cloud.
+            Task { @MainActor in
+                deepLinkEvent = await FirestoreService.shared.fetchEvent(id: eventId, into: modelContext)
             }
         }
     }

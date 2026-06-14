@@ -381,6 +381,11 @@ struct RSVPSheet: View {
             existingGuest.status = selectedStatus
             existingGuest.plusOneCount = plusOnes
             existingGuest.respondedAt = Date()
+            // Bind this guest entry to the signed-in account so the app knows
+            // who accepted, and the guest sees the event under their account.
+            if existingGuest.userId == nil, let uid = authManager.currentUser?.id {
+                existingGuest.userId = uid
+            }
             if !comment.isEmpty {
                 if existingGuest.metadata != nil {
                     existingGuest.metadata?.notes = comment

@@ -116,6 +116,13 @@ struct GatherApp: App {
                     if GIDSignIn.sharedInstance.handle(url) { return }
                     handleDeepLink(url)
                 }
+                // Universal links (https://thebighead.ca/gathr/invite?...) are
+                // delivered as a browsing user activity, not through onOpenURL.
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    if let url = activity.webpageURL {
+                        handleDeepLink(url)
+                    }
+                }
                 .onChange(of: scenePhase) { _, newPhase in
                     // Push guest/RSVP changes to the cloud when the app backgrounds.
                     if newPhase == .background {

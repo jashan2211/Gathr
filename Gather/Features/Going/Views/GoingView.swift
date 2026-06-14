@@ -501,18 +501,21 @@ struct HomeView: View {
     }
     private func mine(_ e: Event) -> Bool { isHost(e) || isGuest(e) }
 
+    /// A pending invitation belongs in "Invites waiting", not "Upcoming", so it
+    /// never shows in both sections at once.
+    private func isPendingInvite(_ e: Event) -> Bool {
+        guard let myId else { return false }
+        return e.guests.contains { $0.userId == myId && $0.status == .pending }
+    }
+
     private var upcoming: [Event] {
-        allEvents.filter { !$0.isDraft && $0.startDate >= horizon && mine($0) }
+        allEvents.filter { !$0.isDraft && $0.startDate >= horizon && mine($0) && !isPendingInvite($0) }
     }
     private var nextEvent: Event? { upcoming.first }
     private var laterEvents: [Event] { Array(upcoming.dropFirst()) }
 
     private var invitesWaiting: [Event] {
-        guard let myId else { return [] }
-        return allEvents.filter { e in
-            !e.isDraft && e.startDate >= horizon &&
-            e.guests.contains { $0.userId == myId && $0.status == .pending }
-        }
+        allEvents.filter { !$0.isDraft && $0.startDate >= horizon && isPendingInvite($0) }
     }
 
     private var drafts: [Event] {
@@ -600,14 +603,7 @@ struct HomeView: View {
                     .foregroundStyle(Color.gatherPrimaryText)
             }
             Spacer()
-            Button { appState.selectedTab = .profile } label: {
-                Image(systemName: "bell")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.gatherPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .background(Color.gatherSurface, in: Circle())
-            }
-            .accessibilityLabel("Notifications")
+            NotificationBellButton()
         }
     }
 

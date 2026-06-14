@@ -26,6 +26,14 @@ struct MainTabView: View {
             CreateEventView()
                 .presentationDragIndicator(.visible)
         }
+        // The macOS/iPad "New Event" menu command (Cmd+N) flips this app-level
+        // flag; mirror it into the local create sheet.
+        .onChange(of: appState.isShowingCreateEvent) { _, show in
+            if show {
+                showCreateSheet = true
+                appState.isShowingCreateEvent = false
+            }
+        }
         .task {
             // Pull the signed-in user's hosted events and their invitations
             // down from the cloud on launch.
@@ -35,6 +43,7 @@ struct MainTabView: View {
         .fullScreenCover(item: $deepLinkEvent, onDismiss: {
             pendingRSVP = false
             appState.showRSVPForDeepLink = false
+            appState.deepLinkGuestId = nil
         }) { event in
             NavigationStack {
                 EventDetailView(event: event)

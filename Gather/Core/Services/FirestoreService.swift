@@ -198,6 +198,11 @@ final class FirestoreService {
             }
             return false
         }
+        // Already a guest of this event under a different guest id (e.g. a second
+        // invite link) — don't create a duplicate entry for the same person.
+        if event.guests.contains(where: { $0.userId == userId }) {
+            return false
+        }
         let guest = Guest(id: guestId, name: name, status: status, userId: userId)
         event.guests.append(guest)
         return true

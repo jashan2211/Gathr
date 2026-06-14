@@ -221,7 +221,7 @@ struct OverviewTab: View {
                 Text(monthAbbreviation)
                     .font(.caption2)
                     .fontWeight(.bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.onCategory(event.category))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.xxs)
                     .background(Color.forCategory(event.category))

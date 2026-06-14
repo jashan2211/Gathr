@@ -79,14 +79,12 @@ struct ExploreView: View {
                 }
                 .padding(.bottom, Layout.tabBarHeight + 20)
             }
-            .background(Color.gatherBackground.ignoresSafeArea())
+            .background(Color.gatherCanvas.ignoresSafeArea())
             .refreshable {
                 try? await Task.sleep(for: .milliseconds(500))
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(item: $selectedEvent) { event in
                 EventDetailView(event: event)
                     .toolbar(.visible, for: .navigationBar)
@@ -128,12 +126,14 @@ struct ExploreView: View {
     private var greetingHeader: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text(timeGreeting)
-                    .font(GatherFont.callout)
+                Text(headerSubtitle)
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 Text("Explore")
-                    .gatherLargeTitle()
+                    .font(.system(size: 34, weight: .heavy))
+                    .kerning(-1)
+                    .foregroundStyle(Color.gatherPrimaryText)
                     .accessibilityAddTraits(.isHeader)
             }
 
@@ -142,26 +142,20 @@ struct ExploreView: View {
             // Event count pill
             if !publicEvents.isEmpty {
                 Text("\(publicEvents.count) events")
-                    .font(GatherFont.caption)
-                    .fontWeight(.medium)
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.accentPurpleFallback)
                     .padding(.horizontal, Spacing.sm)
-                    .padding(.vertical, Spacing.xxs)
-                    .background(Color.gatherSecondaryBackground)
-                    .clipShape(Capsule())
+                    .padding(.vertical, 6)
+                    .background(Color.gatherSurface, in: Capsule())
             }
         }
         .padding(.top, Spacing.xl)
     }
 
-    private var timeGreeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 5..<12: return "Good morning"
-        case 12..<17: return "Good afternoon"
-        case 17..<22: return "Good evening"
-        default: return "Late night vibes"
-        }
+    private var headerSubtitle: String {
+        let count = publicEvents.count
+        if count == 0 { return "Discover events near you" }
+        return "\(count) public \(count == 1 ? "event" : "events") to discover"
     }
 
     // MARK: - Search + Filter Bar
@@ -172,11 +166,12 @@ struct ExploreView: View {
             HStack(spacing: Spacing.sm) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(isSearchFocused ? Color.accentPurpleFallback : Color.gatherSecondaryText)
-                    .fontWeight(.medium)
+                    .font(.system(size: 16, weight: .semibold))
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSearchFocused)
 
                 TextField("Search events, venues...", text: $searchText)
-                    .font(GatherFont.body)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.gatherPrimaryText)
                     .focused($isSearchFocused)
 
                 if !searchText.isEmpty {
@@ -188,20 +183,19 @@ struct ExploreView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(Color.gatherSecondaryText)
                             .font(.body)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 28, height: 28)
                             .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, Spacing.md)
-            .padding(.vertical, Spacing.sm)
-            .background(Color.gatherSecondaryBackground)
-            .clipShape(Capsule())
+            .frame(height: 46)
+            .background(Color.gatherSurface, in: Capsule())
             .overlay(
                 Capsule()
                     .strokeBorder(
-                        isSearchFocused ? Color.accentPurpleFallback.opacity(0.5) : Color.clear,
+                        isSearchFocused ? Color.accentPurpleFallback.opacity(0.6) : Color.clear,
                         lineWidth: 1.5
                     )
             )
@@ -214,14 +208,13 @@ struct ExploreView: View {
             } label: {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "line.3.horizontal.decrease")
-                        .font(.body)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(hasLocationFilter ? .white : Color.gatherSecondaryText)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 46, height: 46)
                         .background(
                             hasLocationFilter
                                 ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                                : AnyShapeStyle(Color.gatherSecondaryBackground)
+                                : AnyShapeStyle(Color.gatherSurface)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
 
@@ -322,6 +315,7 @@ struct ExploreView: View {
                     emoji: "\u{2728}",
                     count: publicEvents.count,
                     accent: Color.accentPurpleFallback,
+                    category: nil,
                     isSelected: selectedCategory == nil
                 ) {
                     HapticService.tabSwitch()
@@ -337,6 +331,7 @@ struct ExploreView: View {
                         emoji: category.emoji,
                         count: count,
                         accent: Color.forCategory(category),
+                        category: category,
                         isSelected: selectedCategory == category
                     ) {
                         HapticService.tabSwitch()
@@ -363,14 +358,14 @@ struct ExploreView: View {
                     .overlay(alignment: .topLeading) {
                         Text(event.category.emoji)
                             .font(.system(size: 80))
-                            .opacity(0.2)
+                            .opacity(0.25)
                             .rotationEffect(.degrees(-15))
                             .offset(x: -10, y: -10)
                     }
 
                 // Dark overlay for readability
                 LinearGradient(
-                    colors: [.clear, .clear, .black.opacity(0.4), .black.opacity(0.75)],
+                    colors: [.clear, .clear, .black.opacity(0.45), .black.opacity(0.8)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -381,53 +376,47 @@ struct ExploreView: View {
                     HStack {
                         HStack(spacing: 4) {
                             Image(systemName: "star.fill")
-                                .font(.caption2)
+                                .font(.system(size: 10, weight: .bold))
                             Text("FEATURED")
-                                .font(.caption2)
-                                .fontWeight(.bold)
+                                .font(.system(size: 11, weight: .heavy))
                                 .tracking(1)
                         }
                         .foregroundStyle(.white)
                         .padding(.horizontal, Spacing.sm)
-                        .padding(.vertical, 5)
-                        .background(.ultraThinMaterial.opacity(0.8))
-                        .clipShape(Capsule())
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.3), in: Capsule())
 
                         if event.isDemo {
                             Text("SAMPLE")
-                                .font(.caption2)
-                                .fontWeight(.heavy)
+                                .font(.system(size: 11, weight: .heavy))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.orange.opacity(0.85))
-                                .clipShape(Capsule())
+                                .background(Color.orange.opacity(0.9), in: Capsule())
                         }
 
                         Spacer()
 
                         // Countdown
                         Text(relativeDate(event.startDate))
-                            .font(.caption)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, Spacing.sm)
-                            .padding(.vertical, 5)
-                            .background(.ultraThinMaterial.opacity(0.8))
-                            .clipShape(Capsule())
+                            .padding(.vertical, 6)
+                            .background(.white.opacity(0.22), in: Capsule())
                     }
 
                     Spacer()
 
                     // Event info
                     Text(event.title)
-                        .font(GatherFont.title2)
-                        .fontWeight(.bold)
+                        .font(.system(size: 26, weight: .heavy))
+                        .kerning(-0.5)
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
-                    // Info row with frosted glass
+                    // Info row
                     HStack(spacing: Spacing.md) {
                         if let location = event.location {
                             Label(location.shortLocation ?? location.name, systemImage: "mappin.circle.fill")
@@ -458,13 +447,13 @@ struct ExploreView: View {
                             }
                         }
                     }
-                    .font(GatherFont.caption)
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.95))
                 }
                 .padding(Spacing.lg)
             }
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card))
-            .shadow(color: .black.opacity(0.15), radius: 12, y: 6)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+            .shadow(color: .black.opacity(0.25), radius: 14, y: 8)
         }
         .buttonStyle(CardPressStyle())
         .zoomSource(id: event.id, in: zoomNamespace)
@@ -483,9 +472,9 @@ struct ExploreView: View {
                 HStack(spacing: Spacing.xs) {
                     Image(systemName: "flame.fill")
                         .foregroundStyle(Color.warmCoral)
-                        .font(.callout)
+                        .font(.system(size: 15, weight: .bold))
                     Text("Happening Soon")
-                        .font(GatherFont.title3)
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(Color.gatherPrimaryText)
                         .accessibilityAddTraits(.isHeader)
                 }
@@ -493,7 +482,7 @@ struct ExploreView: View {
                 Spacer()
 
                 Text("\(events.count) events")
-                    .font(GatherFont.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .horizontalPadding()
@@ -525,14 +514,14 @@ struct ExploreView: View {
             // Section header
             HStack(alignment: .firstTextBaseline) {
                 Text(sectionTitle)
-                    .font(GatherFont.title3)
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Color.gatherPrimaryText)
                     .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
                 Text("\(events.count) events")
-                    .font(GatherFont.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.gatherSecondaryText)
             }
 
@@ -768,53 +757,60 @@ struct ExploreCategoryChip: View {
     let emoji: String
     var count: Int = 0
     let accent: Color
+    /// The category this chip filters by, or `nil` for the "All" chip (which
+    /// uses the accent gradient when selected).
+    var category: EventCategory? = nil
     let isSelected: Bool
     let action: () -> Void
 
-    // Conference/meetup accents are light fills; white text fails contrast on them
-    private var usesDarkText: Bool {
-        accent == .sunshineYellow || accent == .mintGreen
+    /// Legible foreground on the selected fill. Category chips defer to
+    /// `Color.onCategory`; the "All" chip rides the white accent gradient.
+    private var selectedForeground: Color {
+        guard let category else { return .white }
+        return Color.onCategory(category)
+    }
+
+    private var badgeForeground: Color {
+        isSelected ? selectedForeground.opacity(0.85) : Color.gatherSecondaryText
+    }
+
+    private var badgeBackground: Color {
+        isSelected ? selectedForeground.opacity(0.18) : Color.gatherElevated
     }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Text(emoji)
-                    .font(.footnote)
+                    .font(.system(size: 14))
                 Text(title)
-                    .font(GatherFont.caption)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 14, weight: .semibold))
 
                 // swiftlint:disable:next empty_count — `count` is an Int badge value, not a collection
                 if count > 0 {
                     Text("\(count)")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(
-                            isSelected
-                                ? (usesDarkText ? Color.black.opacity(0.7) : Color.white.opacity(0.8))
-                                : Color.gatherSecondaryText
-                        )
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(badgeForeground)
                         .contentTransition(.numericText())
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(
-                            isSelected
-                                ? (usesDarkText ? Color.black.opacity(0.1) : Color.white.opacity(0.2))
-                                : Color.gatherTertiaryBackground
-                        )
-                        .clipShape(Capsule())
+                        .background(badgeBackground, in: Capsule())
                 }
             }
-            .foregroundStyle(
-                isSelected
-                    ? (usesDarkText ? Color.black.opacity(0.85) : Color.white)
-                    : Color.gatherPrimaryText
-            )
+            .foregroundStyle(isSelected ? selectedForeground : Color.gatherSecondaryText)
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, 10)
-            .background(isSelected ? accent : Color.gatherSecondaryBackground)
-            .clipShape(Capsule())
+            .background {
+                if isSelected {
+                    if category == nil {
+                        Capsule().fill(LinearGradient.gatherAccentGradient)
+                    } else {
+                        Capsule().fill(accent)
+                    }
+                } else {
+                    Capsule().fill(Color.gatherSurface)
+                }
+            }
             .scaleEffect(isSelected ? 1.05 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
         }

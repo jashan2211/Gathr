@@ -2,21 +2,90 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 
+// MARK: - Form Card Surface (dark poster style)
+
+/// Solid card surface for every form section in the Create/Edit wizards.
+/// Replaces the faint `gatherSecondaryBackground.opacity(...)` look with a
+/// solid `gatherSurface` fill, `CornerRadius.xl` rounding, `Spacing.md` padding,
+/// and a hairline border for definition on the near-black canvas.
+struct EventFormCardModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .padding(Spacing.md)
+            .background(Color.gatherSurface)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.xl, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: CornerRadius.xl, style: .continuous)
+                    .strokeBorder(
+                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0),
+                        lineWidth: 1
+                    )
+            )
+    }
+}
+
+extension View {
+    /// Apply the solid form-section card treatment used across the event forms.
+    func eventFormCard() -> some View {
+        modifier(EventFormCardModifier())
+    }
+}
+
+/// Nested input surface — `gatherElevated` fill with a 1pt border that turns
+/// accent once the field is focused or has content. Used by text fields,
+/// pickers and toggle rows so every input reads clearly on dark.
+struct EventFormInputSurface: ViewModifier {
+    var isActive: Bool
+    var cornerRadius: CGFloat = CornerRadius.md
+    var minHeight: CGFloat = Layout.minTouchTarget
+
+    func body(content: Content) -> some View {
+        content
+            .frame(minHeight: minHeight)
+            .background(Color.gatherElevated)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        isActive ? Color.accentPurpleFallback.opacity(0.6) : Color.gatherSeparator.opacity(0.6),
+                        lineWidth: 1
+                    )
+            )
+    }
+}
+
+extension View {
+    /// Style a row/field as a nested input on `gatherElevated` with a border
+    /// that turns accent when `isActive` (focused or filled). Tap target >= 44pt.
+    func eventFormInputSurface(
+        isActive: Bool,
+        cornerRadius: CGFloat = CornerRadius.md,
+        minHeight: CGFloat = Layout.minTouchTarget
+    ) -> some View {
+        modifier(EventFormInputSurface(isActive: isActive, cornerRadius: cornerRadius, minHeight: minHeight))
+    }
+}
+
 // MARK: - Event Form Section Header
 
-/// Shared section header used across Create and Edit event forms
+/// Shared section header used across Create and Edit event forms.
+/// Bold 17pt title + an accent-tinted icon so each section is instantly
+/// scannable on the dark canvas. Pass `accent` to tint the icon in the event's
+/// category color; defaults to the purple app accent.
 struct EventFormSectionHeader: View {
     let title: String
     let icon: String
+    var accent: Color = .accentPurpleFallback
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Spacing.xs) {
             Image(systemName: icon)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(Color.accentPurpleFallback)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(accent)
             Text(title)
-                .font(GatherFont.headline)
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(Color.gatherPrimaryText)
         }
     }
@@ -147,7 +216,7 @@ struct EventCategorySelector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            EventFormSectionHeader(title: headerTitle, icon: "sparkles")
+            EventFormSectionHeader(title: headerTitle, icon: "sparkles", accent: Color.forCategory(selectedCategory))
 
             // Horizontal scrolling category chips with emoji + gradient
             ScrollView(.horizontal, showsIndicators: false) {
@@ -178,37 +247,22 @@ struct EventBasicsSection: View {
     @Binding var description: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             EventFormSectionHeader(title: "Event Details", icon: "textformat")
 
-            // Title field with gradient accent
-            VStack(alignment: .leading, spacing: 6) {
+            // Title field with accent-on-fill border
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("EVENT NAME")
-                    .font(.caption2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color.gatherSecondaryText)
                     .tracking(0.5)
 
                 TextField("Give your event a vibe...", text: $title, axis: .vertical)
-                    .font(GatherFont.title3)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(1...2)
                     .padding(Spacing.md)
-                    .background(Color.gatherTertiaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: CornerRadius.md)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: title.isEmpty
-                                        ? [Color.clear, Color.clear]
-                                        : [Color.accentPurpleFallback, Color.accentPinkFallback],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
+                    .eventFormInputSurface(isActive: !title.isEmpty)
 
                 HStack {
                     Spacer()
@@ -219,11 +273,10 @@ struct EventBasicsSection: View {
             }
 
             // Description field
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 HStack {
                     Text("DESCRIPTION")
-                        .font(.caption2)
-                        .fontWeight(.bold)
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Color.gatherSecondaryText)
                         .tracking(0.5)
                     Text("optional")
@@ -232,15 +285,14 @@ struct EventBasicsSection: View {
                 }
 
                 TextField("Tell people what to expect...", text: $description, axis: .vertical)
-                    .font(GatherFont.body)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(3...6)
                     .padding(Spacing.md)
-                    .background(Color.gatherTertiaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                    .eventFormInputSurface(isActive: !description.isEmpty, minHeight: 88)
             }
         }
-        .padding(Spacing.md)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
     }
 }
 
@@ -255,7 +307,7 @@ struct EventFeaturesSection: View {
             EventFormSectionHeader(title: "Features", icon: "slider.horizontal.3")
 
             Text("Choose what this event needs — you can change this anytime")
-                .font(.caption2)
+                .font(.system(size: 13))
                 .foregroundStyle(Color.gatherSecondaryText)
 
             VStack(spacing: Spacing.xs) {
@@ -276,8 +328,7 @@ struct EventFeaturesSection: View {
                 }
             }
         }
-        .padding(Spacing.md)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
     }
 }
 
@@ -333,8 +384,8 @@ struct EventDateTimeSection: View {
                             .font(.caption)
                             .foregroundStyle(Color.rsvpYesFallback)
                         Text("Starts")
-                            .font(GatherFont.callout)
-                            .fontWeight(.medium)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Color.gatherPrimaryText)
                     }
                     Spacer()
                     if allowPastDates {
@@ -356,9 +407,9 @@ struct EventDateTimeSection: View {
                         .tint(Color.accentPurpleFallback)
                     }
                 }
-                .padding(Spacing.sm)
-                .background(Color.gatherTertiaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.xs)
+                .eventFormInputSurface(isActive: false)
 
                 // End time toggle + picker
                 HStack {
@@ -367,8 +418,8 @@ struct EventDateTimeSection: View {
                             .font(.caption)
                             .foregroundStyle(Color.rsvpNoFallback.opacity(0.7))
                         Text("Ends")
-                            .font(GatherFont.callout)
-                            .fontWeight(.medium)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Color.gatherPrimaryText)
                     }
                     Spacer()
                     if hasEndDate {
@@ -389,13 +440,12 @@ struct EventDateTimeSection: View {
                         .tint(Color.accentPurpleFallback)
                         .scaleEffect(0.85)
                 }
-                .padding(Spacing.sm)
-                .background(Color.gatherTertiaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.xs)
+                .eventFormInputSurface(isActive: hasEndDate)
             }
         }
-        .padding(Spacing.md)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
     }
 }
 
@@ -462,8 +512,7 @@ struct EventLocationSection: View {
                 inPersonContent
             }
         }
-        .padding(Spacing.md)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
         .sheet(isPresented: $showLocationPicker) {
             LocationPickerView { name, address, city, state, country, lat, lon in
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
@@ -552,8 +601,7 @@ struct EventLocationSection: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(locationName.isEmpty ? "Selected location" : locationName)
-                    .font(GatherFont.callout)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(1)
                 if !addressSummary.isEmpty {
@@ -587,12 +635,7 @@ struct EventLocationSection: View {
             .accessibilityLabel("Location options")
         }
         .padding(Spacing.sm)
-        .background(Color.gatherBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
-                .stroke(Color.gatherSeparator.opacity(0.5), lineWidth: 1)
-        )
+        .eventFormInputSurface(isActive: true)
     }
 
     private func clearLocation() {
@@ -625,8 +668,7 @@ struct EventSettingsSection: View {
             // Privacy cards
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("WHO CAN SEE THIS EVENT?")
-                    .font(.caption2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color.gatherSecondaryText)
                     .tracking(0.5)
 
@@ -655,8 +697,7 @@ struct EventSettingsSection: View {
             // Guest list visibility
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("GUEST LIST")
-                    .font(.caption2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color.gatherSecondaryText)
                     .tracking(0.5)
 
@@ -666,19 +707,25 @@ struct EventSettingsSection: View {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { guestListVisibility = option }
                         } label: {
                             Text(option.displayName)
-                                .font(.caption)
-                                .fontWeight(.semibold)
+                                .font(.system(size: 14, weight: .semibold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                                 .foregroundStyle(guestListVisibility == option ? .white : Color.gatherPrimaryText)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, Spacing.xs)
+                                .frame(minHeight: Layout.minTouchTarget)
                                 .background(
                                     guestListVisibility == option
                                         ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                                        : AnyShapeStyle(Color.gatherTertiaryBackground)
+                                        : AnyShapeStyle(Color.gatherElevated)
                                 )
                                 .clipShape(Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(
+                                            guestListVisibility == option ? Color.clear : Color.gatherSeparator.opacity(0.6),
+                                            lineWidth: 1
+                                        )
+                                )
                         }
                         .accessibilityLabel("\(option.displayName) guest list visibility")
                         .accessibilityAddTraits(guestListVisibility == option ? [.isSelected] : [])
@@ -693,21 +740,22 @@ struct EventSettingsSection: View {
                         .font(.caption)
                         .foregroundStyle(Color.accentPurpleFallback)
                     Text("Limit capacity")
-                        .font(GatherFont.callout)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.gatherPrimaryText)
                 }
                 Spacer()
                 Toggle("", isOn: $hasCapacity)
                     .labelsHidden()
                     .tint(Color.accentPurpleFallback)
             }
-            .padding(Spacing.sm)
-            .background(Color.gatherTertiaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.xs)
+            .eventFormInputSurface(isActive: hasCapacity)
 
             if hasCapacity {
                 HStack(spacing: Spacing.sm) {
                     Text("Max guests")
-                        .font(GatherFont.callout)
+                        .font(.system(size: 16))
                         .foregroundStyle(Color.gatherSecondaryText)
                     Spacer()
                     HStack(spacing: Spacing.xs) {
@@ -723,15 +771,15 @@ struct EventSettingsSection: View {
                         TextField("50", value: $capacity, format: .number)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.center)
-                            .font(GatherFont.headline)
-                            .fontWeight(.bold)
-                            .frame(width: 60)
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(Color.gatherPrimaryText)
+                            .frame(width: 64)
                             .padding(.vertical, Spacing.xs)
-                            .background(Color.gatherSecondaryBackground)
+                            .background(Color.gatherElevated)
                             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                             .overlay(
                                 RoundedRectangle(cornerRadius: CornerRadius.sm)
-                                    .strokeBorder(Color.gatherSeparator.opacity(0.5), lineWidth: 1)
+                                    .strokeBorder(Color.accentPurpleFallback.opacity(0.6), lineWidth: 1)
                             )
 
                         Button {
@@ -743,13 +791,12 @@ struct EventSettingsSection: View {
                         }
                     }
                 }
-                .padding(Spacing.sm)
-                .background(Color.gatherTertiaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.xs)
+                .eventFormInputSurface(isActive: true)
             }
         }
-        .padding(Spacing.md)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
     }
 }
 
@@ -762,37 +809,31 @@ struct EventFormCategoryChip: View {
     let isSelected: Bool
     let action: () -> Void
 
-    // Conference/meetup accents are light fills; white text fails contrast on them
-    private var usesDarkText: Bool {
-        category == .conference || category == .meetup
-    }
-
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Text(category.emoji)
                     .font(.callout)
                 Text(category.displayName)
-                    .font(.caption)
-                    .fontWeight(.bold)
+                    .font(.system(size: 14, weight: .bold))
             }
             .foregroundStyle(
                 isSelected
-                    ? (usesDarkText ? Color.black.opacity(0.85) : Color.white)
+                    ? Color.onCategory(category)
                     : Color.gatherPrimaryText
             )
             .padding(.horizontal, Spacing.md)
-            .padding(.vertical, Spacing.xs)
+            .frame(minHeight: Layout.minTouchTarget)
             .background(
                 isSelected
                     ? AnyShapeStyle(Color.forCategory(category))
-                    : AnyShapeStyle(Color.gatherSecondaryBackground)
+                    : AnyShapeStyle(Color.gatherElevated)
             )
             .clipShape(Capsule())
             .overlay(
                 Capsule()
                     .strokeBorder(
-                        isSelected ? Color.clear : Color.gatherSeparator,
+                        isSelected ? Color.clear : Color.gatherSeparator.opacity(0.6),
                         lineWidth: 1
                     )
             )
@@ -830,15 +871,14 @@ struct EventFeatureCard: View {
                     .background(
                         active
                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                            : AnyShapeStyle(Color.gatherSecondaryBackground)
+                            : AnyShapeStyle(Color.gatherSurface)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(feature.displayName)
-                            .font(GatherFont.callout)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(available ? Color.gatherPrimaryText : Color.gatherSecondaryText)
                         if !available {
                             Text("SOON")
@@ -851,7 +891,7 @@ struct EventFeatureCard: View {
                         }
                     }
                     Text(feature.description)
-                        .font(.caption2)
+                        .font(.system(size: 13))
                         .foregroundStyle(Color.gatherSecondaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -862,19 +902,20 @@ struct EventFeatureCard: View {
                 if available {
                     Image(systemName: active ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
-                        .foregroundStyle(active ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.35))
+                        .foregroundStyle(active ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.4))
                 }
             }
             .padding(Spacing.sm)
+            .frame(minHeight: Layout.minTouchTarget)
             .background(
-                RoundedRectangle(cornerRadius: CornerRadius.md)
-                    .fill(active ? Color.accentPurpleFallback.opacity(0.07) : Color.gatherTertiaryBackground)
+                RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                    .fill(active ? Color.accentPurpleFallback.opacity(0.14) : Color.gatherElevated)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: CornerRadius.md)
+                RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
                     .strokeBorder(
-                        active ? Color.accentPurpleFallback.opacity(0.35) : Color.clear,
-                        lineWidth: 1.5
+                        active ? Color.accentPurpleFallback.opacity(0.7) : Color.gatherSeparator.opacity(0.6),
+                        lineWidth: active ? 1.5 : 1
                     )
             )
             .opacity(available ? 1 : 0.55)
@@ -904,20 +945,20 @@ struct EventFormStyledTextField: View {
         HStack(spacing: Spacing.xs) {
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundStyle(Color.accentPurpleFallback.opacity(0.7))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.accentPurpleFallback.opacity(0.8))
                     .frame(width: 20)
             }
             TextField(placeholder, text: $text)
-                .font(GatherFont.body)
+                .font(.system(size: 16))
+                .foregroundStyle(Color.gatherPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .keyboardType(keyboardType)
                 .textInputAutocapitalization(autocapitalization)
         }
-        .padding(Spacing.sm)
-        .background(Color.gatherTertiaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .padding(.horizontal, Spacing.sm)
+        .eventFormInputSurface(isActive: !text.isEmpty)
     }
 }
 
@@ -935,15 +976,14 @@ struct EventFormQuickDateChip: View {
         }) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 10))
+                    .font(.system(size: 11, weight: .semibold))
                 Text(label)
-                    .font(.caption2)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 13, weight: .semibold))
             }
             .foregroundStyle(Color.accentPurpleFallback)
-            .padding(.horizontal, Spacing.sm)
-            .padding(.vertical, 6)
-            .background(Color.accentPurpleFallback.opacity(0.1))
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.xs)
+            .background(Color.accentPurpleFallback.opacity(0.16))
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -963,21 +1003,26 @@ struct EventFormLocationTypeButton: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 14, weight: .semibold))
                 Text(label)
-                    .font(GatherFont.callout)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 16, weight: .semibold))
             }
             .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.sm)
+            .frame(minHeight: Layout.minTouchTarget)
             .background(
                 isSelected
                     ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                    : AnyShapeStyle(Color.gatherTertiaryBackground)
+                    : AnyShapeStyle(Color.gatherElevated)
             )
             .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(
+                        isSelected ? Color.clear : Color.gatherSeparator.opacity(0.6),
+                        lineWidth: 1
+                    )
+            )
         }
         .accessibilityLabel("\(label) location")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -1004,13 +1049,12 @@ struct EventFormPrivacyCard: View {
                     .background(
                         isSelected
                             ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                            : AnyShapeStyle(Color.gatherSecondaryBackground)
+                            : AnyShapeStyle(Color.gatherSurface)
                     )
                     .clipShape(Circle())
 
                 Text(option.displayName)
-                    .font(.caption2)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .foregroundStyle(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryText)
@@ -1019,15 +1063,15 @@ struct EventFormPrivacyCard: View {
             .padding(.vertical, Spacing.sm)
             .background(
                 isSelected
-                    ? Color.accentPurpleFallback.opacity(0.08)
-                    : Color.gatherTertiaryBackground
+                    ? Color.accentPurpleFallback.opacity(0.14)
+                    : Color.gatherElevated
             )
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: CornerRadius.md)
+                RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
                     .strokeBorder(
-                        isSelected ? Color.accentPurpleFallback.opacity(0.3) : Color.clear,
-                        lineWidth: 1.5
+                        isSelected ? Color.accentPurpleFallback.opacity(0.7) : Color.gatherSeparator.opacity(0.6),
+                        lineWidth: isSelected ? 1.5 : 1
                     )
             )
             .overlay(alignment: .topTrailing) {

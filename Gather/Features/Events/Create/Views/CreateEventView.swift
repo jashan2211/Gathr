@@ -80,10 +80,11 @@ struct CreateEventView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
+            .background(Color.gatherCanvas.ignoresSafeArea())
             .safeAreaInset(edge: .bottom) {
                 navigationBar
             }
-            .navigationTitle(step.title)
+            .navigationTitle("Create Event")
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled(hasInput)
             .toolbar {
@@ -115,30 +116,34 @@ struct CreateEventView: View {
     // MARK: - Step Progress Bar
 
     private var stepProgressBar: some View {
-        VStack(spacing: Spacing.xs) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack(spacing: Spacing.xs) {
                 ForEach(CreateStep.allCases, id: \.self) { item in
                     Capsule()
                         .fill(
                             item.rawValue <= step.rawValue
                                 ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                                : AnyShapeStyle(Color.gatherSecondaryBackground)
+                                : AnyShapeStyle(Color.gatherElevated)
                         )
-                        .frame(height: 4)
+                        .frame(height: 5)
                 }
             }
 
-            HStack {
-                Text("Step \(step.rawValue + 1) of \(CreateStep.allCases.count)")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("STEP \(step.rawValue + 1) OF \(CreateStep.allCases.count)")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.5)
                     .foregroundStyle(Color.gatherSecondaryText)
-                Spacer()
+                Text(step.title)
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(Color.gatherPrimaryText)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, Layout.horizontalPadding)
         .padding(.top, Spacing.sm)
-        .padding(.bottom, Spacing.xs)
+        .padding(.bottom, Spacing.sm)
+        .background(Color.gatherCanvas)
     }
 
     // MARK: - Step Content
@@ -218,39 +223,35 @@ struct CreateEventView: View {
     // MARK: - Title Section
 
     private var titleSection: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            EventFormSectionHeader(title: "Name your event", icon: "textformat")
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            EventFormSectionHeader(
+                title: "Name your event",
+                icon: "textformat",
+                accent: Color.forCategory(selectedCategory)
+            )
 
-            TextField("Give your event a vibe...", text: $title, axis: .vertical)
-                .font(GatherFont.title3)
-                .fontWeight(.semibold)
-                .lineLimit(1...2)
-                .padding(Spacing.md)
-                .background(Color.gatherTertiaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                .overlay(
-                    RoundedRectangle(cornerRadius: CornerRadius.md)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: title.isEmpty
-                                    ? [Color.clear, Color.clear]
-                                    : [Color.accentPurpleFallback, Color.accentPinkFallback],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1.5
-                        )
-                )
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text("EVENT NAME")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .tracking(0.5)
 
-            HStack {
-                Spacer()
-                Text("\(title.count)/100")
-                    .font(.caption2)
-                    .foregroundStyle(title.count > 90 ? Color.warmCoral : Color.gatherSecondaryText)
+                TextField("Give your event a vibe...", text: $title, axis: .vertical)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .lineLimit(1...2)
+                    .padding(Spacing.md)
+                    .eventFormInputSurface(isActive: !title.isEmpty)
+
+                HStack {
+                    Spacer()
+                    Text("\(title.count)/100")
+                        .font(.caption2)
+                        .foregroundStyle(title.count > 90 ? Color.warmCoral : Color.gatherSecondaryText)
+                }
             }
         }
-        .padding(Spacing.md)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
     }
 
     // MARK: - Optional Cover & Details
@@ -266,31 +267,29 @@ struct CreateEventView: View {
             } label: {
                 HStack(spacing: Spacing.sm) {
                     Image(systemName: "photo.on.rectangle.angled")
-                        .font(.callout)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.forCategory(selectedCategory))
-                        .frame(width: 36, height: 36)
-                        .background(Color.gatherTertiaryBackground)
+                        .frame(width: 40, height: 40)
+                        .background(Color.gatherElevated)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Add a cover & details")
-                            .font(GatherFont.callout)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Color.gatherPrimaryText)
                         Text(coverDetailsSummary)
-                            .font(.caption2)
+                            .font(.system(size: 13))
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
 
                     Spacer()
 
                     Image(systemName: "chevron.down")
-                        .font(.caption)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.gatherSecondaryText)
                         .rotationEffect(.degrees(showCoverDetails ? 180 : 0))
                 }
+                .frame(minHeight: Layout.minTouchTarget)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Add a cover photo and description")
@@ -306,8 +305,7 @@ struct CreateEventView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(Spacing.md)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
     }
 
     private var coverDetailsSummary: String {
@@ -330,7 +328,7 @@ struct CreateEventView: View {
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                 } else {
                     RoundedRectangle(cornerRadius: CornerRadius.sm)
-                        .fill(Color.gatherSecondaryBackground)
+                        .fill(Color.gatherSurface)
                         .frame(width: 64, height: 48)
                         .overlay {
                             Image(systemName: "photo.badge.plus")
@@ -340,8 +338,7 @@ struct CreateEventView: View {
                 }
 
                 Text(heroImage == nil ? "Add a cover photo" : "Change cover photo")
-                    .font(GatherFont.callout)
-                    .fontWeight(.medium)
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()
@@ -351,8 +348,7 @@ struct CreateEventView: View {
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .padding(Spacing.sm)
-            .background(Color.gatherTertiaryBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            .eventFormInputSurface(isActive: heroImage != nil)
         }
         .accessibilityLabel(heroImage == nil ? "Add a cover photo" : "Change cover photo")
         .onChange(of: selectedPhoto) { _, newValue in
@@ -366,11 +362,10 @@ struct CreateEventView: View {
     }
 
     private var descriptionField: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             HStack {
                 Text("DESCRIPTION")
-                    .font(.caption2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color.gatherSecondaryText)
                     .tracking(0.5)
                 Text("optional")
@@ -379,11 +374,11 @@ struct CreateEventView: View {
             }
 
             TextField("Tell people what to expect...", text: $description, axis: .vertical)
-                .font(GatherFont.body)
+                .font(.system(size: 16))
+                .foregroundStyle(Color.gatherPrimaryText)
                 .lineLimit(3...6)
                 .padding(Spacing.md)
-                .background(Color.gatherTertiaryBackground)
-                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .eventFormInputSurface(isActive: !description.isEmpty, minHeight: 88)
         }
     }
 
@@ -392,14 +387,7 @@ struct CreateEventView: View {
     private var templateSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "wand.and.stars")
-                        .font(.caption)
-                        .foregroundStyle(Color.accentPurpleFallback)
-                    Text("Quick Start")
-                        .font(GatherFont.headline)
-                        .foregroundStyle(Color.gatherPrimaryText)
-                }
+                EventFormSectionHeader(title: "Quick Start", icon: "wand.and.stars")
 
                 Spacer()
 
@@ -407,11 +395,11 @@ struct CreateEventView: View {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showTemplates = false }
                 } label: {
                     Text("Skip")
-                        .font(GatherFont.caption)
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.gatherSecondaryText)
                         .padding(.horizontal, Spacing.sm)
-                        .padding(.vertical, Spacing.xxs)
-                        .background(Color.gatherSecondaryBackground)
+                        .padding(.vertical, Spacing.xs)
+                        .background(Color.gatherElevated)
                         .clipShape(Capsule())
                 }
             }
@@ -440,8 +428,7 @@ struct CreateEventView: View {
                                 }
 
                                 Text(tmpl.name)
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
+                                    .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(Color.gatherPrimaryText)
                                     .lineLimit(1)
                             }
@@ -452,8 +439,7 @@ struct CreateEventView: View {
                 }
             }
         }
-        .padding(Spacing.md)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
     }
 
     private func applyTemplate(_ tmpl: EventTemplate) {
@@ -472,20 +458,19 @@ struct CreateEventView: View {
     private var navigationBar: some View {
         VStack(spacing: 0) {
             LinearGradient(
-                colors: [Color.gatherBackground.opacity(0), Color.gatherBackground],
+                colors: [Color.gatherCanvas.opacity(0), Color.gatherCanvas],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .frame(height: 20)
 
-            VStack(spacing: Spacing.xs) {
+            VStack(spacing: Spacing.sm) {
                 if let hint = stepHint {
                     HStack(spacing: 6) {
                         Image(systemName: "info.circle.fill")
-                            .font(.caption2)
+                            .font(.caption)
                         Text(hint)
-                            .font(.caption2)
-                            .fontWeight(.medium)
+                            .font(.system(size: 13, weight: .medium))
                         Spacer()
                     }
                     .foregroundStyle(Color.gatherSecondaryText)
@@ -501,14 +486,17 @@ struct CreateEventView: View {
                                 Image(systemName: "chevron.left")
                                     .font(.caption)
                                 Text("Back")
-                                    .font(GatherFont.callout)
-                                    .fontWeight(.semibold)
+                                    .font(.system(size: 16, weight: .semibold))
                             }
-                            .foregroundStyle(Color.gatherSecondaryText)
+                            .foregroundStyle(Color.gatherPrimaryText)
                             .padding(.horizontal, Spacing.lg)
                             .frame(height: Layout.buttonHeight)
-                            .background(Color.gatherSecondaryBackground)
+                            .background(Color.gatherElevated)
                             .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(Color.gatherSeparator.opacity(0.6), lineWidth: 1)
+                            )
                         }
                         .disabled(isSubmitting)
                     }
@@ -526,8 +514,7 @@ struct CreateEventView: View {
                                     .font(.callout)
                             }
                             Text(step == .settings ? "Create Event" : "Continue")
-                                .font(GatherFont.callout)
-                                .fontWeight(.bold)
+                                .font(.system(size: 17, weight: .bold))
                             if step != .settings && !isSubmitting {
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
@@ -539,9 +526,10 @@ struct CreateEventView: View {
                         .background(
                             canProceed
                                 ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                                : AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
+                                : AnyShapeStyle(Color.gatherElevated)
                         )
                         .clipShape(Capsule())
+                        .opacity(canProceed ? 1 : 0.6)
                     }
                     .disabled(!canProceed || isSubmitting)
                     .accessibilityIdentifier("wizardPrimaryButton")
@@ -552,8 +540,7 @@ struct CreateEventView: View {
                         createEvent(asDraft: true)
                     } label: {
                         Text("Save as draft instead")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Color.accentPurpleFallback)
                     }
                     .disabled(!isValid || isSubmitting)
@@ -562,7 +549,7 @@ struct CreateEventView: View {
             }
             .padding(.horizontal, Layout.horizontalPadding)
             .padding(.bottom, Spacing.md)
-            .background(Color.gatherBackground)
+            .background(Color.gatherCanvas)
             .animation(.easeInOut(duration: 0.2), value: stepHint)
         }
     }
@@ -717,21 +704,12 @@ struct FormSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             // Header
-            HStack(spacing: Spacing.sm) {
-                Image(systemName: icon)
-                    .font(.headline)
-                    .foregroundStyle(Color.accentPurpleFallback)
-
-                Text(title)
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
-            }
+            EventFormSectionHeader(title: title, icon: icon)
 
             // Content
             content
         }
-        .padding()
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .eventFormCard()
     }
 }
 

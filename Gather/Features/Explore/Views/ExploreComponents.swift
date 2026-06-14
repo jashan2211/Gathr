@@ -14,25 +14,30 @@ struct HappeningSoonCard: View {
                     .overlay(alignment: .bottomTrailing) {
                         Text(event.category.emoji)
                             .font(.system(size: 36))
-                            .opacity(0.3)
+                            .opacity(0.35)
                             .offset(x: -8, y: -8)
                     }
+
+                // Scrim for legibility of the date chip / emoji
+                LinearGradient(
+                    colors: [.black.opacity(0.25), .clear],
+                    startPoint: .top,
+                    endPoint: .center
+                )
 
                 // Date chip - top left
                 VStack {
                     HStack {
                         VStack(spacing: 0) {
                             Text(dayOfMonth)
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 18, weight: .heavy))
                             Text(monthAbbrev)
-                                .font(.caption2)
-                                .fontWeight(.semibold)
+                                .font(.system(size: 10, weight: .bold))
                                 .textCase(.uppercase)
                         }
                         .foregroundStyle(.white)
                         .frame(width: 40, height: 40)
-                        .background(.ultraThinMaterial.opacity(0.7))
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                        .background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
                         .padding(Spacing.xs)
 
                         Spacer()
@@ -40,13 +45,11 @@ struct HappeningSoonCard: View {
                         // Sample badge for demo events
                         if event.isDemo {
                             Text("SAMPLE")
-                                .font(.caption2)
-                                .fontWeight(.heavy)
+                                .font(.system(size: 10, weight: .heavy))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.85))
-                                .clipShape(Capsule())
+                                .background(Color.orange.opacity(0.9), in: Capsule())
                                 .padding(Spacing.xs)
                         }
                     }
@@ -59,8 +62,7 @@ struct HappeningSoonCard: View {
             // Info
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(event.title)
-                    .font(GatherFont.callout)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(1)
 
@@ -71,14 +73,13 @@ struct HappeningSoonCard: View {
                         Text(location.shortLocation ?? location.name)
                             .lineLimit(1)
                     }
-                    .font(.caption2)
+                    .font(.system(size: 11))
                     .foregroundStyle(Color.gatherSecondaryText)
                 }
 
                 HStack(spacing: 4) {
                     Text(relativeDay)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(urgencyColor)
 
                     Spacer()
@@ -147,6 +148,13 @@ struct ExploreGridCard: View {
             ZStack(alignment: .topTrailing) {
                 CategoryMeshBackground(category: event.category)
                     .frame(height: 100)
+                    .overlay(alignment: .topTrailing) {
+                        LinearGradient(
+                            colors: [.black.opacity(0.22), .clear],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                    }
                     .overlay(alignment: .bottomLeading) {
                         Text(event.category.emoji)
                             .font(.title)
@@ -156,24 +164,20 @@ struct ExploreGridCard: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     // Price tag
                     Text(priceLabel)
-                        .font(.caption2)
-                        .fontWeight(.bold)
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, Spacing.xs)
                         .padding(.vertical, 3)
-                        .background(priceColor)
-                        .clipShape(Capsule())
+                        .background(priceColor, in: Capsule())
 
                     // Sample badge for demo events
                     if event.isDemo {
                         Text("SAMPLE")
-                            .font(.caption2)
-                            .fontWeight(.heavy)
+                            .font(.system(size: 10, weight: .heavy))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.85))
-                            .clipShape(Capsule())
+                            .background(Color.orange.opacity(0.9), in: Capsule())
                     }
                 }
                 .padding(Spacing.xs)
@@ -183,8 +187,7 @@ struct ExploreGridCard: View {
             // Content
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.title)
-                    .font(GatherFont.callout)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(2)
                     .frame(minHeight: 36, alignment: .topLeading)
@@ -196,7 +199,7 @@ struct ExploreGridCard: View {
                         Text(location.shortLocation ?? location.name)
                             .lineLimit(1)
                     }
-                    .font(.caption2)
+                    .font(.system(size: 11))
                     .foregroundStyle(Color.gatherSecondaryText)
                 }
 
@@ -207,7 +210,7 @@ struct ExploreGridCard: View {
                     Text(smartDate)
                         .lineLimit(1)
                 }
-                .font(.caption2)
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.accentPurpleFallback)
 
                 // Attendee preview + capacity

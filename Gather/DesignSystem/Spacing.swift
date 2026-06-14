@@ -275,12 +275,14 @@ struct SurfaceCardModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(Color.gatherSecondaryBackground)
+            // Richer near-black surface (gatherSurface) on the dark canvas;
+            // grouped surface in light. Falls back automatically per scheme.
+            .background(Color.gatherSurface)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .strokeBorder(
-                        Color.white.opacity(colorScheme == .dark ? 0.07 : 0),
+                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0),
                         lineWidth: 1
                     )
             )

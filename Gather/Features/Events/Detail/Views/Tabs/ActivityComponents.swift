@@ -255,7 +255,7 @@ struct ActivityPostCard: View {
                                 .frame(width: geo.size.width * percentage)
                         }
                     )
-                    .background(Color.gatherTertiaryBackground)
+                    .background(Color.gatherElevated)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                     .overlay(
                         RoundedRectangle(cornerRadius: CornerRadius.sm)

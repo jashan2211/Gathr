@@ -109,7 +109,7 @@ struct ActivityTab: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Spacing.md)
                     .padding(.vertical, Spacing.sm)
-                    .background(Color.gatherTertiaryBackground)
+                    .background(Color.gatherElevated)
                     .clipShape(Capsule())
             }
 

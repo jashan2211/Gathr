@@ -23,7 +23,9 @@ struct MyTicketsView: View {
             if allTickets.isEmpty {
                 emptyState
             } else {
-                VStack(spacing: Spacing.md) {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    header
+
                     if !validTickets.isEmpty {
                         ForEach(validTickets) { ticket in
                             TicketCard(ticket: ticket, event: event(for: ticket))
@@ -31,16 +33,12 @@ struct MyTicketsView: View {
                     }
 
                     if !cancelledTickets.isEmpty {
-                        HStack(spacing: Spacing.xs) {
-                            Image(systemName: "archivebox")
-                                .font(.caption)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                            Text("Past / Cancelled")
-                                .font(GatherFont.headline)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, Spacing.sm)
+                        Text("PAST / CANCELLED")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(0.5)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, Spacing.sm)
 
                         ForEach(cancelledTickets) { ticket in
                             TicketCard(ticket: ticket, event: event(for: ticket))
@@ -52,8 +50,40 @@ struct MyTicketsView: View {
                 .padding(.vertical)
             }
         }
-        .background(Color.gatherBackground)
+        .background(Color.gatherCanvas.ignoresSafeArea())
         .navigationTitle("My Tickets")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
+    // MARK: - Editorial Header
+
+    private var header: some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                Text("Your QR codes, ready to scan")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.gatherSecondaryText)
+
+                Text("Tickets")
+                    .font(.system(size: 34, weight: .heavy))
+                    .kerning(-1)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .accessibilityAddTraits(.isHeader)
+            }
+
+            Spacer()
+
+            if !validTickets.isEmpty {
+                Text("\(validTickets.count) active")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.accentPurpleFallback)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, 6)
+                    .background(Color.gatherSurface, in: Capsule())
+            }
+        }
+        .padding(.bottom, Spacing.xs)
     }
 
     private var emptyState: some View {
@@ -72,53 +102,79 @@ private struct TicketCard: View {
     let ticket: Ticket
     let event: Event?
 
+    private var category: EventCategory {
+        event?.category ?? .custom
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header with event info
-            HStack(spacing: Spacing.sm) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: CornerRadius.sm)
-                        .fill(Color.forCategory(event?.category ?? .custom).opacity(0.12))
-                        .frame(width: 44, height: 44)
-                    Text(event?.category.emoji ?? "🎫")
-                        .font(.title3)
+            // Poster header: category gradient band with bold event title
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                HStack(alignment: .top) {
+                    Text(category.emoji)
+                        .font(.system(size: 30))
+                    Spacer()
+                    statusBadge
                 }
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(event?.title ?? "Event")
-                        .font(GatherFont.callout)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.gatherPrimaryText)
-                        .lineLimit(1)
+                        .font(.system(size: 22, weight: .heavy))
+                        .kerning(-0.5)
+                        .foregroundStyle(Color.onCategory(category))
+                        .lineLimit(2)
 
                     if let event {
-                        Text(GatherDateFormatter.fullEventDate.string(from: event.startDate))
-                            .font(.caption2)
-                            .foregroundStyle(Color.gatherSecondaryText)
+                        HStack(spacing: Spacing.xs) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 11, weight: .bold))
+                            Text(GatherDateFormatter.fullEventDate.string(from: event.startDate))
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.onCategory(category).opacity(0.85))
+
+                        if let location = event.location {
+                            HStack(spacing: Spacing.xs) {
+                                Image(systemName: "mappin")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text(location.name)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(Color.onCategory(category).opacity(0.85))
+                        }
                     }
                 }
-
-                Spacer()
-
-                // Status
-                statusBadge
             }
             .padding(Spacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.forCategory(category),
+                        Color.forCategory(category).opacity(0.78)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
 
-            // Dashed divider
+            // Perforated stub divider
             DashedDivider()
                 .padding(.horizontal, Spacing.sm)
+                .padding(.vertical, Spacing.xs)
 
             // QR Code + Ticket details
             HStack(spacing: Spacing.md) {
-                // QR Code
+                // QR Code on a light backing so the code stays scannable
                 if let qrImage = generateQRCode(from: ticket.qrCodeData) {
                     Image(uiImage: qrImage)
                         .interpolation(.none)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 80, height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                        .frame(width: 72, height: 72)
+                        .padding(Spacing.xs)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
                 }
 
                 VStack(alignment: .leading, spacing: Spacing.xs) {
@@ -136,6 +192,7 @@ private struct TicketCard: View {
             }
             .padding(Spacing.md)
         }
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .surfaceCard()
     }
 
@@ -145,34 +202,25 @@ private struct TicketCard: View {
                 .font(.caption2)
             Text(ticket.paymentStatus.rawValue)
                 .font(.caption2)
-                .fontWeight(.semibold)
+                .fontWeight(.bold)
         }
-        .foregroundStyle(statusColor)
+        .foregroundStyle(Color.onCategory(category))
         .padding(.horizontal, Spacing.xs)
         .padding(.vertical, 4)
-        .background(statusColor.opacity(0.12))
-        .clipShape(Capsule())
-    }
-
-    private var statusColor: Color {
-        switch ticket.paymentStatus {
-        case .completed: return Color.rsvpYesFallback
-        case .pending, .processing: return Color.rsvpMaybeFallback
-        case .failed, .cancelled: return Color.rsvpNoFallback
-        case .refunded: return Color.accentPurpleFallback
-        }
+        .background(Color.onCategory(category).opacity(0.18), in: Capsule())
     }
 
     private func ticketDetail(label: String, value: String) -> some View {
-        HStack(spacing: 6) {
-            Text(label)
-                .font(.caption2)
+        HStack(spacing: 8) {
+            Text(label.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
                 .foregroundStyle(Color.gatherSecondaryText)
-                .frame(width: 44, alignment: .leading)
+                .frame(width: 48, alignment: .leading)
             Text(value)
-                .font(GatherFont.caption)
-                .fontWeight(.medium)
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.gatherPrimaryText)
+                .lineLimit(1)
         }
     }
 
@@ -199,7 +247,7 @@ private struct DashedDivider: View {
                 path.addLine(to: CGPoint(x: geo.size.width, y: 0))
             }
             .stroke(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-            .foregroundStyle(Color.gatherSecondaryText.opacity(0.3))
+            .foregroundStyle(Color.gatherSecondaryText.opacity(0.4))
         }
         .frame(height: 1)
     }

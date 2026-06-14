@@ -38,7 +38,8 @@ struct WaitlistSheet: View {
             }
             .horizontalPadding()
             .padding(.vertical)
-            .background(Color.gatherBackground)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.gatherCanvas.ignoresSafeArea())
             .navigationTitle("Waitlist")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -84,21 +85,23 @@ struct WaitlistSheet: View {
             // Form fields
             VStack(spacing: Spacing.md) {
                 VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text("Name")
-                        .font(GatherFont.caption)
+                    Text("NAME")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.5)
                         .foregroundStyle(Color.gatherSecondaryText)
 
                     TextField("Your name", text: $name)
                         .textContentType(.name)
                         .submitLabel(.done)
                         .padding()
-                        .background(Color.gatherSecondaryBackground)
+                        .background(Color.gatherElevated)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
 
                 VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text("Email")
-                        .font(GatherFont.caption)
+                    Text("EMAIL")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.5)
                         .foregroundStyle(Color.gatherSecondaryText)
 
                     TextField("you@example.com", text: $email)
@@ -107,7 +110,7 @@ struct WaitlistSheet: View {
                         .autocapitalization(.none)
                         .submitLabel(.done)
                         .padding()
-                        .background(Color.gatherSecondaryBackground)
+                        .background(Color.gatherElevated)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
             }
@@ -257,7 +260,7 @@ struct WaitlistSheet: View {
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .padding()
-            .background(Color.accentPurpleFallback.opacity(0.1))
+            .background(Color.gatherSurface)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             .accessibilityElement(children: .combine)
 

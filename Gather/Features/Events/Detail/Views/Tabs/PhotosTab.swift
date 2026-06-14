@@ -206,10 +206,10 @@ struct PhotosTab: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                         } placeholder: {
-                            Color.gatherSecondaryBackground
+                            Color.gatherElevated
                         }
                     } else {
-                        Color.gatherSecondaryBackground
+                        Color.gatherElevated
                             .overlay(
                                 Image(systemName: "photo")
                                     .foregroundStyle(Color.gatherSecondaryText)

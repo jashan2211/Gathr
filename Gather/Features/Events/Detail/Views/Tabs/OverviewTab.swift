@@ -140,7 +140,8 @@ struct OverviewTab: View {
             // Header
             HStack {
                 Text("Guest Summary")
-                    .font(GatherFont.headline)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()
 
@@ -233,7 +234,7 @@ struct OverviewTab: View {
                     .padding(.vertical, Spacing.xs)
             }
             .frame(width: 56)
-            .background(Color.gatherTertiaryBackground)
+            .background(Color.gatherElevated)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
             VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -264,7 +265,7 @@ struct OverviewTab: View {
                     .font(.title2)
                     .foregroundStyle(Color.accentPurpleFallback)
                     .frame(width: 44, height: 44)
-                    .background(Color.accentPurpleFallback.opacity(0.1))
+                    .background(Color.gatherElevated)
                     .clipShape(Circle())
             }
         }
@@ -281,7 +282,7 @@ struct OverviewTab: View {
                     .font(.title2)
                     .foregroundStyle(Color.accentPinkFallback)
                     .frame(width: 44, height: 44)
-                    .background(Color.accentPinkFallback.opacity(0.1))
+                    .background(Color.gatherElevated)
                     .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
@@ -337,7 +338,7 @@ struct OverviewTab: View {
     private func descriptionSection(_ description: String) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text("About")
-                .font(GatherFont.headline)
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(Color.gatherPrimaryText)
 
             Text(description)
@@ -352,7 +353,8 @@ struct OverviewTab: View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
                 Text("Functions")
-                    .font(GatherFont.headline)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()
 
@@ -381,7 +383,8 @@ struct OverviewTab: View {
     private var whosGoingSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text("Who's Going")
-                .font(GatherFont.headline)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Color.gatherPrimaryText)
 
             let attendingGuests = event.guests.filter { $0.status == .attending }
             let guestNames = attendingGuests.map { guest -> String in
@@ -417,7 +420,8 @@ struct OverviewTab: View {
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text("Recent RSVPs")
-                .font(GatherFont.headline)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Color.gatherPrimaryText)
 
             let recentGuests = event.guests
                 .filter { $0.status == .attending }
@@ -557,7 +561,7 @@ struct RSVPProgressRow: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.gatherTertiaryBackground)
+                        .fill(Color.gatherElevated)
                         .frame(height: 6)
 
                     RoundedRectangle(cornerRadius: 2)

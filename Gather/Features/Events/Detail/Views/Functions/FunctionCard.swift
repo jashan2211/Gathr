@@ -20,7 +20,7 @@ struct FunctionCard: View {
                         .foregroundStyle(Color.accentPurpleFallback)
                 }
                 .frame(width: 48, height: 48)
-                .background(Color.gatherTertiaryBackground)
+                .background(Color.gatherElevated)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
                 VStack(alignment: .leading, spacing: Spacing.xxs) {

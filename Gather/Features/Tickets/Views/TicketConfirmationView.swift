@@ -19,7 +19,7 @@ struct TicketConfirmationView: View {
 
     var body: some View {
         ZStack {
-            Color.gatherBackground.ignoresSafeArea()
+            Color.gatherCanvas.ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: Spacing.xl) {
@@ -161,20 +161,20 @@ struct TicketConfirmationView: View {
             .padding(Spacing.lg)
             .frame(maxWidth: .infinity)
 
-            // Perforated line
+            // Perforated line — notch circles match the canvas behind the card
             HStack(spacing: 0) {
                 Circle()
-                    .fill(Color.gatherBackground)
+                    .fill(Color.gatherCanvas)
                     .frame(width: 24, height: 24)
                     .offset(x: -12)
 
                 Rectangle()
                     .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
-                    .foregroundStyle(Color.gatherSeparator)
+                    .foregroundStyle(Color.gatherSecondaryText.opacity(0.4))
                     .frame(height: 1)
 
                 Circle()
-                    .fill(Color.gatherBackground)
+                    .fill(Color.gatherCanvas)
                     .frame(width: 24, height: 24)
                     .offset(x: 12)
             }
@@ -245,7 +245,7 @@ struct TicketConfirmationView: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                         .padding(.horizontal, Spacing.xs)
                         .padding(.vertical, Spacing.xxs)
-                        .background(Color.gatherTertiaryBackground)
+                        .background(Color.gatherElevated)
                         .clipShape(Capsule())
                 }
             }

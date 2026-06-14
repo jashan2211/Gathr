@@ -489,7 +489,8 @@ struct GuestsTab: View {
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(event.guests.count) Guests")
-                        .font(GatherFont.headline)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.gatherPrimaryText)
                         .accessibilityAddTraits(.isHeader)
                     if event.attendingCount > 0 {
                         Text("\(event.attendingCount) confirmed")
@@ -588,7 +589,7 @@ struct GuestsTab: View {
             }
         }
         .padding(Spacing.sm)
-        .background(Color.gatherSecondaryBackground)
+        .background(Color.gatherElevated)
         .clipShape(Capsule())
         .horizontalPadding()
         .padding(.bottom, Spacing.sm)
@@ -828,7 +829,8 @@ struct GuestsTab: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(event.attendingCount) Going")
-                        .font(GatherFont.headline)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.gatherPrimaryText)
                         .accessibilityAddTraits(.isHeader)
                     if event.maybeCount > 0 {
                         Text("\(event.maybeCount) maybe")
@@ -965,7 +967,7 @@ struct StatusPill: View {
             .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
             .padding(.horizontal, Spacing.sm)
             .padding(.vertical, Spacing.xs)
-            .background(isSelected ? filter.color : Color.gatherSecondaryBackground)
+            .background(isSelected ? filter.color : Color.gatherElevated)
             .clipShape(Capsule())
         }
         .accessibilityLabel("\(filter.rawValue) filter, \(count) guests")
@@ -1002,7 +1004,7 @@ struct WaitlistPill: View {
             .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
             .padding(.horizontal, Spacing.sm)
             .padding(.vertical, Spacing.xs)
-            .background(isSelected ? Color.rsvpMaybeFallback : Color.gatherSecondaryBackground)
+            .background(isSelected ? Color.rsvpMaybeFallback : Color.gatherElevated)
             .clipShape(Capsule())
         }
         .accessibilityLabel("Waitlist filter, \(count) guests")

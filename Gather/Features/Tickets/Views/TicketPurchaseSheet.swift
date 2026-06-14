@@ -110,7 +110,7 @@ struct TicketPurchaseSheet: View {
                     .horizontalPadding()
                     .padding(.vertical)
                 }
-                .background(Color.gatherBackground)
+                .background(Color.gatherCanvas.ignoresSafeArea())
                 .scrollDismissesKeyboard(.interactively)
 
                 // Sticky bottom checkout bar
@@ -161,7 +161,8 @@ struct TicketPurchaseSheet: View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             if !isSingleTier {
                 Text("Select Tickets")
-                    .font(GatherFont.headline)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.gatherPrimaryText)
             }
 
             ForEach(sortedTiers) { tier in
@@ -213,7 +214,7 @@ struct TicketPurchaseSheet: View {
                         .textInputAutocapitalization(.characters)
                         .submitLabel(.done)
                         .padding(Spacing.sm)
-                        .background(Color.gatherSecondaryBackground)
+                        .background(Color.gatherElevated)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
                     Button {
@@ -291,7 +292,8 @@ struct TicketPurchaseSheet: View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             HStack {
                 Text("Your Info")
-                    .font(GatherFont.headline)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.gatherPrimaryText)
                 Spacer()
                 if let user = authManager.currentUser, guestName.isEmpty {
                     Button {
@@ -314,7 +316,7 @@ struct TicketPurchaseSheet: View {
                     .textContentType(.name)
                     .submitLabel(.done)
                     .padding(Spacing.sm)
-                    .background(Color.gatherTertiaryBackground)
+                    .background(Color.gatherElevated)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
 
                 TextField("Email", text: $guestEmail)
@@ -324,7 +326,7 @@ struct TicketPurchaseSheet: View {
                     .autocapitalization(.none)
                     .submitLabel(.done)
                     .padding(Spacing.sm)
-                    .background(Color.gatherTertiaryBackground)
+                    .background(Color.gatherElevated)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
             }
         }
@@ -337,7 +339,8 @@ struct TicketPurchaseSheet: View {
     private var orderSummarySection: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             Text("Order Summary")
-                .font(GatherFont.headline)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Color.gatherPrimaryText)
 
             // Line items
             ForEach(sortedTiers.filter { selectedTiers[$0.id] ?? 0 > 0 }) { tier in

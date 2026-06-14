@@ -47,7 +47,7 @@ struct FunctionsTab: View {
             // Header with Add button
             HStack {
                 Text("\(event.functions.count) Function\(event.functions.count == 1 ? "" : "s")")
-                    .font(GatherFont.headline)
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()

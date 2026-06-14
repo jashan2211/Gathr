@@ -33,7 +33,7 @@ struct ProfileView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
-                    // Profile Header Card
+                    // Editorial header — big avatar + name + handle
                     profileHeader
                         .bouncyAppear()
 
@@ -61,29 +61,22 @@ struct ProfileView: View {
                         // Demo mode banner
                         HStack(spacing: Spacing.xs) {
                             Image(systemName: "hammer.fill")
-                                .font(.caption2)
-                            Text("Demo Mode Active")
-                                .font(.caption2)
-                                .fontWeight(.bold)
+                                .font(.system(size: 11, weight: .bold))
+                            Text("DEMO MODE ACTIVE")
+                                .font(.system(size: 11, weight: .bold))
+                                .tracking(0.5)
                         }
-                        .foregroundStyle(Color.sunshineYellowText)
+                        .foregroundStyle(Color.sunshineYellow)
                         .padding(.horizontal, Spacing.sm)
-                        .padding(.vertical, Spacing.xxs)
-                        .background(Color.sunshineYellow.opacity(0.18))
-                        .clipShape(Capsule())
+                        .padding(.vertical, Spacing.xs)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.gatherElevated, in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Color.sunshineYellow.opacity(0.4), lineWidth: 1)
+                        )
 
                         devToolsSection
-                            .overlay(
-                                RoundedRectangle(cornerRadius: CornerRadius.lg)
-                                    .strokeBorder(
-                                        style: StrokeStyle(lineWidth: 1, dash: [5, 3])
-                                    )
-                                    .foregroundStyle(Color.sunshineYellow.opacity(0.5))
-                            )
-                            .background(
-                                RoundedRectangle(cornerRadius: CornerRadius.lg)
-                                    .fill(Color.sunshineYellow.opacity(0.04))
-                            )
                     }
 
                     // Version
@@ -92,10 +85,11 @@ struct ProfileView: View {
                     Spacer()
                         .frame(height: Layout.tabBarHeight + 20)
                 }
-                .horizontalPadding()
-                .padding(.vertical)
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.top, Spacing.sm)
             }
-            .navigationTitle("Profile")
+            .background(Color.gatherCanvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             .confirmationDialog("Sign Out", isPresented: $showSignOutConfirmation) {
                 Button("Sign Out", role: .destructive) {
                     authManager.signOut()
@@ -124,51 +118,62 @@ struct ProfileView: View {
     // MARK: - Profile Header
 
     private var profileHeader: some View {
-        HStack(spacing: Spacing.md) {
-            // Avatar with gradient ring
-            ZStack {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            // Tiny editorial eyebrow + Edit affordance
+            HStack {
+                Text("YOUR PROFILE")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(Color.gatherSecondaryText)
+
+                Spacer()
+
+                Button {
+                    HapticService.selection()
+                    showEditProfile = true
+                } label: {
+                    Text("Edit")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.accentPurpleFallback)
+                        .padding(.horizontal, Spacing.md)
+                        .padding(.vertical, Spacing.xs)
+                        .background(Color.gatherSurface, in: Capsule())
+                }
+                .accessibilityLabel("Edit profile")
+            }
+
+            HStack(spacing: Spacing.md) {
+                // Large avatar / initials with gradient ring
                 Circle()
                     .fill(LinearGradient.gatherAccentGradient)
-                    .frame(width: AvatarSize.lg, height: AvatarSize.lg)
+                    .frame(width: 72, height: 72)
                     .overlay {
                         Text(authManager.currentUser?.name.prefix(1).uppercased() ?? "?")
-                            .font(.title)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 30, weight: .heavy))
                             .foregroundStyle(.white)
                     }
                     .modifier(GradientRing(color: Color.accentPurpleFallback, lineWidth: 3))
-            }
 
-            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text(authManager.currentUser?.name ?? "User")
-                    .font(GatherFont.title3)
-                    .foregroundStyle(Color.gatherPrimaryText)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(authManager.currentUser?.name ?? "User")
+                        .font(.system(size: 28, weight: .heavy))
+                        .kerning(-0.5)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
 
-                if let email = authManager.currentUser?.email {
-                    Text(email)
-                        .font(GatherFont.caption)
-                        .foregroundStyle(Color.gatherSecondaryText)
+                    if let email = authManager.currentUser?.email {
+                        Text(email)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                 }
-            }
 
-            Spacer()
-
-            Button {
-                showEditProfile = true
-            } label: {
-                Text("Edit")
-                    .font(GatherFont.callout)
-                    .fontWeight(.medium)
-                    .foregroundStyle(Color.accentPurpleFallback)
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.xs)
-                    .background(Color.gatherTertiaryBackground)
-                    .clipShape(Capsule())
+                Spacer(minLength: 0)
             }
-            .accessibilityLabel("Edit profile")
         }
-        .padding(Spacing.md)
-        .surfaceCard()
     }
 
     // MARK: - Stats Row
@@ -200,43 +205,35 @@ struct ProfileView: View {
 
     private var myTicketsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            HStack(spacing: Spacing.xs) {
-                Image(systemName: "ticket.fill")
-                    .foregroundStyle(Color.accentPurpleFallback)
-                Text("My Tickets")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
-            }
+            ProfileSectionHeader("My Tickets")
 
             NavigationLink {
                 MyTicketsView()
             } label: {
                 HStack(spacing: Spacing.md) {
                     Image(systemName: "qrcode")
-                        .font(.title2)
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color.accentPurpleFallback)
-                        .frame(width: 44, height: 44)
-                        .background(Color.gatherTertiaryBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                        .frame(width: 40, height: 40)
+                        .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("View Purchased Tickets")
-                            .font(GatherFont.callout)
-                            .fontWeight(.medium)
+                            .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Color.gatherPrimaryText)
                         Text("Access QR codes and event details")
-                            .font(.caption2)
+                            .font(.system(size: 13))
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.caption)
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
                 .padding(Spacing.md)
-                .surfaceCard()
+                .surfaceCard(cornerRadius: CornerRadius.lg)
             }
         }
     }
@@ -245,26 +242,26 @@ struct ProfileView: View {
 
     private var preferencesSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("Preferences")
-                .font(GatherFont.headline)
-                .foregroundStyle(Color.gatherPrimaryText)
-                .accessibilityAddTraits(.isHeader)
+            ProfileSectionHeader("Preferences")
 
-            VStack(spacing: 1) {
+            VStack(spacing: 0) {
                 ProfileMenuItem(icon: "bell", title: "Notifications", color: Color.accentPurpleFallback) {
                     NotificationSettingsView()
                 }
+                ProfileRowDivider()
                 ProfileMenuItem(icon: "lock", title: "Privacy", color: Color.accentPinkFallback) {
                     PrivacySettingsView()
                 }
+                ProfileRowDivider()
                 ProfileMenuItem(icon: "calendar", title: "Calendar Sync", color: Color.neonBlue) {
                     CalendarSettingsView()
                 }
-                ProfileMenuItem(icon: "paintbrush", title: "Appearance", color: Color.sunshineYellowText) {
+                ProfileRowDivider()
+                ProfileMenuItem(icon: "paintbrush", title: "Appearance", color: Color.sunshineYellow) {
                     AppearanceSettingsView()
                 }
             }
-            .surfaceCard(cornerRadius: CornerRadius.md)
+            .surfaceCard(cornerRadius: CornerRadius.lg)
         }
     }
 
@@ -272,61 +269,58 @@ struct ProfileView: View {
 
     private var supportSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("Support")
-                .font(GatherFont.headline)
-                .foregroundStyle(Color.gatherPrimaryText)
-                .accessibilityAddTraits(.isHeader)
+            ProfileSectionHeader("Support")
 
-            VStack(spacing: 1) {
+            VStack(spacing: 0) {
                 ProfileMenuItem(icon: "questionmark.circle", title: "Help", color: Color.mintGreen) {
                     HelpCenterView()
                 }
+                ProfileRowDivider()
                 ProfileMenuLink(icon: "envelope", title: "Send Feedback", color: Color.accentPurpleFallback) {
                     if let url = URL(string: "mailto:\(AppConfig.contactEmail)?subject=Gather%20Feedback") {
                         UIApplication.shared.open(url)
                     }
                 }
+                ProfileRowDivider()
                 ProfileMenuItem(icon: "info.circle", title: "About Gather", color: Color.neonBlue) {
                     AboutGatherView()
                 }
             }
-            .surfaceCard(cornerRadius: CornerRadius.md)
+            .surfaceCard(cornerRadius: CornerRadius.lg)
         }
     }
 
     // MARK: - Account Section
 
     private var accountSection: some View {
-        VStack(spacing: Spacing.sm) {
-            Button {
-                showSignOutConfirmation = true
-            } label: {
-                HStack {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .foregroundStyle(Color.warmCoral)
-                    Text("Sign Out")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(Color.warmCoral)
-                    Spacer()
-                }
-                .padding(Spacing.md)
-                .surfaceCard()
-            }
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            ProfileSectionHeader("Account")
 
-            Button {
-                showDeleteConfirmation = true
-            } label: {
-                HStack {
-                    Image(systemName: "trash")
-                        .foregroundStyle(Color.gatherError)
-                    Text("Delete Account")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(Color.gatherError)
-                    Spacer()
+            VStack(spacing: 0) {
+                Button {
+                    HapticService.warning()
+                    showSignOutConfirmation = true
+                } label: {
+                    ProfileDestructiveRow(
+                        icon: "rectangle.portrait.and.arrow.right",
+                        title: "Sign Out"
+                    )
                 }
-                .padding(Spacing.md)
-                .surfaceCard()
+                .accessibilityLabel("Sign Out")
+
+                ProfileRowDivider()
+
+                Button {
+                    showDeleteConfirmation = true
+                } label: {
+                    ProfileDestructiveRow(
+                        icon: "trash",
+                        title: "Delete Account"
+                    )
+                }
+                .accessibilityLabel("Delete Account")
             }
+            .surfaceCard(cornerRadius: CornerRadius.lg)
         }
     }
 
@@ -335,12 +329,15 @@ struct ProfileView: View {
     private var devToolsSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack(spacing: Spacing.xs) {
-                Image(systemName: "wrench.and.screwdriver")
+                Image(systemName: "wrench.and.screwdriver.fill")
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Color.gatherSecondaryText)
-                Text("Developer Tools")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
+                Text("DEVELOPER TOOLS")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(Color.gatherSecondaryText)
                     .accessibilityAddTraits(.isHeader)
+                Spacer()
             }
 
             // Data stats
@@ -349,8 +346,8 @@ struct ProfileView: View {
                 DevToolStat(value: profileStats.totalGuests, label: "Guests", color: Color.accentPinkFallback)
                 DevToolStat(value: profileStats.publicCount, label: "Public", color: Color.mintGreen)
             }
-            .padding(Spacing.sm)
-            .surfaceCard()
+            .padding(Spacing.md)
+            .surfaceCard(cornerRadius: CornerRadius.lg)
 
             if isLoadingData {
                 HStack {
@@ -401,19 +398,17 @@ struct ProfileView: View {
             Button {
                 resetDemoData()
             } label: {
-                HStack {
-                    Image(systemName: "trash")
-                        .foregroundStyle(Color.gatherError)
-                    Text("Reset All Data")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(Color.gatherError)
-                    Spacer()
-                }
-                .padding(Spacing.md)
-                .surfaceCard()
+                ProfileDestructiveRow(icon: "trash", title: "Reset All Data")
+                    .surfaceCard(cornerRadius: CornerRadius.lg)
             }
             .disabled(isLoadingData)
         }
+        .padding(Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: CornerRadius.xl, style: .continuous)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5, 3]))
+                .foregroundStyle(Color.sunshineYellow.opacity(0.4))
+        )
     }
 
     // MARK: - Version Badge
@@ -428,9 +423,10 @@ struct ProfileView: View {
     private var versionBadge: some View {
         HStack {
             Spacer()
-            Text("Gather v\(appVersion) (\(buildNumber))")
-                .font(.caption2)
-                .foregroundStyle(Color.gatherSecondaryText)
+            Text("GATHER v\(appVersion) (\(buildNumber))")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Color.gatherTertiaryText)
             Spacer()
         }
         .padding(.top, Spacing.sm)
@@ -499,26 +495,88 @@ struct ProfileStatCard: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
             Image(systemName: icon)
-                .font(.title3)
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(color)
+                .frame(width: 32, height: 32)
+                .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
 
             Text("\(value)")
-                .font(GatherFont.title2)
-                .fontWeight(.bold)
-                .foregroundStyle(Color.gatherPrimaryText)
+                .font(.system(size: 24, weight: .heavy))
+                .foregroundStyle(color)
                 .contentTransition(.numericText())
 
-            Text(label)
-                .font(.caption2)
+            Text(label.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
                 .foregroundStyle(Color.gatherSecondaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.md)
-        .surfaceCard()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Spacing.md)
+        .surfaceCard(cornerRadius: CornerRadius.lg)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(value) \(label)")
+    }
+}
+
+// MARK: - Profile Section Header
+
+/// A small editorial ALL-CAPS section label for the dark poster identity.
+struct ProfileSectionHeader: View {
+    let title: String
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.system(size: 11, weight: .bold))
+            .tracking(0.5)
+            .foregroundStyle(Color.gatherSecondaryText)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+// MARK: - Profile Row Divider
+
+/// A hairline divider for grouped rows on a solid surface card, inset past the
+/// leading icon tile so it reads as a list separator rather than a full rule.
+struct ProfileRowDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.06))
+            .frame(height: 1)
+            .padding(.leading, Spacing.md + 36 + Spacing.md)
+    }
+}
+
+// MARK: - Profile Destructive Row
+
+/// A destructive grouped-card row (Sign Out / Delete Account / Reset) with a
+/// red icon tile and red title in `rsvpNoFallback`.
+struct ProfileDestructiveRow: View {
+    let icon: String
+    let title: String
+
+    var body: some View {
+        HStack(spacing: Spacing.md) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.rsvpNoFallback)
+                .frame(width: 36, height: 36)
+                .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.rsvpNoFallback)
+
+            Spacer()
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, Spacing.sm + 2)
+        .contentShape(Rectangle())
     }
 }
 
@@ -543,24 +601,24 @@ struct ProfileMenuItem: View {
         } label: {
             HStack(spacing: Spacing.md) {
                 Image(systemName: icon)
-                    .font(.body)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(color)
-                    .frame(width: 30, height: 30)
-                    .background(Color.gatherTertiaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .frame(width: 36, height: 36)
+                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 Text(title)
-                    .font(GatherFont.callout)
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .padding(.horizontal, Spacing.md)
-            .padding(.vertical, Spacing.sm)
+            .padding(.vertical, Spacing.sm + 2)
+            .contentShape(Rectangle())
         }
     }
 }
@@ -579,24 +637,24 @@ struct ProfileMenuLink: View {
         } label: {
             HStack(spacing: Spacing.md) {
                 Image(systemName: icon)
-                    .font(.body)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(color)
-                    .frame(width: 30, height: 30)
-                    .background(Color.gatherTertiaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .frame(width: 36, height: 36)
+                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 Text(title)
-                    .font(GatherFont.callout)
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()
 
                 Image(systemName: "arrow.up.right")
-                    .font(.caption)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .padding(.horizontal, Spacing.md)
-            .padding(.vertical, Spacing.sm)
+            .padding(.vertical, Spacing.sm + 2)
+            .contentShape(Rectangle())
         }
     }
 }
@@ -1102,12 +1160,12 @@ struct DevToolStat: View {
     var body: some View {
         VStack(spacing: 2) {
             Text("\(value)")
-                .font(GatherFont.title2)
-                .fontWeight(.bold)
+                .font(.system(size: 22, weight: .heavy))
                 .foregroundStyle(color)
                 .contentTransition(.numericText())
-            Text(label)
-                .font(.caption2)
+            Text(label.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
                 .foregroundStyle(Color.gatherSecondaryText)
         }
         .frame(maxWidth: .infinity)
@@ -1130,33 +1188,30 @@ struct DataLoadButton: View {
         Button {
             action()
         } label: {
-            HStack(spacing: Spacing.sm) {
+            HStack(spacing: Spacing.md) {
                 Image(systemName: icon)
-                    .font(.body)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(color)
-                    .frame(width: 32, height: 32)
-                    .background(Color.gatherTertiaryBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                    .frame(width: 36, height: 36)
+                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(GatherFont.callout)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.gatherPrimaryText)
                     Text(subtitle)
-                        .font(.caption2)
+                        .font(.system(size: 13))
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .padding(Spacing.sm)
-            .surfaceCard()
+            .surfaceCard(cornerRadius: CornerRadius.lg)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Load \(title) data. \(subtitle)")
             .accessibilityAddTraits(.isButton)
@@ -1200,8 +1255,9 @@ struct EditProfileSheet: View {
 
                     TextField("Your name", text: $displayName)
                         .font(GatherFont.body)
-                        .padding(Spacing.sm)
-                        .background(Color.gatherSecondaryBackground)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .padding(Spacing.md)
+                        .background(Color.gatherElevated)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
                 .horizontalPadding()
@@ -1215,9 +1271,9 @@ struct EditProfileSheet: View {
                         Text(email)
                             .font(GatherFont.body)
                             .foregroundStyle(Color.gatherSecondaryText)
-                            .padding(Spacing.sm)
+                            .padding(Spacing.md)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.gatherSecondaryBackground.opacity(0.5))
+                            .background(Color.gatherSurface)
                             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
                     .horizontalPadding()
@@ -1248,6 +1304,8 @@ struct EditProfileSheet: View {
                 .horizontalPadding()
                 .padding(.bottom)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.gatherCanvas.ignoresSafeArea())
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1297,11 +1355,11 @@ struct ReauthenticateSheet: View {
                 VStack(spacing: Spacing.md) {
                     ZStack {
                         Circle()
-                            .fill(Color.gatherError.opacity(0.1))
+                            .fill(Color.gatherElevated)
                             .frame(width: 80, height: 80)
                         Image(systemName: "exclamationmark.shield.fill")
                             .font(.system(size: 36))
-                            .foregroundStyle(Color.gatherError)
+                            .foregroundStyle(Color.rsvpNoFallback)
                     }
 
                     Text("Confirm Your Identity")
@@ -1333,11 +1391,12 @@ struct ReauthenticateSheet: View {
 
                         SecureField("Your password", text: $password)
                             .font(GatherFont.body)
+                            .foregroundStyle(Color.gatherPrimaryText)
                             .textContentType(.password)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
-                            .padding(Spacing.sm)
-                            .background(Color.gatherSecondaryBackground)
+                            .padding(Spacing.md)
+                            .background(Color.gatherElevated)
                             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                     }
 
@@ -1353,11 +1412,11 @@ struct ReauthenticateSheet: View {
                         }
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 52)
+                        .frame(height: Layout.buttonHeight)
                         .background(
                             password.isEmpty
-                                ? Color.gatherSecondaryText
-                                : Color.gatherError
+                                ? Color.gatherElevated
+                                : Color.rsvpNoFallback
                         )
                         .clipShape(Capsule())
                     }
@@ -1367,13 +1426,15 @@ struct ReauthenticateSheet: View {
                 if let error = errorMessage {
                     Text(error)
                         .font(GatherFont.caption)
-                        .foregroundStyle(Color.gatherError)
+                        .foregroundStyle(Color.rsvpNoFallback)
                         .multilineTextAlignment(.center)
                 }
 
                 Spacer()
             }
             .horizontalPadding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.gatherCanvas.ignoresSafeArea())
             .navigationTitle("Delete Account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

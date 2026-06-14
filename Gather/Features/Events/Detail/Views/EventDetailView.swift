@@ -100,6 +100,7 @@ struct EventDetailView: View {
                 .padding(.top, 24)
         }
         .ignoresSafeArea(edges: .top)
+        .background(Color.gatherCanvas.ignoresSafeArea())
         .task {
             // Host opens the event — pull any RSVPs guests submitted from the
             // web invite page or their own app and merge them into the list.
@@ -254,43 +255,39 @@ struct EventDetailView: View {
                 endPoint: .bottom
             )
 
-            // Event title overlay
-            VStack(alignment: .leading, spacing: Spacing.xs) {
+            // Event title overlay — bold poster hierarchy
+            VStack(alignment: .leading, spacing: 8) {
                 Spacer()
 
-                // Date pill
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar")
-                        .font(.caption2)
-                    Text(heroFormattedDate)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, Spacing.sm)
-                .padding(.vertical, Spacing.xxs)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
+                Text(event.category.displayName.uppercased())
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.black.opacity(0.28), in: Capsule())
 
                 Text(event.title)
-                    .font(GatherFont.title)
-                    .kerning(-0.4)
+                    .font(.system(size: 30, weight: .heavy))
+                    .kerning(-0.5)
                     .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
-                    .lineLimit(2)
+                    .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
+                    .lineLimit(3)
 
                 HStack(spacing: Spacing.md) {
+                    Label(heroFormattedDate, systemImage: "calendar")
                     if let location = event.location {
                         Label(location.shortLocation ?? location.name, systemImage: "mappin")
                             .lineLimit(1)
                     }
-
-                    if event.attendingCount > 0 {
-                        Label("\(event.attendingCount) going", systemImage: "person.2.fill")
-                    }
                 }
-                .font(GatherFont.caption)
-                .foregroundStyle(.white.opacity(0.9))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.92))
+
+                if event.attendingCount > 0 {
+                    Label("\(event.attendingCount) going", systemImage: "person.2.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
             }
             .padding(Spacing.lg)
             .padding(.bottom, Spacing.lg)

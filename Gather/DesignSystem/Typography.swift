@@ -107,6 +107,29 @@ extension View {
     }
 }
 
+// MARK: - Editorial Scale (2026 poster identity)
+
+/// A small, coherent set of font styles for the redesign. Use these instead of
+/// scattering ad-hoc `.font(.system(size:))` calls so the type scale stays
+/// consistent. They set font + tracking only (not color), so callers keep
+/// control of `foregroundStyle`.
+extension View {
+    /// 34pt heavy — top-level screen titles (Home, Explore, You).
+    func gatherScreenTitle() -> some View { self.font(.system(size: 34, weight: .heavy)).kerning(-1) }
+    /// 26pt heavy — poster / hero titles over imagery.
+    func gatherPosterTitle() -> some View { self.font(.system(size: 26, weight: .heavy)).kerning(-0.5) }
+    /// 20pt bold — prominent card titles.
+    func gatherCardTitle() -> some View { self.font(.system(size: 20, weight: .bold)) }
+    /// 17pt bold — section headers within a screen.
+    func gatherSectionHeader() -> some View { self.font(.system(size: 17, weight: .bold)) }
+    /// 15pt semibold — list-row titles.
+    func gatherRowTitle() -> some View { self.font(.system(size: 15, weight: .semibold)) }
+    /// 13pt medium — meta lines, subtitles, timestamps.
+    func gatherMetaText() -> some View { self.font(.system(size: 13, weight: .medium)) }
+    /// 11pt heavy, tracked — eyebrows and ALL-CAPS labels.
+    func gatherEyebrow() -> some View { self.font(.system(size: 11, weight: .heavy)).tracking(0.5) }
+}
+
 // MARK: - Accessibility Helpers
 
 extension Font {

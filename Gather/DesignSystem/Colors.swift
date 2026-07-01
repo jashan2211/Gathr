@@ -25,14 +25,28 @@ extension Color {
 
     // MARK: - Semantic Colors
 
-    /// Primary text color
-    static let gatherPrimaryText = Color(.label)
+    /// Primary text color. Explicit near-white on the dark canvas (system
+    /// `.label` is pure white, a touch harsh) and near-black in light.
+    static let gatherPrimaryText = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(white: 0.97, alpha: 1)
+            : UIColor(white: 0.09, alpha: 1)
+    })
 
-    /// Secondary text color
-    static let gatherSecondaryText = Color(.secondaryLabel)
+    /// Secondary text — brightened for the near-black canvas, where system
+    /// `.secondaryLabel` (~0.6α) reads too dim to pass contrast.
+    static let gatherSecondaryText = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(white: 0.72, alpha: 1)
+            : UIColor(white: 0.38, alpha: 1)
+    })
 
-    /// Tertiary text color
-    static let gatherTertiaryText = Color(.tertiaryLabel)
+    /// Tertiary text — hints and metadata.
+    static let gatherTertiaryText = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(white: 0.52, alpha: 1)
+            : UIColor(white: 0.56, alpha: 1)
+    })
 
     /// Primary background
     static let gatherBackground = Color(.systemBackground)
@@ -53,21 +67,21 @@ extension Color {
     static let gatherCanvas = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.043, green: 0.043, blue: 0.071, alpha: 1)
-            : UIColor.systemBackground
+            : UIColor(red: 0.957, green: 0.957, blue: 0.969, alpha: 1)  // soft off-white
     })
 
-    /// Card surface that sits on the canvas (#16161F dark / grouped light).
+    /// Card surface that sits on the canvas (#16161F dark / white light).
     static let gatherSurface = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.086, green: 0.086, blue: 0.122, alpha: 1)
-            : UIColor.secondarySystemBackground
+            : UIColor(white: 1, alpha: 1)
     })
 
-    /// Elevated surface for nested fills (#1F1F2B dark / white light).
+    /// Elevated surface for nested fills (#1F1F2B dark / light-gray light).
     static let gatherElevated = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.122, green: 0.122, blue: 0.169, alpha: 1)
-            : UIColor(white: 1, alpha: 1)
+            : UIColor(red: 0.933, green: 0.933, blue: 0.949, alpha: 1)
     })
 
     // MARK: - Fallback Colors (if asset catalog not set up)

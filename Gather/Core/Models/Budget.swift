@@ -212,13 +212,18 @@ struct ExpensePayment: Codable, Equatable, Hashable, Identifiable {
     var date: Date
     var method: String?
     var note: String?
+    /// Who made this payment — enables multiple people paying different amounts
+    /// toward one expense (e.g. Designer $3000: Simar $2000, Jashan $1000).
+    /// Optional so older stored payments decode as `nil` (no migration needed).
+    var paidByName: String?
 
-    init(id: UUID = UUID(), amount: Double, date: Date = Date(), method: String? = nil, note: String? = nil) {
+    init(id: UUID = UUID(), amount: Double, date: Date = Date(), method: String? = nil, note: String? = nil, paidByName: String? = nil) {
         self.id = id
         self.amount = amount
         self.date = date
         self.method = method
         self.note = note
+        self.paidByName = paidByName
     }
 }
 
@@ -281,15 +286,24 @@ extension Expense {
 
     /// Records an installment and keeps the legacy `isPaid`/`paidDate`
     /// fields in sync so older UI and Firestore sync stay correct.
-    func recordPayment(amount paymentAmount: Double, date: Date = Date(), method: String? = nil, note: String? = nil) {
+    func recordPayment(amount paymentAmount: Double, date: Date = Date(), method: String? = nil, note: String? = nil, paidByName: String? = nil) {
         var list = payments ?? []
         // Migrate a legacy full payment into the list before appending.
         if list.isEmpty && isPaid {
-            list.append(ExpensePayment(amount: amount, date: paidDate ?? createdAt))
+            list.append(ExpensePayment(amount: amount, date: paidDate ?? createdAt, paidByName: self.paidByName))
         }
-        list.append(ExpensePayment(amount: paymentAmount, date: date, method: method, note: note))
+        list.append(ExpensePayment(amount: paymentAmount, date: date, method: method, note: note, paidByName: paidByName))
         payments = list
         syncLegacyPaidFlags()
+    }
+
+    /// Amount paid grouped by payer, largest first — powers the "who paid what"
+    /// contributions breakdown on an expense.
+    var contributionsByPayer: [(name: String, amount: Double)] {
+        let named = recordedPayments.filter { !($0.paidByName ?? "").isEmpty }
+        let grouped = Dictionary(grouping: named) { $0.paidByName ?? "" }
+            .map { (name: $0.key, amount: $0.value.reduce(0) { $0 + $1.amount }) }
+        return grouped.sorted { $0.amount > $1.amount }
     }
 
     func removePayment(id paymentId: UUID) {

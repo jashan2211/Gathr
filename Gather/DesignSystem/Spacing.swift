@@ -51,11 +51,15 @@ enum CornerRadius {
     /// 16pt - Cards, containers
     static let lg: CGFloat = 16
 
-    /// 20pt - Glass cards (friendlier, Partiful-style)
+    /// 20pt - Standard cards, list rows (the default card radius)
     static let card: CGFloat = 20
 
     /// 24pt - Large cards, sheets
     static let xl: CGFloat = 24
+
+    /// 28pt - Hero / poster cards (the biggest rounding). Consolidates the
+    /// ad-hoc 26/28 values that had crept into poster views.
+    static let featured: CGFloat = 28
 
     /// 32pt - Full rounding for pills
     static let full: CGFloat = 32

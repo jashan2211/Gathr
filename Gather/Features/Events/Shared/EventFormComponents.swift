@@ -317,7 +317,9 @@ struct EventFeaturesSection: View {
                 .foregroundStyle(Color.gatherSecondaryText)
 
             LazyVGrid(columns: columns, spacing: Spacing.xs) {
-                ForEach(EventFeature.allCases, id: \.self) { feature in
+                // Only show features that are actually available — coming-soon
+                // ones are hidden entirely rather than greyed out.
+                ForEach(EventFeature.allCases.filter { $0.isAvailable }, id: \.self) { feature in
                     EventFeatureGridCard(
                         feature: feature,
                         isEnabled: enabledFeatures.contains(feature)
@@ -704,13 +706,6 @@ struct EventSettingsSection: View {
                     .tracking(0.5)
 
                 HStack(spacing: Spacing.xs) {
-                    EventFormPrivacyCard(
-                        option: .publicEvent,
-                        icon: "globe",
-                        isSelected: privacy == .publicEvent,
-                        isAvailable: false
-                    ) { }
-
                     EventFormPrivacyCard(
                         option: .unlisted,
                         icon: "link",

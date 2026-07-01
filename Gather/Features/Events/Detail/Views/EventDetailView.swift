@@ -67,7 +67,6 @@ struct EventDetailView: View {
     @State private var showEditSheet = false
     @State private var showAddGuest = false
     @State private var showBudget = false
-    @State private var showSeatingChart = false
     @State private var showTicketPurchase = false
     @State private var showWaitlist = false
     @State private var isLoadingRSVPs = false
@@ -128,10 +127,7 @@ struct EventDetailView: View {
                         Button {
                             showEditSheet = true
                         } label: {
-                            Image(systemName: "pencil.circle.fill")
-                                .font(.title3)
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(Color.accentPurpleFallback)
+                            heroControlIcon("pencil")
                         }
                         .accessibilityLabel("Edit Event")
 
@@ -148,12 +144,6 @@ struct EventDetailView: View {
                                 Label("Add Guest", systemImage: "person.badge.plus")
                             }
 
-                            Button {
-                                showSeatingChart = true
-                            } label: {
-                                Label("Seating Chart", systemImage: "tablecells")
-                            }
-
                             Divider()
 
                             Button {
@@ -162,7 +152,7 @@ struct EventDetailView: View {
                                 Label("Duplicate Event", systemImage: "plus.square.on.square")
                             }
                         } label: {
-                            Image(systemName: "ellipsis.circle")
+                            heroControlIcon("ellipsis")
                         }
                         .accessibilityLabel("More options")
                     }
@@ -176,7 +166,7 @@ struct EventDetailView: View {
                             Label("Share Event", systemImage: "square.and.arrow.up")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        heroControlIcon("ellipsis")
                     }
                     .accessibilityLabel("More options")
                 }
@@ -228,11 +218,6 @@ struct EventDetailView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showSeatingChart) {
-            SeatingChartView(event: event)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
         .alert("Event Duplicated", isPresented: $showDuplicateConfirmation) {
             Button("Done", role: .cancel) { dismiss() }
         } message: {
@@ -241,6 +226,18 @@ struct EventDetailView: View {
     }
 
     // MARK: - Hero Section
+
+    /// A circular control chip for the hero toolbar. A semi-opaque dark disc
+    /// with a white glyph reads clearly over any category gradient (light or
+    /// dark) — unlike the old tinted icon that vanished on purple/pink heroes.
+    private func heroControlIcon(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 34, height: 34)
+            .background(Color.black.opacity(0.38), in: Circle())
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+    }
 
     private var heroSection: some View {
         ZStack(alignment: .bottomLeading) {

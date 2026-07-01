@@ -140,7 +140,7 @@ struct OverviewTab: View {
             // Header
             HStack {
                 Text("Guest Summary")
-                    .font(.system(size: 17, weight: .bold))
+                    .gatherSectionHeader()
                     .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()
@@ -338,7 +338,7 @@ struct OverviewTab: View {
     private func descriptionSection(_ description: String) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text("About")
-                .font(.system(size: 17, weight: .bold))
+                .gatherSectionHeader()
                 .foregroundStyle(Color.gatherPrimaryText)
 
             Text(description)
@@ -353,7 +353,7 @@ struct OverviewTab: View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
                 Text("Functions")
-                    .font(.system(size: 17, weight: .bold))
+                    .gatherSectionHeader()
                     .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()
@@ -383,7 +383,7 @@ struct OverviewTab: View {
     private var whosGoingSection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text("Who's Going")
-                .font(.system(size: 17, weight: .bold))
+                .gatherSectionHeader()
                 .foregroundStyle(Color.gatherPrimaryText)
 
             let attendingGuests = event.guests.filter { $0.status == .attending }
@@ -420,7 +420,7 @@ struct OverviewTab: View {
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text("Recent RSVPs")
-                .font(.system(size: 17, weight: .bold))
+                .gatherSectionHeader()
                 .foregroundStyle(Color.gatherPrimaryText)
 
             let recentGuests = event.guests

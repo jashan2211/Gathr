@@ -17,6 +17,7 @@ struct ExpenseDetailSheet: View {
     @State private var paymentDate = Date()
     @State private var paymentMethod: PaymentMethodOption?
     @State private var paymentNote = ""
+    @State private var paymentPaidBy = ""
 
     private enum PaymentMethodOption: String, CaseIterable, Identifiable {
         case cash = "Cash"
@@ -103,6 +104,41 @@ struct ExpenseDetailSheet: View {
                     }
                 }
                 .listRowBackground(Color.gatherSecondaryBackground)
+
+                // Contributions (multi-payer summary). Rows reconcile to the
+                // full amount: named payers + any unattributed paid + unpaid.
+                if !expense.contributionsByPayer.isEmpty {
+                    Section("Contributions") {
+                        ForEach(expense.contributionsByPayer, id: \.name) { contribution in
+                            ExpenseContributionRow(name: contribution.name, amount: contribution.amount)
+                        }
+
+                        // Money that's been paid but not attributed to a person.
+                        let namedPaid = expense.contributionsByPayer.reduce(0) { $0 + $1.amount }
+                        let unattributed = expense.amountPaid - namedPaid
+                        if unattributed >= 0.005 {
+                            ExpenseContributionRow(name: "Unattributed", amount: unattributed)
+                        }
+
+                        if expense.amountRemaining > 0 {
+                            HStack(spacing: Spacing.sm) {
+                                Image(systemName: "circle.dashed")
+                                    .font(.callout)
+                                    .foregroundStyle(Color.gatherTertiaryText)
+                                Text("Unpaid")
+                                    .gatherRowTitle()
+                                    .foregroundStyle(Color.gatherSecondaryText)
+                                Spacer()
+                                Text(expense.amountRemaining.asCurrency)
+                                    .gatherRowTitle()
+                                    .foregroundStyle(Color.rsvpMaybeFallback)
+                            }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Unpaid, \(expense.amountRemaining.asCurrency) remaining")
+                        }
+                    }
+                    .listRowBackground(Color.gatherSecondaryBackground)
+                }
 
                 // Editable details
                 Section("Details") {
@@ -388,6 +424,14 @@ struct ExpenseDetailSheet: View {
                 }
             }
 
+            fieldLabel("Paid By (Optional)")
+            TextField("e.g. Simar, You", text: $paymentPaidBy)
+                .padding(Spacing.sm)
+                .background(Color.gatherElevated)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+                .submitLabel(.done)
+                .accessibilityLabel("Paid by")
+
             fieldLabel("Note (Optional)")
             TextField("e.g. Deposit", text: $paymentNote)
                 .padding(Spacing.sm)
@@ -502,6 +546,7 @@ struct ExpenseDetailSheet: View {
         paymentDate = Date()
         paymentMethod = nil
         paymentNote = ""
+        paymentPaidBy = expense.paidByName ?? ""
         HapticService.buttonTap()
         withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             showRecordPayment = true
@@ -512,11 +557,13 @@ struct ExpenseDetailSheet: View {
         // Clamp so an entry larger than the outstanding balance can't overpay.
         let amount = clampedPaymentAmount
         guard amount > 0 else { return }
+        let trimmedPaidBy = paymentPaidBy.trimmingCharacters(in: .whitespacesAndNewlines)
         expense.recordPayment(
             amount: amount,
             date: paymentDate,
             method: paymentMethod?.rawValue,
-            note: paymentNote.isEmpty ? nil : paymentNote
+            note: paymentNote.isEmpty ? nil : paymentNote,
+            paidByName: trimmedPaidBy.isEmpty ? nil : trimmedPaidBy
         )
         category?.reconcileSpent()
         modelContext.safeSave()
@@ -595,10 +642,23 @@ struct ExpensePaymentHistoryRow: View {
                 .foregroundStyle(Color.rsvpYesFallback)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(payment.amount.asCurrency)
-                    .font(GatherFont.callout)
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.gatherPrimaryText)
+                HStack(spacing: Spacing.xs) {
+                    Text(payment.amount.asCurrency)
+                        .font(GatherFont.callout)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.gatherPrimaryText)
+
+                    if let payer = payment.paidByName, !payer.isEmpty {
+                        Text(payer)
+                            .gatherEyebrow()
+                            .textCase(nil)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.accentPurpleFallback.opacity(0.14))
+                            .clipShape(Capsule())
+                    }
+                }
 
                 HStack(spacing: 4) {
                     Text(payment.date.formatted(date: .abbreviated, time: .omitted))
@@ -622,7 +682,40 @@ struct ExpensePaymentHistoryRow: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Payment of \(payment.amount.asCurrency) on \(payment.date.formatted(date: .abbreviated, time: .omitted))\(payment.method.map { ", via \($0)" } ?? "")\(payment.note.map { ". \($0)" } ?? "")")
+        .accessibilityLabel("Payment of \(payment.amount.asCurrency)\(payment.paidByName.map { $0.isEmpty ? "" : " by \($0)" } ?? "") on \(payment.date.formatted(date: .abbreviated, time: .omitted))\(payment.method.map { ", via \($0)" } ?? "")\(payment.note.map { ". \($0)" } ?? "")")
         .accessibilityHint("Swipe up or down for delete action")
+    }
+}
+
+// MARK: - Contribution Row (multi-payer summary)
+
+struct ExpenseContributionRow: View {
+    let name: String
+    let amount: Double
+
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            Circle()
+                .fill(Color.accentPurpleFallback.opacity(0.9))
+                .frame(width: 30, height: 30)
+                .overlay {
+                    Text(name.isEmpty ? "?" : name.prefix(1).uppercased())
+                        .font(GatherFont.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
+
+            Text(name.isEmpty ? "Unknown" : name)
+                .gatherRowTitle()
+                .foregroundStyle(Color.gatherPrimaryText)
+
+            Spacer()
+
+            Text(amount.asCurrency)
+                .gatherRowTitle()
+                .foregroundStyle(Color.gatherPrimaryText)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name.isEmpty ? "Unknown" : name) paid \(amount.asCurrency)")
     }
 }

@@ -44,7 +44,7 @@ struct BudgetView: View {
                 .horizontalPadding()
             }
             .background(Color.gatherBackground)
-            .navigationTitle("Budget")
+            .navigationTitle("Finance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if budget != nil {

@@ -127,12 +127,11 @@ struct ExploreView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(headerSubtitle)
-                    .font(.system(size: 15, weight: .medium))
+                    .gatherMetaText()
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 Text("Explore")
-                    .font(.system(size: 34, weight: .heavy))
-                    .kerning(-1)
+                    .gatherScreenTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
                     .accessibilityAddTraits(.isHeader)
             }
@@ -410,8 +409,7 @@ struct ExploreView: View {
 
                     // Event info
                     Text(event.title)
-                        .font(.system(size: 26, weight: .heavy))
-                        .kerning(-0.5)
+                        .gatherPosterTitle()
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -474,7 +472,7 @@ struct ExploreView: View {
                         .foregroundStyle(Color.warmCoral)
                         .font(.system(size: 15, weight: .bold))
                     Text("Happening Soon")
-                        .font(.system(size: 17, weight: .bold))
+                        .gatherSectionHeader()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .accessibilityAddTraits(.isHeader)
                 }
@@ -482,7 +480,7 @@ struct ExploreView: View {
                 Spacer()
 
                 Text("\(events.count) events")
-                    .font(.system(size: 12, weight: .medium))
+                    .gatherMetaText()
                     .foregroundStyle(Color.gatherSecondaryText)
             }
             .horizontalPadding()
@@ -514,14 +512,14 @@ struct ExploreView: View {
             // Section header
             HStack(alignment: .firstTextBaseline) {
                 Text(sectionTitle)
-                    .font(.system(size: 17, weight: .bold))
+                    .gatherSectionHeader()
                     .foregroundStyle(Color.gatherPrimaryText)
                     .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
                 Text("\(events.count) events")
-                    .font(.system(size: 12, weight: .medium))
+                    .gatherMetaText()
                     .foregroundStyle(Color.gatherSecondaryText)
             }
 

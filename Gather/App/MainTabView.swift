@@ -174,9 +174,15 @@ struct MainTabView: View {
         .padding(.top, Spacing.sm)
         .padding(.bottom, Spacing.xs)
         .background(
-            // Glass floating bar hovering over scrolling content.
+            // Glass floating bar hovering over scrolling content, capped with a
+            // hairline top edge so it reads as a distinct surface on dark.
             Rectangle()
                 .fill(.ultraThinMaterial)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 1)
+                }
                 .shadow(color: .black.opacity(0.25), radius: 15, y: -6)
                 .ignoresSafeArea(edges: .bottom)
         )
@@ -216,10 +222,13 @@ struct MainTabView: View {
                 ZStack {
                     Circle()
                         .fill(LinearGradient.gatherAccentGradient)
-                        .frame(width: 50, height: 50)
-                        .shadow(color: Color.accentPurpleFallback.opacity(0.5), radius: 10, y: 4)
+                        .frame(width: 54, height: 54)
+                        .overlay(
+                            Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                        )
+                        .shadow(color: Color.accentPurpleFallback.opacity(0.5), radius: 12, y: 5)
                     Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .semibold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundStyle(.white)
                 }
                 .offset(y: -14)

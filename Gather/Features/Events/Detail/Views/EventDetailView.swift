@@ -70,9 +70,12 @@ struct EventDetailView: View {
     @State private var showSeatingChart = false
     @State private var showTicketPurchase = false
     @State private var showWaitlist = false
+    @State private var isLoadingRSVPs = false
+    @State private var showDuplicateConfirmation = false
     @Namespace private var tabNamespace
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @Query private var eventTickets: [Ticket]
 
     init(event: Event) {
@@ -105,7 +108,9 @@ struct EventDetailView: View {
             // Host opens the event — pull any RSVPs guests submitted from the
             // web invite page or their own app and merge them into the list.
             if isHost {
+                isLoadingRSVPs = true
                 await FirestoreService.shared.fetchRSVPs(for: event, into: modelContext)
+                isLoadingRSVPs = false
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -147,6 +152,14 @@ struct EventDetailView: View {
                                 showSeatingChart = true
                             } label: {
                                 Label("Seating Chart", systemImage: "tablecells")
+                            }
+
+                            Divider()
+
+                            Button {
+                                duplicateEvent()
+                            } label: {
+                                Label("Duplicate Event", systemImage: "plus.square.on.square")
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -220,6 +233,11 @@ struct EventDetailView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .alert("Event Duplicated", isPresented: $showDuplicateConfirmation) {
+            Button("Done", role: .cancel) { dismiss() }
+        } message: {
+            Text("A draft copy was added to your events. Open it from your events list to edit and publish.")
+        }
     }
 
     // MARK: - Hero Section
@@ -260,15 +278,14 @@ struct EventDetailView: View {
                 Spacer()
 
                 Text(event.category.displayName.uppercased())
-                    .font(.system(size: 11, weight: .heavy))
+                    .gatherEyebrow()
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(.black.opacity(0.28), in: Capsule())
 
                 Text(event.title)
-                    .font(.system(size: 30, weight: .heavy))
-                    .kerning(-0.5)
+                    .gatherPosterTitle()
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
                     .lineLimit(3)
@@ -280,12 +297,12 @@ struct EventDetailView: View {
                             .lineLimit(1)
                     }
                 }
-                .font(.system(size: 13, weight: .medium))
+                .gatherMetaText()
                 .foregroundStyle(.white.opacity(0.92))
 
                 if event.attendingCount > 0 {
                     Label("\(event.attendingCount) going", systemImage: "person.2.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                        .gatherMetaText()
                         .foregroundStyle(.white)
                 }
             }
@@ -322,13 +339,37 @@ struct EventDetailView: View {
                     Spacer()
                 }
             }
+
+            // Subtle RSVP sync indicator — top center while the host's list
+            // pulls fresh responses from the cloud.
+            if isLoadingRSVPs {
+                VStack {
+                    HStack(spacing: Spacing.xs) {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .tint(.white)
+                        Text("Syncing RSVPs")
+                            .gatherMetaText()
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xs)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.top, 52)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .accessibilityLabel("Syncing RSVPs")
+
+                    Spacer()
+                }
+            }
         }
+        .animation(.easeInOut(duration: 0.25), value: isLoadingRSVPs)
         .frame(height: Layout.heroHeightDetail)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
-                bottomLeadingRadius: CornerRadius.card,
-                bottomTrailingRadius: CornerRadius.card,
+                bottomLeadingRadius: CornerRadius.featured,
+                bottomTrailingRadius: CornerRadius.featured,
                 topTrailingRadius: 0
             )
         )
@@ -481,6 +522,47 @@ struct EventDetailView: View {
         modelContext.safeSave()
         FirestoreService.shared.pushEvent(event)
         HapticService.success()
+    }
+
+    /// Creates a fresh draft copy of this event owned by the current user.
+    /// Copies the core details and the functions (name/date/location only —
+    /// no invites), but deliberately drops guests, RSVPs, budget, and tickets
+    /// so the host starts from a clean slate.
+    private func duplicateEvent() {
+        let copy = Event(
+            title: "Copy of \(event.title)",
+            eventDescription: event.eventDescription,
+            startDate: event.startDate,
+            endDate: event.endDate,
+            location: event.location,
+            capacity: event.capacity,
+            privacy: event.privacy,
+            guestListVisibility: event.guestListVisibility,
+            category: event.category,
+            enabledFeatures: event.enabledFeatures,
+            hostId: authManager.currentUser?.id,
+            isDraft: true
+        )
+
+        // Copy functions without their invites (name/date/location/etc.).
+        copy.functions = event.functions.map { source in
+            EventFunction(
+                name: source.name,
+                functionDescription: source.functionDescription,
+                date: source.date,
+                endTime: source.endTime,
+                location: source.location,
+                dressCode: source.dressCode,
+                customDressCode: source.customDressCode,
+                sortOrder: source.sortOrder,
+                eventId: copy.id
+            )
+        }
+
+        modelContext.insert(copy)
+        modelContext.safeSave()
+        HapticService.success()
+        showDuplicateConfirmation = true
     }
 
     private var shouldShowRSVPButton: Bool {

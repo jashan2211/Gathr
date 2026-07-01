@@ -131,11 +131,10 @@ struct CreateEventView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("STEP \(step.rawValue + 1) OF \(CreateStep.allCases.count)")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.5)
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
                 Text(step.title)
-                    .font(.system(size: 22, weight: .heavy))
+                    .gatherPosterTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
             }
         }
@@ -154,7 +153,7 @@ struct CreateEventView: View {
         case .typeAndTitle:
             // Minimum-ask step: template shortcut, category, title.
             // Cover photo + description live in a collapsed optional section.
-            VStack(spacing: Spacing.lg) {
+            VStack(spacing: Spacing.md) {
                 if showTemplates && template == nil {
                     templateSection
                 }
@@ -170,11 +169,11 @@ struct CreateEventView: View {
                 coverDetailsSection
             }
             .padding(.horizontal, Layout.horizontalPadding)
-            .padding(.top, Spacing.lg)
-            .padding(.bottom, 100)
+            .padding(.top, Spacing.md)
+            .padding(.bottom, Spacing.xl)
 
         case .whenAndWhere:
-            VStack(spacing: Spacing.lg) {
+            VStack(spacing: Spacing.md) {
                 EventDateTimeSection(
                     startDate: $startDate,
                     endDate: $endDate,
@@ -194,16 +193,16 @@ struct CreateEventView: View {
                 )
             }
             .padding(.horizontal, Layout.horizontalPadding)
-            .padding(.top, Spacing.lg)
-            .padding(.bottom, 100)
+            .padding(.top, Spacing.md)
+            .padding(.bottom, Spacing.xl)
 
         case .features:
             VStack(spacing: Spacing.lg) {
                 EventFeaturesSection(enabledFeatures: $enabledFeatures)
             }
             .padding(.horizontal, Layout.horizontalPadding)
-            .padding(.top, Spacing.lg)
-            .padding(.bottom, 100)
+            .padding(.top, Spacing.md)
+            .padding(.bottom, Spacing.xl)
 
         case .settings:
             VStack(spacing: Spacing.lg) {
@@ -215,8 +214,8 @@ struct CreateEventView: View {
                 )
             }
             .padding(.horizontal, Layout.horizontalPadding)
-            .padding(.top, Spacing.lg)
-            .padding(.bottom, 100)
+            .padding(.top, Spacing.md)
+            .padding(.bottom, Spacing.xl)
         }
     }
 

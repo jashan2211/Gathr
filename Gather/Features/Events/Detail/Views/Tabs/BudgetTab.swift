@@ -1,6 +1,13 @@
 import SwiftUI
 import SwiftData
 
+/// One person's total contribution across every expense in the event.
+private struct PayerTotal: Identifiable {
+    let name: String
+    let paid: Double
+    var id: String { name }
+}
+
 struct BudgetTab: View {
     @Bindable var event: Event
     @State private var filterFunction: EventFunction?
@@ -48,6 +55,9 @@ struct BudgetTab: View {
 
                     // Who Paid What
                     whoPaidWhat(budget, expenses: expenses)
+
+                    // Settle Up (even split among payers)
+                    settleUp(budget, expenses: expenses)
 
                     // Quick Actions
                     quickActions(budget)
@@ -227,7 +237,7 @@ struct BudgetTab: View {
 
         return VStack(spacing: Spacing.md) {
             HStack {
-                Text("Budget Overview")
+                Text("Finance")
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.gatherPrimaryText)
                     // A11Y-007: Section header trait
@@ -304,7 +314,7 @@ struct BudgetTab: View {
         .surfaceCard()
         // A11Y-009: Financial data grouping for budget summary
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Budget overview. Total budget \(budget.totalBudget.asCurrency). Spent \(spentAmount.asCurrency). \(percentUsed) percent used. \(remainingAmount.asCurrency) remaining.")
+        .accessibilityLabel("Finance overview. Total budget \(budget.totalBudget.asCurrency). Spent \(spentAmount.asCurrency). \(percentUsed) percent used. \(remainingAmount.asCurrency) remaining.")
         .bouncyAppear()
     }
 
@@ -385,83 +395,192 @@ struct BudgetTab: View {
         .accessibilityLabel("\(label). \(amount.asCurrency)")
     }
 
+    // MARK: - Payer Aggregation
+
+    /// Per-person total actually paid across every expense in the event.
+    ///
+    /// Walks each expense's individual payments and attributes each to its
+    /// `paidByName`. When an expense has recorded payments but a payment carries
+    /// no payer, that money falls back to the expense-level `paidByName`
+    /// (legacy single-payer). Expenses with no recorded payments but a legacy
+    /// `isPaid`/`paidByName` are attributed as a full payment to that person.
+    private func payerTotals(_ expenses: [Expense]) -> [PayerTotal] {
+        var totals: [String: Double] = [:]
+
+        for expense in expenses {
+            let payments = expense.recordedPayments
+            if payments.isEmpty { continue }
+
+            for payment in payments {
+                let payer = (payment.paidByName?.isEmpty == false ? payment.paidByName : nil)
+                    ?? (expense.paidByName?.isEmpty == false ? expense.paidByName : nil)
+                guard let name = payer, !name.isEmpty else { continue }
+                totals[name, default: 0] += payment.amount
+            }
+        }
+
+        return totals
+            .map { PayerTotal(name: $0.key, paid: $0.value) }
+            .sorted { $0.paid > $1.paid }
+    }
+
     // MARK: - Who Paid What
 
     @ViewBuilder
     private func whoPaidWhat(_ budget: Budget, expenses: [Expense]) -> some View {
-        let paidExpenses = expenses.filter { $0.paidByName != nil && !$0.paidByName!.isEmpty }
-        let grouped = Dictionary(grouping: paidExpenses) { $0.paidByName! }
+        let payers = payerTotals(expenses)
 
-        if !grouped.isEmpty {
+        if !payers.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack {
                     Image(systemName: "person.2.circle.fill")
                         .foregroundStyle(Color.accentPurpleFallback)
                     Text("Who Paid What")
-                        .font(GatherFont.headline)
+                        .gatherSectionHeader()
                         .foregroundStyle(Color.gatherPrimaryText)
                         // A11Y-007: Section header trait
                         .accessibilityAddTraits(.isHeader)
                     Spacer()
                 }
 
-                ForEach(grouped.keys.sorted(), id: \.self) { person in
-                    let personExpenses = grouped[person] ?? []
-                    let totalCommitted = personExpenses.reduce(0) { $0 + $1.amount }
-                    let totalPaid = personExpenses.reduce(0) { $0 + min($1.amountPaid, $1.amount) }
-                    let paidCount = personExpenses.filter { $0.paymentState == .paid }.count
-                    let allPaid = paidCount == personExpenses.count
-
+                ForEach(payers) { payer in
                     HStack(spacing: Spacing.sm) {
                         Circle()
-                            .fill(avatarColor(for: person))
+                            .fill(avatarColor(for: payer.name))
                             .frame(width: 36, height: 36)
                             .overlay {
-                                Text(person.isEmpty ? "?" : person.prefix(1).uppercased())
+                                Text(payer.name.isEmpty ? "?" : payer.name.prefix(1).uppercased())
                                     .font(GatherFont.caption)
                                     .fontWeight(.bold)
                                     .foregroundStyle(.white)
                             }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(person.isEmpty ? "Unknown" : person)
-                                .font(GatherFont.callout)
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.gatherPrimaryText)
-
-                            Text("\(personExpenses.count) expense\(personExpenses.count == 1 ? "" : "s")")
-                                .font(.caption2)
-                                .foregroundStyle(Color.gatherSecondaryText)
-                        }
+                        Text(payer.name.isEmpty ? "Unknown" : payer.name)
+                            .gatherRowTitle()
+                            .foregroundStyle(Color.gatherPrimaryText)
 
                         Spacer()
 
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(totalPaid.asCurrency)
-                                .font(GatherFont.callout)
-                                .fontWeight(.bold)
-                                .foregroundStyle(Color.gatherPrimaryText)
-
-                            if allPaid {
-                                Label("All paid", systemImage: "checkmark.circle.fill")
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.rsvpYesFallback)
-                            } else {
-                                Text("of \(totalCommitted.asCurrency)")
-                                    .font(.caption2)
-                                    .foregroundStyle(Color.rsvpMaybeFallback)
-                            }
-                        }
+                        Text(payer.paid.asCurrency)
+                            .gatherRowTitle()
+                            .foregroundStyle(Color.gatherPrimaryText)
                     }
                     .padding(Spacing.sm)
                     .surfaceCard()
                     // A11Y: Who-paid-what row grouping
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(person.isEmpty ? "Unknown" : person). Paid \(totalPaid.asCurrency)\(allPaid ? ", all paid" : " of \(totalCommitted.asCurrency)").")
+                    .accessibilityLabel("\(payer.name.isEmpty ? "Unknown" : payer.name) paid \(payer.paid.asCurrency).")
                 }
             }
             .bouncyAppear(delay: 0.08)
         }
+    }
+
+    // MARK: - Settle Up
+
+    @ViewBuilder
+    private func settleUp(_ budget: Budget, expenses: [Expense]) -> some View {
+        let payers = payerTotals(expenses)
+
+        // Only meaningful with 2+ distinct payers to split between.
+        if payers.count >= 2 {
+            let totalPaid = payers.reduce(0) { $0 + $1.paid }
+            let fairShare = totalPaid / Double(payers.count)
+            let sortedByBalance = payers
+                .map { (name: $0.name, balance: $0.paid - fairShare) }
+                .sorted { $0.balance > $1.balance }
+
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                HStack {
+                    Image(systemName: "arrow.left.arrow.right.circle.fill")
+                        .foregroundStyle(Color.accentPurpleFallback)
+                    Text("Settle Up")
+                        .gatherSectionHeader()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                }
+
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Total paid")
+                            .gatherMetaText()
+                            .foregroundStyle(Color.gatherSecondaryText)
+                        Text(totalPaid.asCurrency)
+                            .gatherCardTitle()
+                            .foregroundStyle(Color.gatherPrimaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Even split \u{00B7} \(payers.count) people")
+                            .gatherMetaText()
+                            .foregroundStyle(Color.gatherSecondaryText)
+                        Text(fairShare.asCurrency)
+                            .gatherCardTitle()
+                            .foregroundStyle(Color.gatherPrimaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Total paid \(totalPaid.asCurrency). Even split \(fairShare.asCurrency) each across \(payers.count) people.")
+
+                Divider()
+                    .overlay(Color.gatherElevated)
+
+                ForEach(sortedByBalance, id: \.name) { entry in
+                    settleUpRow(name: entry.name, balance: entry.balance)
+                }
+            }
+            .padding()
+            .surfaceCard()
+            .bouncyAppear(delay: 0.1)
+        }
+    }
+
+    private func settleUpRow(name: String, balance: Double) -> some View {
+        // Round to the cent so tiny Double residue doesn't read as "owes $0".
+        let cents = (balance * 100).rounded() / 100
+        let displayName = name.isEmpty ? "Unknown" : name
+
+        let statusText: String
+        let statusColor: Color
+        if cents > 0.005 {
+            statusText = "is owed \(cents.asCurrency)"
+            statusColor = Color.rsvpYesFallback
+        } else if cents < -0.005 {
+            statusText = "owes \(abs(cents).asCurrency)"
+            statusColor = Color.rsvpNoFallback
+        } else {
+            statusText = "settled up"
+            statusColor = Color.gatherSecondaryText
+        }
+
+        return HStack(spacing: Spacing.sm) {
+            Circle()
+                .fill(avatarColor(for: name))
+                .frame(width: 30, height: 30)
+                .overlay {
+                    Text(name.isEmpty ? "?" : name.prefix(1).uppercased())
+                        .font(GatherFont.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
+
+            Text(displayName)
+                .gatherRowTitle()
+                .foregroundStyle(Color.gatherPrimaryText)
+
+            Spacer()
+
+            Text(statusText)
+                .gatherMetaText()
+                .foregroundStyle(statusColor)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(displayName) \(statusText)")
     }
 
     // MARK: - Quick Actions

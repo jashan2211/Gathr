@@ -74,6 +74,9 @@ struct SendInvitesSheet: View {
     @State private var showQRSheet = false
     @State private var showQRShareSheet = false
 
+    // "Copy all links" confirmation (guest section)
+    @State private var allLinksCopied = false
+
     // "Needs contact info" tap-through
     @State private var contactFixGuest: Guest?
 
@@ -321,6 +324,32 @@ struct SendInvitesSheet: View {
         }
     }
 
+    /// Copy every selected guest's personalized RSVP link as a newline block —
+    /// "Name: link" per line. Unlike the send-path copy channel, this does not
+    /// mark anyone as invited; it's a lightweight grab-and-paste helper.
+    private func copyAllPersonalizedLinks() {
+        let guests = selectedGuests.sorted { $0.name < $1.name }
+        guard !guests.isEmpty else { return }
+
+        let block = guests.compactMap { guest -> String? in
+            guard let link = inviteService.generateInviteLink(guest: guest, event: event) else { return nil }
+            return "\(guest.name): \(link.absoluteString)"
+        }.joined(separator: "\n")
+
+        guard !block.isEmpty else { return }
+        UIPasteboard.general.string = block
+        HapticService.success()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            allLinksCopied = true
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                allLinksCopied = false
+            }
+        }
+    }
+
     private var qrCodeSheet: some View {
         VStack(spacing: Spacing.lg) {
             Text(event.title)
@@ -375,8 +404,13 @@ struct SendInvitesSheet: View {
                 title: "All Guests",
                 count: event.guests.count,
                 icon: "person.2.fill",
-                isSelected: selectedGuestIds.count == event.guests.count,
-                action: { selectedGuestIds = Set(event.guests.map { $0.id }) }
+                isSelected: allGuestsSelected,
+                action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        selectedGuestIds = Set(event.guests.map { $0.id })
+                    }
+                    HapticService.buttonTap()
+                }
             )
 
             InviteQuickActionPill(
@@ -384,17 +418,28 @@ struct SendInvitesSheet: View {
                 count: guestsNotSent.count,
                 icon: "bell.badge",
                 isSelected: selectedGuestIds == Set(guestsNotSent.map { $0.id }) && !guestsNotSent.isEmpty,
-                action: { selectedGuestIds = Set(guestsNotSent.map { $0.id }) }
+                action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        selectedGuestIds = Set(guestsNotSent.map { $0.id })
+                    }
+                    HapticService.buttonTap()
+                }
             )
 
             InviteQuickActionPill(
                 title: "Custom",
                 count: selectedGuestIds.count,
                 icon: "hand.tap",
-                isSelected: !selectedGuestIds.isEmpty && selectedGuestIds.count != event.guests.count && selectedGuestIds != Set(guestsNotSent.map { $0.id }),
+                isSelected: !selectedGuestIds.isEmpty && !allGuestsSelected && selectedGuestIds != Set(guestsNotSent.map { $0.id }),
                 action: {}
             )
         }
+    }
+
+    /// Every guest is selected (and there's at least one) — drives the
+    /// "All Guests" pill's selected state without lighting up on an empty list.
+    private var allGuestsSelected: Bool {
+        !event.guests.isEmpty && selectedGuestIds.count == event.guests.count
     }
 
     // MARK: - Smart Routing Plan
@@ -497,6 +542,27 @@ struct SendInvitesSheet: View {
                 }
 
                 Spacer()
+
+                // Copy every selected guest's personalized link as one block
+                Button {
+                    copyAllPersonalizedLinks()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: allLinksCopied ? "checkmark" : "doc.on.doc")
+                            .font(.caption2)
+                        Text(allLinksCopied ? "Copied!" : "Copy all links")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundStyle(allLinksCopied ? Color.rsvpYesFallback : Color.accentPurpleFallback)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xxs)
+                    .background((allLinksCopied ? Color.rsvpYesFallback : Color.accentPurpleFallback).opacity(0.1))
+                    .clipShape(Capsule())
+                }
+                .disabled(selectedGuestIds.isEmpty)
+                .opacity(selectedGuestIds.isEmpty ? 0.4 : 1)
+                .accessibilityLabel(allLinksCopied ? "All links copied" : "Copy all personalized RSVP links")
 
                 Text("\(selectedGuestIds.count) selected")
                     .font(.caption2)

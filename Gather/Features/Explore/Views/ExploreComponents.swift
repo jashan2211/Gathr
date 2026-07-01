@@ -62,7 +62,7 @@ struct HappeningSoonCard: View {
             // Info
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(event.title)
-                    .font(.system(size: 15, weight: .bold))
+                    .gatherRowTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(1)
 
@@ -187,7 +187,7 @@ struct ExploreGridCard: View {
             // Content
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.title)
-                    .font(.system(size: 15, weight: .bold))
+                    .gatherRowTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(2)
                     .frame(minHeight: 36, alignment: .topLeading)

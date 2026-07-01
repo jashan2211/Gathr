@@ -298,21 +298,27 @@ struct EventBasicsSection: View {
 
 // MARK: - Event Features Section
 
-/// Feature toggle chips in a wrapping LazyVGrid layout
+/// Feature toggle cards in a condensed 2-column grid so every feature fits on
+/// one screen without scrolling at the default text size.
 struct EventFeaturesSection: View {
     @Binding var enabledFeatures: Set<EventFeature>
+
+    private let columns = [
+        GridItem(.flexible(), spacing: Spacing.xs),
+        GridItem(.flexible(), spacing: Spacing.xs)
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             EventFormSectionHeader(title: "Features", icon: "slider.horizontal.3")
 
             Text("Choose what this event needs — you can change this anytime")
-                .font(.system(size: 13))
+                .gatherMetaText()
                 .foregroundStyle(Color.gatherSecondaryText)
 
-            VStack(spacing: Spacing.xs) {
+            LazyVGrid(columns: columns, spacing: Spacing.xs) {
                 ForEach(EventFeature.allCases, id: \.self) { feature in
-                    EventFeatureCard(
+                    EventFeatureGridCard(
                         feature: feature,
                         isEnabled: enabledFeatures.contains(feature)
                     ) {
@@ -533,13 +539,18 @@ struct EventLocationSection: View {
     // MARK: In-person layout
 
     /// Map-first: one prominent search action, the five address fields hidden
-    /// behind a disclosure most guests never need to open.
+    /// behind a collapsed disclosure most guests never need to open.
     @ViewBuilder
     private var inPersonContent: some View {
         if hasLocation {
             selectedLocationCard
         } else {
             searchButton
+
+            // Collapsed "Enter address manually" disclosure — hidden by default
+            // so the fresh step stays short. This is the main height offender
+            // when expanded, so it never auto-opens.
+            manualEntryDisclosure
         }
 
         if showManualEntry {
@@ -553,17 +564,37 @@ struct EventLocationSection: View {
                 EventFormStyledTextField(placeholder: "Country", text: $locationCountry, icon: "globe")
             }
             .transition(.opacity.combined(with: .move(edge: .top)))
-        } else if !hasLocation {
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showManualEntry = true }
-            } label: {
-                Text("Enter address manually")
-                    .font(GatherFont.footnote)
-                    .fontWeight(.medium)
-                    .foregroundStyle(Color.gatherSecondaryText)
-            }
-            .padding(.top, Spacing.xxs)
         }
+    }
+
+    /// Disclosure toggle for the manual address fields. Only shown before a
+    /// place is picked; once a location exists the fields live under the card's
+    /// "Edit details" menu action instead.
+    private var manualEntryDisclosure: some View {
+        Button {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showManualEntry.toggle() }
+            HapticService.buttonTap()
+        } label: {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.accentPurpleFallback)
+                Text("Enter address manually")
+                    .gatherMetaText()
+                    .foregroundStyle(Color.gatherSecondaryText)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .rotationEffect(.degrees(showManualEntry ? 180 : 0))
+            }
+            .frame(minHeight: Layout.minTouchTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Enter address manually")
+        .accessibilityValue(showManualEntry ? "Expanded" : "Collapsed")
+        .accessibilityHint("Double tap to \(showManualEntry ? "collapse" : "expand")")
     }
 
     private var searchButton: some View {
@@ -907,6 +938,91 @@ struct EventFeatureCard: View {
             }
             .padding(Spacing.sm)
             .frame(minHeight: Layout.minTouchTarget)
+            .background(
+                RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                    .fill(active ? Color.accentPurpleFallback.opacity(0.14) : Color.gatherElevated)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                    .strokeBorder(
+                        active ? Color.accentPurpleFallback.opacity(0.7) : Color.gatherSeparator.opacity(0.6),
+                        lineWidth: active ? 1.5 : 1
+                    )
+            )
+            .opacity(available ? 1 : 0.55)
+        }
+        .buttonStyle(.plain)
+        .disabled(!available)
+        .scaleEffect(active ? 1.01 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: active)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(feature.displayName). \(feature.description)\(available ? "" : ". Coming soon")")
+        .accessibilityValue(available ? (isEnabled ? "On" : "Off") : "")
+        .accessibilityAddTraits(active ? [.isSelected] : [])
+        .accessibilityHint(available ? "Double tap to toggle" : "")
+    }
+}
+
+// MARK: Event Feature Grid Card (condensed 2-column)
+
+/// A compact, square-ish feature card for the 2-column features grid. Same
+/// toggle semantics as `EventFeatureCard` but with a smaller icon tile and a
+/// one-line description so all features fit on screen without scrolling.
+struct EventFeatureGridCard: View {
+    let feature: EventFeature
+    let isEnabled: Bool
+    let onToggle: () -> Void
+
+    private var available: Bool { feature.isAvailable }
+    private var active: Bool { isEnabled && available }
+
+    var body: some View {
+        Button(action: onToggle) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: feature.icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(active ? .white : Color.gatherSecondaryText)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            active
+                                ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                                : AnyShapeStyle(Color.gatherSurface)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+
+                    Spacer(minLength: 0)
+
+                    if available {
+                        Image(systemName: active ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 16))
+                            .foregroundStyle(active ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.4))
+                    } else {
+                        Text("SOON")
+                            .font(.system(size: 9, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.gatherSecondaryText.opacity(0.55))
+                            .clipShape(Capsule())
+                    }
+                }
+
+                Text(feature.displayName)
+                    .gatherRowTitle()
+                    .foregroundStyle(available ? Color.gatherPrimaryText : Color.gatherSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                Text(feature.description)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(Spacing.sm)
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
             .background(
                 RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
                     .fill(active ? Color.accentPurpleFallback.opacity(0.14) : Color.gatherElevated)

@@ -16,6 +16,9 @@ struct GuestsTab: View {
     @State private var guestPendingRemoval: Guest?
     @State private var guestPendingPromotion: Guest?
     @State private var dietaryExpanded = false
+    // Bulk-invite action row (host)
+    @State private var showShareLinkSheet = false
+    @State private var shareLinkCopied = false
     @AppStorage("guestSortOrder") private var guestSortOrderRaw = GuestSortOrder.name.rawValue
     @EnvironmentObject var authManager: AuthManager
 
@@ -35,6 +38,21 @@ struct GuestsTab: View {
     /// this works for events with or without functions.
     private var sentGuestIds: Set<UUID> {
         Set(event.guests.filter { $0.inviteWasSent }.map { $0.id })
+    }
+
+    /// Guests who haven't been sent an invite yet — the natural target for
+    /// "Invite everyone". Falls back to all guests if everyone's been invited.
+    private var guestsNotYetInvited: [Guest] {
+        event.guests.filter { $0.inviteSentAt == nil }
+    }
+
+    /// A single link anyone can RSVP through, for pasting into a group chat.
+    private var shareLinkURLString: String {
+        InviteService.shared.generateShareableLink(event: event)?.absoluteString ?? ""
+    }
+
+    private var shareLinkItems: [Any] {
+        ["You're invited to \(event.title)!\nRSVP: \(shareLinkURLString)"]
     }
 
     /// Lookup dictionary: [functionId: [guestId: FunctionInvite]]
@@ -130,6 +148,11 @@ struct GuestsTab: View {
                     // Headcount summary strip
                     headcountSummaryStrip
 
+                    // Prominent bulk-invite actions
+                    if !event.guests.isEmpty {
+                        bulkInviteRow
+                    }
+
                     // Dietary needs summary
                     dietarySummaryCard
                 }
@@ -171,6 +194,9 @@ struct GuestsTab: View {
             GuestDetailSheet(guest: guest, event: event)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showShareLinkSheet) {
+            ShareActivitySheet(items: shareLinkItems)
         }
         .alert(
             "Remove Guest",
@@ -309,6 +335,98 @@ struct GuestsTab: View {
             label += " \(event.attendingCount) of \(capacity) capacity."
         }
         return label
+    }
+
+    // MARK: - Bulk Invite Row
+
+    /// Two prominent, effortless bulk actions for the host: invite every
+    /// not-yet-invited guest in one tap, or grab a single shareable RSVP link
+    /// to drop into a group chat.
+    private var bulkInviteRow: some View {
+        HStack(spacing: Spacing.sm) {
+            // Invite everyone → SendInvitesSheet preselected with not-yet-invited
+            Button {
+                inviteEveryone()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.caption)
+                    Text("Invite everyone")
+                        .gatherRowTitle()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: Layout.minTouchTarget)
+                .background(LinearGradient.gatherAccentGradient)
+                .clipShape(Capsule())
+            }
+            .accessibilityLabel(
+                inviteEveryoneCount > 0
+                    ? "Invite everyone, \(inviteEveryoneCount) not yet invited"
+                    : "Invite everyone"
+            )
+
+            // Share event link → copy + system share sheet
+            Button {
+                shareEventLink()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: shareLinkCopied ? "checkmark" : "link")
+                        .font(.caption)
+                    Text(shareLinkCopied ? "Copied!" : "Share link")
+                        .gatherRowTitle()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .foregroundStyle(shareLinkCopied ? Color.rsvpYesFallback : Color.gatherPrimaryText)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: Layout.minTouchTarget)
+                .background(Color.gatherElevated)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.gatherSeparator.opacity(0.6), lineWidth: 1)
+                )
+            }
+            .accessibilityLabel(shareLinkCopied ? "Event link copied" : "Share event link")
+            .accessibilityHint("Copies a link anyone can RSVP through and opens the share sheet")
+        }
+        .horizontalPadding()
+        .padding(.bottom, Spacing.sm)
+    }
+
+    /// How many guests "Invite everyone" would target — used for the label.
+    private var inviteEveryoneCount: Int {
+        guestsNotYetInvited.isEmpty ? event.guests.count : guestsNotYetInvited.count
+    }
+
+    /// Preselect the not-yet-invited guests (or all, if everyone's been invited)
+    /// and open the send sheet. Uses the shared selection set so the sheet's
+    /// preselection picks it up, without flipping into multi-select mode.
+    private func inviteEveryone() {
+        let targets = guestsNotYetInvited.isEmpty ? event.guests : guestsNotYetInvited
+        selectedGuests = Set(targets.map { $0.id })
+        HapticService.buttonTap()
+        showSendInvites = true
+    }
+
+    /// Copy the shareable RSVP link, flash a "Copied!" confirmation, and present
+    /// the system share sheet so the host can paste it anywhere.
+    private func shareEventLink() {
+        UIPasteboard.general.string = shareLinkURLString
+        HapticService.success()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            shareLinkCopied = true
+        }
+        showShareLinkSheet = true
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                shareLinkCopied = false
+            }
+        }
     }
 
     // MARK: - Dietary Needs Summary

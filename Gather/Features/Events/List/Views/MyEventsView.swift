@@ -507,8 +507,7 @@ struct CalendarView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.lg) {
                     Text("Calendar")
-                        .font(.system(size: 34, weight: .heavy))
-                        .kerning(-1)
+                        .gatherScreenTitle()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .padding(.top, Spacing.xs)
 
@@ -517,14 +516,21 @@ struct CalendarView: View {
                     } else {
                         ForEach(grouped, id: \.key) { group in
                             VStack(alignment: .leading, spacing: Spacing.sm) {
-                                Text(group.title.uppercased())
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Color.gatherSecondaryText)
-                                ForEach(group.events, id: \.id) { event in
-                                    Button { selectedEvent = event } label: {
-                                        HomeUpcomingRow(event: event, hosting: event.hostId == myId)
+                                HStack(spacing: Spacing.xs) {
+                                    Text(group.title.uppercased())
+                                        .gatherEyebrow()
+                                        .foregroundStyle(Color.accentPurpleFallback)
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.06))
+                                        .frame(height: 1)
+                                }
+                                VStack(spacing: Spacing.xs) {
+                                    ForEach(group.events, id: \.id) { event in
+                                        Button { selectedEvent = event } label: {
+                                            HomeUpcomingRow(event: event, hosting: event.hostId == myId)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                         }
@@ -541,19 +547,11 @@ struct CalendarView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.sm) {
-            Image(systemName: "calendar")
-                .font(.system(size: 40))
-                .foregroundStyle(Color.gatherSecondaryText)
-            Text("No events yet")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Color.gatherPrimaryText)
-            Text("Events you host or join show up here, organized by month.")
-                .font(.subheadline)
-                .foregroundStyle(Color.gatherSecondaryText)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.xxl)
+        GatherEmptyState(
+            icon: "calendar",
+            title: "No events yet",
+            message: "Events you host or join show up here, organized by month."
+        )
+        .padding(.top, Spacing.xl)
     }
 }

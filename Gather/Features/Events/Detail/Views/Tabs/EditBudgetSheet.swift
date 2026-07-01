@@ -76,7 +76,7 @@ struct EditBudgetSheet: View {
                     )
                 )
             }
-            .navigationTitle("Edit Budget")
+            .navigationTitle("Edit Finance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

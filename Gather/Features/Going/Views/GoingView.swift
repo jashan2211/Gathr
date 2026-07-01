@@ -530,7 +530,7 @@ struct HomeView: View {
 
                     if let nextEvent {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
-                            sectionLabel(isHost(nextEvent) ? "You're hosting next" : "Your next event")
+                            sectionEyebrow(isHost(nextEvent) ? "Up next · you're hosting" : "Up next")
                             HomePosterHero(event: nextEvent, hosting: isHost(nextEvent)) {
                                 selectedEvent = nextEvent
                             }
@@ -553,11 +553,13 @@ struct HomeView: View {
                     if !laterEvents.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
                             sectionLabel("Upcoming")
-                            ForEach(laterEvents, id: \.id) { event in
-                                Button { selectedEvent = event } label: {
-                                    HomeUpcomingRow(event: event, hosting: isHost(event))
+                            VStack(spacing: Spacing.xs) {
+                                ForEach(laterEvents, id: \.id) { event in
+                                    Button { selectedEvent = event } label: {
+                                        HomeUpcomingRow(event: event, hosting: isHost(event))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -565,11 +567,13 @@ struct HomeView: View {
                     if !drafts.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
                             sectionLabel("Drafts")
-                            ForEach(drafts, id: \.id) { event in
-                                Button { selectedEvent = event } label: {
-                                    HomeUpcomingRow(event: event, hosting: true, isDraft: true)
+                            VStack(spacing: Spacing.xs) {
+                                ForEach(drafts, id: \.id) { event in
+                                    Button { selectedEvent = event } label: {
+                                        HomeUpcomingRow(event: event, hosting: true, isDraft: true)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -583,6 +587,10 @@ struct HomeView: View {
                 .padding(.bottom, 120)
             }
             .background(Color.gatherCanvas.ignoresSafeArea())
+            .refreshable {
+                await FirestoreService.shared.mergeRemoteEvents(into: modelContext)
+                await FirestoreService.shared.fetchInvitedEvents(into: modelContext)
+            }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(item: $selectedEvent) { EventDetailView(event: $0) }
             .sheet(isPresented: $showCreate) {
@@ -593,13 +601,12 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(greeting)
-                    .font(.subheadline)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(greeting.uppercased())
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
                 Text("Home")
-                    .font(.system(size: 34, weight: .heavy))
-                    .kerning(-1)
+                    .gatherScreenTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
             }
             Spacer()
@@ -607,47 +614,45 @@ struct HomeView: View {
         }
     }
 
+    /// A small ALL-CAPS eyebrow that sits above a hero — lighter than a section
+    /// header, for editorial rhythm.
+    private func sectionEyebrow(_ text: String) -> some View {
+        Text(text.uppercased())
+            .gatherEyebrow()
+            .foregroundStyle(Color.accentPurpleFallback)
+    }
+
     private func sectionLabel(_ text: String, badge: Int? = nil) -> some View {
         HStack(spacing: Spacing.xs) {
             Text(text)
-                .font(.system(size: 17, weight: .bold))
+                .gatherSectionHeader()
                 .foregroundStyle(Color.gatherPrimaryText)
             if let badge, badge > 0 {
                 Text("\(badge)")
-                    .font(.system(size: 12, weight: .bold))
+                    .gatherEyebrow()
                     .foregroundStyle(.white)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
                     .background(Color.accentPinkFallback, in: Capsule())
             }
             Spacer()
+            // A hairline that trails the label to anchor the section band.
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 1)
+                .frame(maxWidth: 120)
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: Spacing.md) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 44))
-                .foregroundStyle(LinearGradient.gatherAccentGradient)
-            Text("Nothing on the calendar")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Color.gatherPrimaryText)
-            Text("Create your first event, or explore what's happening near you.")
-                .font(.subheadline)
-                .foregroundStyle(Color.gatherSecondaryText)
-                .multilineTextAlignment(.center)
-            Button { showCreate = true } label: {
-                Text("Create event")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 14)
-                    .background(LinearGradient.gatherAccentGradient, in: Capsule())
-            }
-            .padding(.top, Spacing.xs)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.xxl)
+        GatherEmptyState(
+            icon: "sparkles",
+            title: "Nothing on the calendar",
+            message: "Create your first event, or explore what's happening near you.",
+            actionTitle: "Create event",
+            action: { showCreate = true }
+        )
+        .padding(.top, Spacing.xl)
     }
 
     private var greeting: String {
@@ -700,14 +705,14 @@ struct HomePosterHero: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         Text(countdown)
-                            .font(.system(size: 11, weight: .heavy))
+                            .gatherEyebrow()
                             .foregroundStyle(.white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(.white.opacity(0.22), in: Capsule())
                         Spacer()
                         Text(hosting ? "HOSTING" : "GOING")
-                            .font(.system(size: 10, weight: .heavy))
+                            .gatherEyebrow()
                             .foregroundStyle(.white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -715,8 +720,7 @@ struct HomePosterHero: View {
                     }
                     Spacer()
                     Text(event.title)
-                        .font(.system(size: 26, weight: .heavy))
-                        .kerning(-0.5)
+                        .gatherPosterTitle()
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -730,12 +734,12 @@ struct HomePosterHero: View {
                             Text(loc).lineLimit(1)
                         }
                     }
-                    .font(.system(size: 13, weight: .medium))
+                    .gatherMetaText()
                     .foregroundStyle(.white.opacity(0.92))
                     .padding(.bottom, 12)
                     HStack {
                         Text("\(attendingCount) going")
-                            .font(.system(size: 13, weight: .semibold))
+                            .gatherMetaText()
                             .foregroundStyle(.white)
                         Spacer()
                         Image(systemName: "arrow.up.right")
@@ -749,7 +753,8 @@ struct HomePosterHero: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .frame(height: 240)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.featured, style: .continuous))
+            .shadow(color: .black.opacity(0.28), radius: 18, y: 10)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
@@ -795,11 +800,11 @@ struct HomeUpcomingRow: View {
                     .foregroundStyle(Color.gatherPrimaryText)
             }
             .frame(width: 52, height: 52)
-            .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(event.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .gatherRowTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(1)
                 HStack(spacing: 4) {
@@ -808,19 +813,19 @@ struct HomeUpcomingRow: View {
                         Text("· \(loc)").lineLimit(1)
                     }
                 }
-                .font(.system(size: 12))
+                .gatherMetaText()
                 .foregroundStyle(Color.gatherSecondaryText)
             }
             Spacer()
             Text(isDraft ? "Draft" : (hosting ? "Hosting" : "Going"))
-                .font(.system(size: 10, weight: .bold))
+                .gatherEyebrow()
                 .foregroundStyle(tagColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(tagColor.opacity(0.15), in: Capsule())
         }
         .padding(12)
-        .background(Color.gatherSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .surfaceCard()
     }
 }
 
@@ -846,11 +851,11 @@ struct HomeInviteCard: View {
                     Text(event.category.emoji).font(.system(size: 30))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(event.title)
-                            .font(.system(size: 15, weight: .semibold))
+                            .gatherRowTitle()
                             .foregroundStyle(Color.gatherPrimaryText)
                             .lineLimit(1)
                         Text(subtitle)
-                            .font(.system(size: 12))
+                            .gatherMetaText()
                             .foregroundStyle(Color.gatherSecondaryText)
                             .lineLimit(1)
                     }
@@ -869,17 +874,21 @@ struct HomeInviteCard: View {
             }
         }
         .padding(14)
-        .background(Color.gatherSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.gatherSurface, in: RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
                 .strokeBorder(Color.accentPinkFallback.opacity(0.4), lineWidth: 1)
         )
     }
 
     private func respondButton(_ label: String, _ status: RSVPStatus, _ color: Color) -> some View {
-        Button { onRespond(status) } label: {
+        Button {
+            HapticService.selection()
+            onRespond(status)
+        } label: {
             Text(label)
-                .font(.system(size: 13, weight: .bold))
+                .gatherMetaText()
+                .fontWeight(.bold)
                 .foregroundStyle(color)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)

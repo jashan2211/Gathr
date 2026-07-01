@@ -63,8 +63,7 @@ struct ProfileView: View {
                             Image(systemName: "hammer.fill")
                                 .font(.system(size: 11, weight: .bold))
                             Text("DEMO MODE ACTIVE")
-                                .font(.system(size: 11, weight: .bold))
-                                .tracking(0.5)
+                                .gatherEyebrow()
                         }
                         .foregroundStyle(Color.sunshineYellow)
                         .padding(.horizontal, Spacing.sm)
@@ -122,8 +121,7 @@ struct ProfileView: View {
             // Tiny editorial eyebrow + Edit affordance
             HStack {
                 Text("YOUR PROFILE")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.5)
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 Spacer()
@@ -156,15 +154,14 @@ struct ProfileView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(authManager.currentUser?.name ?? "User")
-                        .font(.system(size: 28, weight: .heavy))
-                        .kerning(-0.5)
+                        .gatherPosterTitle()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
 
                     if let email = authManager.currentUser?.email {
                         Text(email)
-                            .font(.system(size: 14, weight: .medium))
+                            .gatherMetaText()
                             .foregroundStyle(Color.gatherSecondaryText)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -215,14 +212,14 @@ struct ProfileView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color.accentPurpleFallback)
                         .frame(width: 40, height: 40)
-                        .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("View Purchased Tickets")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Color.gatherPrimaryText)
                         Text("Access QR codes and event details")
-                            .font(.system(size: 13))
+                            .gatherMetaText()
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
 
@@ -333,8 +330,7 @@ struct ProfileView: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Color.gatherSecondaryText)
                 Text("DEVELOPER TOOLS")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(0.5)
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
@@ -424,8 +420,7 @@ struct ProfileView: View {
         HStack {
             Spacer()
             Text("GATHER v\(appVersion) (\(buildNumber))")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(0.5)
+                .gatherEyebrow()
                 .foregroundStyle(Color.gatherTertiaryText)
             Spacer()
         }
@@ -500,7 +495,7 @@ struct ProfileStatCard: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(color)
                 .frame(width: 32, height: 32)
-                .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
 
             Text("\(value)")
                 .font(.system(size: 24, weight: .heavy))
@@ -508,8 +503,7 @@ struct ProfileStatCard: View {
                 .contentTransition(.numericText())
 
             Text(label.uppercased())
-                .font(.system(size: 11, weight: .bold))
-                .tracking(0.5)
+                .gatherEyebrow()
                 .foregroundStyle(Color.gatherSecondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -532,8 +526,7 @@ struct ProfileSectionHeader: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.system(size: 11, weight: .bold))
-            .tracking(0.5)
+            .gatherEyebrow()
             .foregroundStyle(Color.gatherSecondaryText)
             .accessibilityAddTraits(.isHeader)
     }
@@ -566,7 +559,7 @@ struct ProfileDestructiveRow: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.rsvpNoFallback)
                 .frame(width: 36, height: 36)
-                .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
 
             Text(title)
                 .font(.system(size: 17, weight: .semibold))
@@ -604,7 +597,7 @@ struct ProfileMenuItem: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(color)
                     .frame(width: 36, height: 36)
-                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
 
                 Text(title)
                     .font(.system(size: 17, weight: .medium))
@@ -640,7 +633,7 @@ struct ProfileMenuLink: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(color)
                     .frame(width: 36, height: 36)
-                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
 
                 Text(title)
                     .font(.system(size: 17, weight: .medium))
@@ -1164,8 +1157,7 @@ struct DevToolStat: View {
                 .foregroundStyle(color)
                 .contentTransition(.numericText())
             Text(label.uppercased())
-                .font(.system(size: 11, weight: .bold))
-                .tracking(0.5)
+                .gatherEyebrow()
                 .foregroundStyle(Color.gatherSecondaryText)
         }
         .frame(maxWidth: .infinity)
@@ -1193,14 +1185,14 @@ struct DataLoadButton: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(color)
                     .frame(width: 36, height: 36)
-                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.gatherPrimaryText)
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .gatherMetaText()
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
 

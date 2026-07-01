@@ -292,8 +292,16 @@ extension Expense {
         if list.isEmpty && isPaid {
             list.append(ExpensePayment(amount: amount, date: paidDate ?? createdAt, paidByName: self.paidByName))
         }
-        list.append(ExpensePayment(amount: paymentAmount, date: date, method: method, note: note, paidByName: paidByName))
-        payments = list
+        // Model-level guard: never let recorded payments exceed the expense
+        // amount, so a stray call (or a legacy already-paid expense) can't push
+        // the total negative and corrupt settle-up / progress math.
+        let alreadyRecorded = list.reduce(0) { $0 + $1.amount }
+        let room = max(0, amount - alreadyRecorded)
+        let clamped = min(max(0, paymentAmount), room)
+        if clamped >= Self.centTolerance {
+            list.append(ExpensePayment(amount: clamped, date: date, method: method, note: note, paidByName: paidByName))
+        }
+        payments = list.isEmpty ? nil : list
         syncLegacyPaidFlags()
     }
 

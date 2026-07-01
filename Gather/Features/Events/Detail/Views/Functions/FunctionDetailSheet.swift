@@ -408,12 +408,162 @@ struct FunctionDetailSheet: View {
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
             .surfaceCard()
+
+            // Per-function guest list — hosts pick who is invited to THIS
+            // function, independent of the parent event's full guest list.
+            if isHost {
+                guestListSection
+            }
         }
         .alert("Calendar", isPresented: $showCalendarAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(calendarAlertMessage)
         }
+    }
+
+    // MARK: - Guest List (host-only)
+
+    /// Guests sorted so already-invited people float to the top, then by name.
+    private var sortedGuests: [Guest] {
+        event.guests.sorted { lhs, rhs in
+            let lInvited = isInvited(lhs)
+            let rInvited = isInvited(rhs)
+            if lInvited != rInvited { return lInvited }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    /// How many of the event's guests are invited to THIS function.
+    private var invitedCount: Int {
+        function.invites.count
+    }
+
+    private var guestListSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            // Header + live invited summary
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text("Guests")
+                        .gatherSectionHeader()
+                        .foregroundStyle(Color.gatherPrimaryText)
+
+                    Text(inviteSummaryText)
+                        .gatherMetaText()
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+
+                Spacer()
+
+                // Quick actions
+                HStack(spacing: Spacing.xs) {
+                    Button {
+                        inviteAll()
+                    } label: {
+                        Text("Invite all")
+                            .font(GatherFont.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                            .padding(.horizontal, Spacing.sm)
+                            .padding(.vertical, 6)
+                            .background(Color.accentPurpleFallback.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(event.guests.isEmpty || invitedCount == event.guests.count)
+
+                    Button {
+                        clearInvites()
+                    } label: {
+                        Text("Clear")
+                            .font(GatherFont.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.gatherError)
+                            .padding(.horizontal, Spacing.sm)
+                            .padding(.vertical, 6)
+                            .background(Color.gatherError.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(invitedCount == 0)
+                }
+            }
+
+            if event.guests.isEmpty {
+                Text("Add guests to the event first, then choose who's invited to this function.")
+                    .gatherMetaText()
+                    .foregroundStyle(Color.gatherTertiaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, Spacing.sm)
+            } else {
+                VStack(spacing: Spacing.xs) {
+                    ForEach(sortedGuests, id: \.id) { guest in
+                        FunctionGuestRow(
+                            guest: guest,
+                            isInvited: isInvited(guest),
+                            response: response(for: guest),
+                            onToggle: { toggleInvite(for: guest) }
+                        )
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surfaceCard()
+    }
+
+    /// Per-function RSVP breakdown of the people actually invited here.
+    private var inviteSummaryText: String {
+        let going = function.invites.filter { $0.response == .yes }.count
+        let maybe = function.invites.filter { $0.response == .maybe }.count
+        return "\(invitedCount) invited · \(going) going · \(maybe) maybe"
+    }
+
+    private func isInvited(_ guest: Guest) -> Bool {
+        function.invites.contains { $0.guestId == guest.id }
+    }
+
+    private func response(for guest: Guest) -> RSVPResponse? {
+        function.invites.first { $0.guestId == guest.id }?.response
+    }
+
+    /// Toggling ON creates a FunctionInvite for this guest+function; toggling
+    /// OFF removes it from the relationship and deletes the record.
+    private func toggleInvite(for guest: Guest) {
+        if let existing = function.invites.first(where: { $0.guestId == guest.id }) {
+            function.invites.removeAll { $0.id == existing.id }
+            modelContext.delete(existing)
+            HapticService.selection()
+        } else {
+            let invite = FunctionInvite(guestId: guest.id, functionId: function.id)
+            function.invites.append(invite)
+            HapticService.selection()
+        }
+        function.updatedAt = Date()
+        modelContext.safeSave()
+    }
+
+    private func inviteAll() {
+        for guest in event.guests where !isInvited(guest) {
+            let invite = FunctionInvite(guestId: guest.id, functionId: function.id)
+            function.invites.append(invite)
+        }
+        function.updatedAt = Date()
+        modelContext.safeSave()
+        HapticService.success()
+    }
+
+    /// Removes every invite for this function. Guests who already responded
+    /// lose their per-function RSVP too — that's the intended "start over".
+    private func clearInvites() {
+        for invite in function.invites {
+            modelContext.delete(invite)
+        }
+        function.invites.removeAll()
+        function.updatedAt = Date()
+        modelContext.safeSave()
+        HapticService.mediumImpact()
     }
 
     // MARK: - Editing View
@@ -603,6 +753,87 @@ struct RSVPStatBox: View {
         .padding(.vertical, Spacing.sm)
         .background(color.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+    }
+}
+
+// MARK: - Function Guest Row
+
+/// One guest row in the per-function guest list: avatar initials, name, live
+/// per-function RSVP badge, and an invite toggle.
+struct FunctionGuestRow: View {
+    let guest: Guest
+    let isInvited: Bool
+    let response: RSVPResponse?
+    let onToggle: () -> Void
+
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            // Initials avatar
+            ZStack {
+                Circle()
+                    .fill(Color.gatherElevated)
+                    .frame(width: 36, height: 36)
+                Text(initials)
+                    .font(GatherFont.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(guest.name)
+                    .gatherRowTitle()
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .lineLimit(1)
+
+                if isInvited {
+                    Text(responseLabel)
+                        .font(GatherFont.caption)
+                        .foregroundStyle(responseColor)
+                }
+            }
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { isInvited },
+                set: { _ in onToggle() }
+            ))
+            .labelsHidden()
+            .tint(Color.accentPurpleFallback)
+        }
+        .padding(.vertical, Spacing.xs)
+        .padding(.horizontal, Spacing.sm)
+        .background(Color.gatherElevated.opacity(isInvited ? 0.6 : 0))
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(guest.name), \(isInvited ? "invited to this function" : "not invited")")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var initials: String {
+        let parts = guest.name.split(separator: " ")
+        let first = parts.first?.first.map(String.init) ?? ""
+        let last = parts.count > 1 ? (parts.last?.first.map(String.init) ?? "") : ""
+        let result = (first + last).uppercased()
+        return result.isEmpty ? "?" : result
+    }
+
+    private var responseLabel: String {
+        switch response {
+        case .yes: return "Going"
+        case .maybe: return "Maybe"
+        case .no: return "Can't make it"
+        case .none: return "Invited · no response yet"
+        }
+    }
+
+    private var responseColor: Color {
+        switch response {
+        case .yes: return .rsvpYesFallback
+        case .maybe: return .rsvpMaybeFallback
+        case .no: return .rsvpNoFallback
+        case .none: return .gatherSecondaryText
+        }
     }
 }
 

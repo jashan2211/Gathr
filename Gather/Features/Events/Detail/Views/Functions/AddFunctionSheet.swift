@@ -7,15 +7,31 @@ struct AddFunctionSheet: View {
 
     @State private var name = ""
     @State private var functionDescription = ""
-    @State private var date = Date()
+    @State private var date: Date
     @State private var hasEndTime = false
-    @State private var endTime = Date().addingTimeInterval(3600 * 4)
+    @State private var endTime: Date
     @State private var hasLocation = false
     @State private var locationName = ""
     @State private var locationAddress = ""
+    // Resolved coordinates from the map picker (nil when entered manually).
+    @State private var locationCity: String?
+    @State private var locationState: String?
+    @State private var locationCountry: String?
+    @State private var locationLat: Double?
+    @State private var locationLon: Double?
+    @State private var showLocationPicker = false
     @State private var hasDressCode = false
     @State private var dressCode: DressCode = .formal
     @State private var customDressCode = ""
+
+    /// Defaults the new function to the parent event's start date so the host
+    /// isn't editing "today" for a wedding six months out. End time seeds to
+    /// four hours after the start.
+    init(event: Event) {
+        self.event = event
+        _date = State(initialValue: event.startDate)
+        _endTime = State(initialValue: event.startDate.addingTimeInterval(3600 * 4))
+    }
 
     var body: some View {
         NavigationStack {
@@ -54,14 +70,61 @@ struct AddFunctionSheet: View {
                         .font(GatherFont.body)
 
                     if hasLocation {
-                        TextField("Venue Name", text: $locationName)
+                        // Map search — fills name/address/coords like the main
+                        // create flow. Manual name below stays as a fallback.
+                        Button {
+                            HapticService.buttonTap()
+                            showLocationPicker = true
+                        } label: {
+                            HStack(spacing: Spacing.sm) {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundStyle(Color.accentPinkFallback)
+                                Text(locationLat == nil ? "Search for a place" : "Change place")
+                                    .gatherRowTitle()
+                                    .foregroundStyle(Color.gatherPrimaryText)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.gatherTertiaryText)
+                            }
+                        }
+
+                        // Show the resolved place (from the map) as a summary row.
+                        if locationLat != nil {
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                                Text(locationName)
+                                    .gatherRowTitle()
+                                    .foregroundStyle(Color.gatherPrimaryText)
+                                if !locationAddress.isEmpty {
+                                    Text(locationAddress)
+                                        .gatherMetaText()
+                                        .foregroundStyle(Color.gatherSecondaryText)
+                                }
+                                Button("Clear place") {
+                                    clearLocation()
+                                }
+                                .font(GatherFont.caption)
+                                .foregroundStyle(Color.gatherError)
+                            }
+                        }
+
+                        // Manual fallback — always available for a venue with no
+                        // map match (a home, a marquee, etc.).
+                        TextField("Venue name", text: $locationName)
                             .font(GatherFont.body)
 
-                        TextField("Address (optional)", text: $locationAddress)
-                            .font(GatherFont.body)
+                        if locationLat == nil {
+                            TextField("Address (optional)", text: $locationAddress)
+                                .font(GatherFont.body)
+                        }
                     }
                 } header: {
                     Text("Where")
+                } footer: {
+                    if hasLocation {
+                        Text("Search for a place to pin it on the map, or just type a venue name.")
+                            .font(GatherFont.caption)
+                    }
                 }
 
                 // Dress Code
@@ -132,7 +195,28 @@ struct AddFunctionSheet: View {
                     }
                 }
             }
+            .sheet(isPresented: $showLocationPicker) {
+                LocationPickerView { name, address, city, state, country, lat, lon in
+                    locationName = name
+                    locationAddress = address ?? ""
+                    locationCity = city
+                    locationState = state
+                    locationCountry = country
+                    locationLat = lat
+                    locationLon = lon
+                }
+            }
         }
+    }
+
+    private func clearLocation() {
+        locationName = ""
+        locationAddress = ""
+        locationCity = nil
+        locationState = nil
+        locationCountry = nil
+        locationLat = nil
+        locationLon = nil
     }
 
     // MARK: - Primary CTA
@@ -182,7 +266,15 @@ struct AddFunctionSheet: View {
 
     private func addFunction() {
         let location: EventLocation? = hasLocation && !locationName.isEmpty
-            ? EventLocation(name: locationName, address: locationAddress.isEmpty ? nil : locationAddress)
+            ? EventLocation(
+                name: locationName,
+                address: locationAddress.isEmpty ? nil : locationAddress,
+                city: locationCity,
+                state: locationState,
+                country: locationCountry,
+                latitude: locationLat,
+                longitude: locationLon
+            )
             : nil
 
         let finalEndTime: Date? = hasEndTime ? endTime : nil

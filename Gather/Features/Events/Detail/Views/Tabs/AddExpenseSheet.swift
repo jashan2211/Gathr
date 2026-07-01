@@ -113,7 +113,10 @@ struct AddExpenseSheet: View {
                     )
                     category.expenses.append(expense)
                     if paidSoFar > 0 {
-                        expense.recordPayment(amount: min(paidSoFar, amount))
+                        expense.recordPayment(
+                            amount: min(paidSoFar, amount),
+                            paidByName: paidByName.isEmpty ? nil : paidByName
+                        )
                     }
                     category.reconcileSpent()
                     modelContext.safeSave()

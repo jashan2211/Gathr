@@ -53,6 +53,9 @@ struct BudgetTab: View {
                     // Payment Breakdown (Paid / Owed / Overdue)
                     paymentBreakdown(budget, expenses: expenses)
 
+                    // Spending by category (visual share of spend)
+                    spendingByCategory(budget)
+
                     // Who Paid What
                     whoPaidWhat(budget, expenses: expenses)
 
@@ -230,92 +233,154 @@ struct BudgetTab: View {
 
     // MARK: - Summary Card
 
+    /// The flagship overview: a circular progress ring paired with big,
+    /// confident Total / Spent / Remaining figures. The ring and headline
+    /// numbers shift green → amber → red as the budget fills up.
     private func summaryCard(_ budget: Budget) -> some View {
         let spentAmount = filteredSpent(budget)
-        let percentUsed = Int(filteredPercentSpent(budget))
+        let percent = filteredPercentSpent(budget)
+        let percentUsed = Int(percent.rounded())
         let remainingAmount = filteredRemaining(budget)
+        let accent = spentColor(budget)
+        let isOver = remainingAmount < 0
 
-        return VStack(spacing: Spacing.md) {
+        return VStack(alignment: .leading, spacing: Spacing.lg) {
             HStack {
                 Text("Finance")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
+                    .gatherEyebrow()
+                    .foregroundStyle(Color.gatherTertiaryText)
                     // A11Y-007: Section header trait
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button {
+                    HapticService.buttonTap()
                     showEditBudget = true
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "pencil")
+                        Image(systemName: "slider.horizontal.3")
                         Text("Edit")
                     }
                     .font(GatherFont.caption)
+                    .fontWeight(.semibold)
                     .foregroundStyle(Color.accentPurpleFallback)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, 6)
+                    .background(Color.accentPurpleFallback.opacity(0.12))
+                    .clipShape(Capsule())
                 }
+                .accessibilityLabel("Edit budget")
             }
 
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Total Budget")
-                        .font(.caption2)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                    Text(budget.totalBudget.asCurrency)
-                        .font(GatherFont.title)
-                        .foregroundStyle(Color.gatherPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+            HStack(alignment: .center, spacing: Spacing.lg) {
+                // Circular progress ring — the confident focal point.
+                budgetRing(percent: percent, percentUsed: percentUsed, accent: accent, isOver: isOver)
+                    .frame(width: 116, height: 116)
+
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    summaryMetric(
+                        label: "Spent",
+                        value: spentAmount.asCurrency,
+                        color: accent,
+                        emphasized: true
+                    )
+                    summaryMetric(
+                        label: isOver ? "Over budget" : "Remaining",
+                        value: abs(remainingAmount).asCurrency,
+                        color: isOver ? Color.rsvpNoFallback : Color.rsvpYesFallback,
+                        emphasized: false
+                    )
+                    summaryMetric(
+                        label: "Total budget",
+                        value: budget.totalBudget.asCurrency,
+                        color: Color.gatherPrimaryText,
+                        emphasized: false
+                    )
                 }
 
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("Spent")
-                        .font(.caption2)
-                        .foregroundStyle(Color.gatherSecondaryText)
-                    Text(spentAmount.asCurrency)
-                        .font(GatherFont.title)
-                        .foregroundStyle(spentColor(budget))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
+                Spacer(minLength: 0)
             }
 
-            // Progress bar
+            // Slim linear track echoing the ring, for a scannable read.
             VStack(spacing: Spacing.xs) {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.gatherTertiaryBackground)
-
-                        RoundedRectangle(cornerRadius: 6)
+                        Capsule()
+                            .fill(Color.gatherElevated)
+                        Capsule()
                             .fill(progressGradient(budget))
-                            .frame(width: max(0, min(geometry.size.width, geometry.size.width * filteredPercentSpent(budget) / 100)))
+                            .frame(width: max(0, min(geometry.size.width, geometry.size.width * percent / 100)))
                     }
                 }
-                .frame(height: 12)
+                .frame(height: 8)
 
                 HStack {
-                    Text("\(percentUsed)% used")
+                    Label("\(percentUsed)% of budget used", systemImage: isOver ? "exclamationmark.triangle.fill" : "chart.pie.fill")
                         .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(spentColor(budget))
-
+                        .fontWeight(.semibold)
+                        .foregroundStyle(accent)
                     Spacer()
-
-                    Text("\(remainingAmount.asCurrency) left")
+                    Text(isOver ? "\(abs(remainingAmount).asCurrency) over" : "\(remainingAmount.asCurrency) left")
                         .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(remainingAmount >= 0 ? Color.rsvpYesFallback : Color.rsvpNoFallback)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(isOver ? Color.rsvpNoFallback : Color.rsvpYesFallback)
                 }
             }
         }
-        .padding()
-        .surfaceCard()
+        .padding(Spacing.md)
+        .surfaceCard(cornerRadius: CornerRadius.featured)
         // A11Y-009: Financial data grouping for budget summary
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Finance overview. Total budget \(budget.totalBudget.asCurrency). Spent \(spentAmount.asCurrency). \(percentUsed) percent used. \(remainingAmount.asCurrency) remaining.")
+        .accessibilityLabel("Finance overview. Total budget \(budget.totalBudget.asCurrency). Spent \(spentAmount.asCurrency). \(percentUsed) percent used. \(isOver ? "\(abs(remainingAmount).asCurrency) over budget." : "\(remainingAmount.asCurrency) remaining.")")
         .bouncyAppear()
+    }
+
+    /// Circular budget ring with the percent used at its center.
+    private func budgetRing(percent: Double, percentUsed: Int, accent: Color, isOver: Bool) -> some View {
+        let clamped = min(percent / 100, 1)
+        return ZStack {
+            Circle()
+                .stroke(Color.gatherElevated, lineWidth: 12)
+
+            Circle()
+                .trim(from: 0, to: max(0.001, clamped))
+                .stroke(
+                    AngularGradient(
+                        colors: isOver
+                            ? [Color.rsvpNoFallback, .orange, Color.rsvpNoFallback]
+                            : [Color.accentPurpleFallback, Color.accentPinkFallback, Color.accentPurpleFallback],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: clamped)
+
+            VStack(spacing: 0) {
+                Text("\(percentUsed)%")
+                    .font(.system(size: 26, weight: .heavy))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text("used")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gatherTertiaryText)
+            }
+        }
+    }
+
+    private func summaryMetric(label: String, value: String, color: Color, emphasized: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .heavy))
+                .tracking(0.5)
+                .foregroundStyle(Color.gatherTertiaryText)
+            Text(value)
+                .font(emphasized ? .system(size: 24, weight: .heavy) : .system(size: 17, weight: .bold))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+        }
     }
 
     // MARK: - Payment Breakdown
@@ -356,29 +421,31 @@ struct BudgetTab: View {
     }
 
     private func paymentStatCard(label: String, amount: Double, total: Double, icon: String, color: Color) -> some View {
-        VStack(spacing: Spacing.xs) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(color)
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.footnote)
+                    .foregroundStyle(color)
+                Text(label.uppercased())
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(0.5)
+                    .foregroundStyle(Color.gatherTertiaryText)
+                Spacer(minLength: 0)
+            }
 
             Text(amount.asCurrency)
-                .font(GatherFont.callout)
-                .fontWeight(.bold)
+                .font(.system(size: 18, weight: .heavy))
                 .foregroundStyle(Color.gatherPrimaryText)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
-
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(Color.gatherSecondaryText)
+                .minimumScaleFactor(0.5)
 
             // Mini progress
             if total > 0 {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.gatherTertiaryBackground)
-                        RoundedRectangle(cornerRadius: 2)
+                        Capsule()
+                            .fill(Color.gatherElevated)
+                        Capsule()
                             .fill(color)
                             .frame(width: max(0, min(geometry.size.width, geometry.size.width * (amount / total))))
                     }
@@ -386,13 +453,113 @@ struct BudgetTab: View {
                 .frame(height: 4)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Spacing.sm)
-        .padding(.horizontal, Spacing.xs)
-        .surfaceCard()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Spacing.sm)
+        .surfaceCard(cornerRadius: CornerRadius.lg)
         // A11Y-009: Financial data grouping for payment stat cards
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label). \(amount.asCurrency)")
+    }
+
+    // MARK: - Spending by Category
+
+    /// A visual breakdown of where the money is going: a stacked "donut" bar of
+    /// each category's share of spend, then per-category rows with icon, color,
+    /// share percent, and amount. Purely derived from existing category data.
+    @ViewBuilder
+    private func spendingByCategory(_ budget: Budget) -> some View {
+        // Only categories that have actually been spent against.
+        let spending = filteredCategories(budget)
+            .filter { $0.spent > 0.005 }
+            .sorted { $0.spent > $1.spent }
+        let totalSpent = spending.reduce(0) { $0 + $1.spent }
+
+        if !spending.isEmpty, totalSpent > 0 {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                HStack {
+                    Image(systemName: "chart.pie.fill")
+                        .foregroundStyle(Color.accentPurpleFallback)
+                    Text("Spending by Category")
+                        .gatherSectionHeader()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    Text(totalSpent.asCurrency)
+                        .gatherMetaText()
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+
+                // Stacked share bar ("donut" unrolled) — each category's slice.
+                GeometryReader { geometry in
+                    HStack(spacing: 2) {
+                        ForEach(spending) { category in
+                            categoryColor(category.color)
+                                .frame(width: max(3, geometry.size.width * (category.spent / totalSpent)))
+                        }
+                    }
+                    .frame(height: 14)
+                    .clipShape(Capsule())
+                }
+                .frame(height: 14)
+                .accessibilityHidden(true)
+
+                VStack(spacing: Spacing.sm) {
+                    ForEach(spending) { category in
+                        categoryShareRow(category, totalSpent: totalSpent)
+                    }
+                }
+            }
+            .padding(Spacing.md)
+            .surfaceCard()
+            .bouncyAppear(delay: 0.05)
+        }
+    }
+
+    private func categoryShareRow(_ category: BudgetCategory, totalSpent: Double) -> some View {
+        let share = totalSpent > 0 ? (category.spent / totalSpent) * 100 : 0
+        let color = categoryColor(category.color)
+
+        return HStack(spacing: Spacing.sm) {
+            Image(systemName: category.icon)
+                .font(.caption)
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(color)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(category.name)
+                        .gatherRowTitle()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(category.spent.asCurrency)
+                        .gatherRowTitle()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                }
+
+                // Per-category share track.
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.gatherElevated)
+                        Capsule()
+                            .fill(color)
+                            .frame(width: max(3, geometry.size.width * share / 100))
+                    }
+                }
+                .frame(height: 5)
+            }
+
+            Text("\(Int(share.rounded()))%")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.gatherSecondaryText)
+                .frame(width: 34, alignment: .trailing)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(category.name). \(category.spent.asCurrency), \(Int(share.rounded())) percent of spending.")
     }
 
     // MARK: - Payer Aggregation
@@ -429,6 +596,7 @@ struct BudgetTab: View {
     @ViewBuilder
     private func whoPaidWhat(_ budget: Budget, expenses: [Expense]) -> some View {
         let payers = payerTotals(expenses)
+        let totalPaid = payers.reduce(0) { $0 + $1.paid }
 
         if !payers.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.md) {
@@ -441,39 +609,65 @@ struct BudgetTab: View {
                         // A11Y-007: Section header trait
                         .accessibilityAddTraits(.isHeader)
                     Spacer()
+                    Text(totalPaid.asCurrency)
+                        .gatherMetaText()
+                        .foregroundStyle(Color.gatherSecondaryText)
                 }
 
-                ForEach(payers) { payer in
-                    HStack(spacing: Spacing.sm) {
-                        Circle()
-                            .fill(avatarColor(for: payer.name))
-                            .frame(width: 36, height: 36)
-                            .overlay {
-                                Text(payer.name.isEmpty ? "?" : payer.name.prefix(1).uppercased())
-                                    .font(GatherFont.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                            }
-
-                        Text(payer.name.isEmpty ? "Unknown" : payer.name)
-                            .gatherRowTitle()
-                            .foregroundStyle(Color.gatherPrimaryText)
-
-                        Spacer()
-
-                        Text(payer.paid.asCurrency)
-                            .gatherRowTitle()
-                            .foregroundStyle(Color.gatherPrimaryText)
+                VStack(spacing: Spacing.sm) {
+                    ForEach(payers) { payer in
+                        whoPaidRow(payer, totalPaid: totalPaid)
                     }
-                    .padding(Spacing.sm)
-                    .surfaceCard()
-                    // A11Y: Who-paid-what row grouping
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(payer.name.isEmpty ? "Unknown" : payer.name) paid \(payer.paid.asCurrency).")
                 }
             }
+            .padding(Spacing.md)
+            .surfaceCard()
             .bouncyAppear(delay: 0.08)
         }
+    }
+
+    private func whoPaidRow(_ payer: PayerTotal, totalPaid: Double) -> some View {
+        let share = totalPaid > 0 ? (payer.paid / totalPaid) * 100 : 0
+        let name = payer.name.isEmpty ? "Unknown" : payer.name
+
+        return HStack(spacing: Spacing.sm) {
+            Circle()
+                .fill(avatarColor(for: payer.name))
+                .frame(width: 38, height: 38)
+                .overlay {
+                    Text(payer.name.isEmpty ? "?" : payer.name.prefix(1).uppercased())
+                        .font(GatherFont.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(name)
+                        .gatherRowTitle()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(payer.paid.asCurrency)
+                        .gatherRowTitle()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                }
+
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.gatherElevated)
+                        Capsule()
+                            .fill(avatarColor(for: payer.name))
+                            .frame(width: max(3, geometry.size.width * share / 100))
+                    }
+                }
+                .frame(height: 5)
+            }
+        }
+        // A11Y: Who-paid-what row grouping
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name) paid \(payer.paid.asCurrency), \(Int(share.rounded())) percent of the total.")
     }
 
     // MARK: - Settle Up
@@ -501,11 +695,13 @@ struct BudgetTab: View {
                     Spacer()
                 }
 
-                HStack(alignment: .top) {
+                // Even-split summary on a nested elevated tile.
+                HStack(alignment: .center, spacing: Spacing.sm) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Total paid")
-                            .gatherMetaText()
-                            .foregroundStyle(Color.gatherSecondaryText)
+                        Text("TOTAL PAID")
+                            .font(.system(size: 10, weight: .heavy))
+                            .tracking(0.5)
+                            .foregroundStyle(Color.gatherTertiaryText)
                         Text(totalPaid.asCurrency)
                             .gatherCardTitle()
                             .foregroundStyle(Color.gatherPrimaryText)
@@ -513,10 +709,15 @@ struct BudgetTab: View {
                             .minimumScaleFactor(0.6)
                     }
                     Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.caption)
+                        .foregroundStyle(Color.gatherTertiaryText)
+                    Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("Even split \u{00B7} \(payers.count) people")
-                            .gatherMetaText()
-                            .foregroundStyle(Color.gatherSecondaryText)
+                        Text("EVEN SPLIT \u{00B7} \(payers.count)")
+                            .font(.system(size: 10, weight: .heavy))
+                            .tracking(0.5)
+                            .foregroundStyle(Color.gatherTertiaryText)
                         Text(fairShare.asCurrency)
                             .gatherCardTitle()
                             .foregroundStyle(Color.gatherPrimaryText)
@@ -524,17 +725,19 @@ struct BudgetTab: View {
                             .minimumScaleFactor(0.6)
                     }
                 }
+                .padding(Spacing.sm)
+                .background(Color.gatherElevated)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Total paid \(totalPaid.asCurrency). Even split \(fairShare.asCurrency) each across \(payers.count) people.")
 
-                Divider()
-                    .overlay(Color.gatherElevated)
-
-                ForEach(sortedByBalance, id: \.name) { entry in
-                    settleUpRow(name: entry.name, balance: entry.balance)
+                VStack(spacing: Spacing.sm) {
+                    ForEach(sortedByBalance, id: \.name) { entry in
+                        settleUpRow(name: entry.name, balance: entry.balance)
+                    }
                 }
             }
-            .padding()
+            .padding(Spacing.md)
             .surfaceCard()
             .bouncyAppear(delay: 0.1)
         }
@@ -546,22 +749,30 @@ struct BudgetTab: View {
         let displayName = name.isEmpty ? "Unknown" : name
 
         let statusText: String
+        let statusValue: String
         let statusColor: Color
+        let statusIcon: String
         if cents > 0.005 {
-            statusText = "is owed \(cents.asCurrency)"
+            statusText = "is owed"
+            statusValue = cents.asCurrency
             statusColor = Color.rsvpYesFallback
+            statusIcon = "arrow.down.left"
         } else if cents < -0.005 {
-            statusText = "owes \(abs(cents).asCurrency)"
+            statusText = "owes"
+            statusValue = abs(cents).asCurrency
             statusColor = Color.rsvpNoFallback
+            statusIcon = "arrow.up.right"
         } else {
             statusText = "settled up"
-            statusColor = Color.gatherSecondaryText
+            statusValue = ""
+            statusColor = Color.rsvpYesFallback
+            statusIcon = "checkmark"
         }
 
         return HStack(spacing: Spacing.sm) {
             Circle()
                 .fill(avatarColor(for: name))
-                .frame(width: 30, height: 30)
+                .frame(width: 34, height: 34)
                 .overlay {
                     Text(name.isEmpty ? "?" : name.prefix(1).uppercased())
                         .font(GatherFont.caption)
@@ -569,18 +780,34 @@ struct BudgetTab: View {
                         .foregroundStyle(.white)
                 }
 
-            Text(displayName)
-                .gatherRowTitle()
-                .foregroundStyle(Color.gatherPrimaryText)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(displayName)
+                    .gatherRowTitle()
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .lineLimit(1)
+                Text(statusText)
+                    .font(.caption2)
+                    .foregroundStyle(Color.gatherTertiaryText)
+            }
 
             Spacer()
 
-            Text(statusText)
-                .gatherMetaText()
-                .foregroundStyle(statusColor)
+            HStack(spacing: 5) {
+                Image(systemName: statusIcon)
+                    .font(.system(size: 10, weight: .bold))
+                if !statusValue.isEmpty {
+                    Text(statusValue)
+                        .font(.system(size: 14, weight: .bold))
+                }
+            }
+            .foregroundStyle(statusColor)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, 6)
+            .background(statusColor.opacity(0.12))
+            .clipShape(Capsule())
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(displayName) \(statusText)")
+        .accessibilityLabel("\(displayName) \(statusText) \(statusValue)")
     }
 
     // MARK: - Quick Actions
@@ -818,14 +1045,29 @@ struct BudgetTab: View {
     // MARK: - Categories Section
 
     private func categoriesSection(_ budget: Budget) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            Text("Categories")
-                .font(GatherFont.headline)
-                .foregroundStyle(Color.gatherPrimaryText)
-                // A11Y-007: Section header trait
-                .accessibilityAddTraits(.isHeader)
+        let categories = filteredCategories(budget).sorted { $0.sortOrder < $1.sortOrder }
 
-            let categories = filteredCategories(budget).sorted { $0.sortOrder < $1.sortOrder }
+        return VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack {
+                Image(systemName: "folder.fill")
+                    .foregroundStyle(Color.accentPurpleFallback)
+                Text("Categories")
+                    .gatherSectionHeader()
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    // A11Y-007: Section header trait
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button {
+                    HapticService.buttonTap()
+                    showAddCategory = true
+                } label: {
+                    Label("Add", systemImage: "plus.circle.fill")
+                        .font(GatherFont.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.accentPurpleFallback)
+                }
+                .accessibilityLabel("Add category")
+            }
 
             if categories.isEmpty {
                 GatherEmptyState(
@@ -927,10 +1169,10 @@ struct BudgetTab: View {
             if category.allocated > 0 {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color.gatherTertiaryBackground)
+                        Capsule()
+                            .fill(Color.gatherElevated)
 
-                        RoundedRectangle(cornerRadius: 3)
+                        Capsule()
                             .fill(category.isOverBudget ? Color.rsvpNoFallback : categoryColor(category.color))
                             .frame(width: max(4, min(geometry.size.width, geometry.size.width * category.percentSpent / 100)))
                     }
@@ -1080,12 +1322,28 @@ struct BudgetTab: View {
         let vendors = budget.vendorSummaries
 
         if !vendors.isEmpty {
+            let vendorRemaining = vendors.reduce(0) { $0 + $1.remaining }
             VStack(alignment: .leading, spacing: Spacing.md) {
-                Text("Vendors")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
-                    // A11Y-007: Section header trait
-                    .accessibilityAddTraits(.isHeader)
+                HStack {
+                    Image(systemName: "bag.fill")
+                        .foregroundStyle(Color.accentPurpleFallback)
+                    Text("Vendors")
+                        .gatherSectionHeader()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        // A11Y-007: Section header trait
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    if vendorRemaining > 0.009 {
+                        Text("\(vendorRemaining.asCurrency) to pay")
+                            .gatherMetaText()
+                            .foregroundStyle(Color.rsvpMaybeFallback)
+                    } else {
+                        Label("All settled", systemImage: "checkmark.circle.fill")
+                            .font(GatherFont.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.rsvpYesFallback)
+                    }
+                }
 
                 ForEach(vendors) { vendor in
                     Button {
@@ -1134,9 +1392,9 @@ struct BudgetTab: View {
 
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.gatherTertiaryBackground)
-                        RoundedRectangle(cornerRadius: 2)
+                        Capsule()
+                            .fill(Color.gatherElevated)
+                        Capsule()
                             .fill(Color.rsvpYesFallback)
                             .frame(width: max(0, min(geometry.size.width, geometry.size.width * vendor.percentPaid / 100)))
                     }

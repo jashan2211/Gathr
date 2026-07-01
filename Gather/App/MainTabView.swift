@@ -145,19 +145,143 @@ struct MainTabView: View {
 
     // MARK: - iPad Layout
 
+    /// A branded, premium sidebar: the Gathr wordmark up top, the four tabs as
+    /// large icon+label rows with an accent-gradient selection highlight, and a
+    /// pinned "Create Event" button that drives the same create sheet as iPhone.
+    /// The detail pane still hosts `selectedTabView`, so navigation, deep links,
+    /// and the create flow behave exactly as before — only the chrome changed.
     private var iPadLayout: some View {
         NavigationSplitView {
-            List(AppState.Tab.allCases, id: \.self, selection: Binding(
-                get: { appState.selectedTab },
-                set: { if let tab = $0 { appState.selectedTab = tab } }
-            )) { tab in
-                Label(tab.title, systemImage: tab.icon)
+            List {
+                Section {
+                    ForEach(AppState.Tab.allCases, id: \.self) { tab in
+                        sidebarRow(tab)
+                    }
+                } header: {
+                    sidebarBrand
+                }
             }
-            .navigationTitle("Gathr")
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            .background(Color.gatherCanvas.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                sidebarCreateButton
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
         } detail: {
             selectedTabView
         }
         .navigationSplitViewStyle(.balanced)
+        .navigationSplitViewColumnWidth(min: 260, ideal: 280, max: 320)
+    }
+
+    /// The wordmark that crowns the sidebar — a gradient "G" mark beside the
+    /// Gathr wordmark and a whisper of a tagline, echoing the app-icon treatment.
+    private var sidebarBrand: some View {
+        HStack(spacing: Spacing.sm) {
+            RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                .fill(LinearGradient.gatherAccentGradient)
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Text("G")
+                        .font(.system(size: 24, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                )
+                .shadow(color: Color.accentPurpleFallback.opacity(0.45), radius: 8, y: 3)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Gathr")
+                    .font(.system(size: 22, weight: .heavy))
+                    .kerning(-0.5)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .textCase(nil)
+                Text("Bring people together")
+                    .gatherEyebrow()
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .textCase(nil)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, Spacing.md)
+        .padding(.horizontal, Spacing.xs)
+        .listRowInsets(EdgeInsets(top: 0, leading: Spacing.xs, bottom: Spacing.xs, trailing: Spacing.xs))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Gathr")
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    /// A large icon+label sidebar row. The selected row rides the accent gradient
+    /// with a soft glow; the rest sit quietly on the canvas.
+    private func sidebarRow(_ tab: AppState.Tab) -> some View {
+        let isSelected = appState.selectedTab == tab
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                appState.selectedTab = tab
+            }
+        } label: {
+            HStack(spacing: Spacing.md) {
+                Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isSelected ? .white : Color.gatherSecondaryText)
+                    .frame(width: 30)
+
+                Text(tab.title)
+                    .font(.system(size: 17, weight: isSelected ? .bold : .medium))
+                    .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, Spacing.sm + 2)
+            .padding(.horizontal, Spacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                        .fill(LinearGradient.gatherAccentGradient)
+                        .shadow(color: Color.accentPurpleFallback.opacity(0.4), radius: 10, y: 4)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 3, leading: Spacing.xs, bottom: 3, trailing: Spacing.xs))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    /// The pinned "Create Event" call to action at the foot of the sidebar. It
+    /// drives the very same `showCreateSheet` the iPhone center button uses, so
+    /// the create flow is identical across form factors.
+    private var sidebarCreateButton: some View {
+        Button {
+            HapticService.mediumImpact()
+            showCreateSheet = true
+        } label: {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .bold))
+                Text("Create Event")
+                    .font(.system(size: 17, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: Layout.buttonHeight)
+            .background(LinearGradient.gatherAccentGradient, in: Capsule())
+            .overlay(
+                Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .shadow(color: Color.accentPurpleFallback.opacity(0.5), radius: 14, y: 6)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, Spacing.md)
+        .padding(.top, Spacing.sm)
+        .padding(.bottom, Spacing.md)
+        .background(Color.gatherCanvas.ignoresSafeArea(edges: .bottom))
+        .accessibilityLabel("Create event")
+        .accessibilityHint("Opens the new event form")
     }
 
     // MARK: - Floating Tab Bar

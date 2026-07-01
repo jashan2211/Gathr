@@ -487,9 +487,14 @@ struct HomeView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var appState: AppState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var selectedEvent: Event?
     @State private var showCreate = false
+
+    /// On the wide iPad canvas, keep content at a comfortable reading width and
+    /// let the next-event poster sit beside the lists.
+    private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
     private var myId: UUID? { authManager.currentUser?.id }
     private var horizon: Date { Date().addingTimeInterval(-3600) }
@@ -528,60 +533,18 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: Spacing.xl) {
                     header
 
-                    if let nextEvent {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            sectionEyebrow(isHost(nextEvent) ? "Up next · you're hosting" : "Up next")
-                            HomePosterHero(event: nextEvent, hosting: isHost(nextEvent)) {
-                                selectedEvent = nextEvent
-                            }
-                        }
-                    }
-
-                    if !invitesWaiting.isEmpty {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            sectionLabel("Invites waiting", badge: invitesWaiting.count)
-                            ForEach(invitesWaiting, id: \.id) { event in
-                                HomeInviteCard(
-                                    event: event,
-                                    onRespond: { respond(to: event, status: $0) },
-                                    onOpen: { selectedEvent = event }
-                                )
-                            }
-                        }
-                    }
-
-                    if !laterEvents.isEmpty {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            sectionLabel("Upcoming")
-                            VStack(spacing: Spacing.xs) {
-                                ForEach(laterEvents, id: \.id) { event in
-                                    Button { selectedEvent = event } label: {
-                                        HomeUpcomingRow(event: event, hosting: isHost(event))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                    }
-
-                    if !drafts.isEmpty {
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            sectionLabel("Drafts")
-                            VStack(spacing: Spacing.xs) {
-                                ForEach(drafts, id: \.id) { event in
-                                    Button { selectedEvent = event } label: {
-                                        HomeUpcomingRow(event: event, hosting: true, isDraft: true)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
+                    if isRegularWidth {
+                        regularWidthBody
+                    } else {
+                        compactBody
                     }
 
                     if upcoming.isEmpty && invitesWaiting.isEmpty && drafts.isEmpty {
                         emptyState
                     }
                 }
+                .frame(maxWidth: isRegularWidth ? 900 : .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, Layout.horizontalPadding)
                 .padding(.top, Spacing.xs)
                 .padding(.bottom, 120)
@@ -595,6 +558,110 @@ struct HomeView: View {
             .navigationDestination(item: $selectedEvent) { EventDetailView(event: $0) }
             .sheet(isPresented: $showCreate) {
                 CreateEventView().presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    // MARK: - Layouts (compact vs. regular width)
+
+    /// iPhone / compact: a single stacked column, exactly as before.
+    @ViewBuilder
+    private var compactBody: some View {
+        nextEventSection
+        invitesSection
+        upcomingSection
+        draftsSection
+    }
+
+    /// iPad / regular width: the next-event poster takes the left column while
+    /// invites, upcoming, and drafts stack in a right column — the wide canvas
+    /// used for a real two-column arrangement rather than a stretched single
+    /// column. If there's no next event, the lists simply span the full width.
+    @ViewBuilder
+    private var regularWidthBody: some View {
+        if nextEvent != nil && !(invitesWaiting.isEmpty && laterEvents.isEmpty && drafts.isEmpty) {
+            HStack(alignment: .top, spacing: Spacing.lg) {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    nextEventSection
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    invitesSection
+                    upcomingSection
+                    draftsSection
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else {
+            // Only a poster, or only lists — a single column reads best.
+            nextEventSection
+            invitesSection
+            upcomingSection
+            draftsSection
+        }
+    }
+
+    // MARK: - Sections
+
+    @ViewBuilder
+    private var nextEventSection: some View {
+        if let nextEvent {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                sectionEyebrow(isHost(nextEvent) ? "Up next · you're hosting" : "Up next")
+                HomePosterHero(event: nextEvent, hosting: isHost(nextEvent)) {
+                    selectedEvent = nextEvent
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var invitesSection: some View {
+        if !invitesWaiting.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                sectionLabel("Invites waiting", badge: invitesWaiting.count)
+                ForEach(invitesWaiting, id: \.id) { event in
+                    HomeInviteCard(
+                        event: event,
+                        onRespond: { respond(to: event, status: $0) },
+                        onOpen: { selectedEvent = event }
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var upcomingSection: some View {
+        if !laterEvents.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                sectionLabel("Upcoming")
+                VStack(spacing: Spacing.xs) {
+                    ForEach(laterEvents, id: \.id) { event in
+                        Button { selectedEvent = event } label: {
+                            HomeUpcomingRow(event: event, hosting: isHost(event))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var draftsSection: some View {
+        if !drafts.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                sectionLabel("Drafts")
+                VStack(spacing: Spacing.xs) {
+                    ForEach(drafts, id: \.id) { event in
+                        Button { selectedEvent = event } label: {
+                            HomeUpcomingRow(event: event, hosting: true, isDraft: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
     }
@@ -684,6 +751,12 @@ struct HomePosterHero: View {
     let event: Event
     let hosting: Bool
     let onTap: () -> Void
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// Give the poster more presence in its column on the wide iPad canvas.
+    private var posterHeight: CGFloat {
+        horizontalSizeClass == .regular ? 340 : 240
+    }
 
     private var attendingCount: Int {
         event.guests.filter { $0.status == .attending }.count + (hosting ? 1 : 0)
@@ -752,7 +825,7 @@ struct HomePosterHero: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(height: 240)
+            .frame(height: posterHeight)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.featured, style: .continuous))
             .shadow(color: .black.opacity(0.28), radius: 18, y: 10)
         }

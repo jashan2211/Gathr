@@ -7,6 +7,7 @@ import EventKit
 struct ProfileView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query private var allEvents: [Event]
     @State private var showDeleteConfirmation = false
     @State private var showSignOutConfirmation = false

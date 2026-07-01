@@ -476,6 +476,7 @@ struct EventStatPill: View {
 struct CalendarView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var selectedEvent: Event?
 
@@ -536,6 +537,11 @@ struct CalendarView: View {
                         }
                     }
                 }
+                // The agenda is a single column of rows; on the wide iPad
+                // canvas cap it to a comfortable reading width and center it
+                // rather than letting rows stretch edge to edge.
+                .frame(maxWidth: horizontalSizeClass == .regular ? 700 : .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, Layout.horizontalPadding)
                 .padding(.top, Spacing.xs)
                 .padding(.bottom, 120)

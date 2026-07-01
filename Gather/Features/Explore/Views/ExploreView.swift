@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ExploreView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
@@ -70,8 +71,12 @@ struct ExploreView: View {
                             .animation(.easeInOut(duration: 0.2), value: result.filteredEvents.map(\.id))
                     }
 
-                    // Create Event CTA
+                    // Create Event CTA — a thin single-row card, so cap it to a
+                    // comfortable reading width and center it on the wide canvas
+                    // rather than letting it stretch edge to edge.
                     createEventCTA
+                        .frame(maxWidth: horizontalSizeClass == .regular ? 700 : .infinity)
+                        .frame(maxWidth: .infinity)
                         .horizontalPadding()
                         .padding(.top, Spacing.lg)
                         .padding(.bottom, Spacing.xl)
@@ -507,6 +512,13 @@ struct ExploreView: View {
 
     // MARK: - Events Grid
 
+    /// Two columns on iPhone; three on the wider iPad (regular width) canvas so
+    /// the poster cards fill the space instead of stretching too wide.
+    private var gridColumns: [GridItem] {
+        let count = horizontalSizeClass == .regular ? 3 : 2
+        return Array(repeating: GridItem(.flexible(), spacing: Spacing.sm), count: count)
+    }
+
     private func eventsGrid(events: [Event]) -> some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             // Section header
@@ -523,11 +535,8 @@ struct ExploreView: View {
                     .foregroundStyle(Color.gatherSecondaryText)
             }
 
-            // 2-Column Grid
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: Spacing.sm),
-                GridItem(.flexible(), spacing: Spacing.sm)
-            ], spacing: Spacing.sm) {
+            // Poster grid — 2 columns on iPhone, 3 on the wider iPad canvas.
+            LazyVGrid(columns: gridColumns, spacing: Spacing.sm) {
                 ForEach(events, id: \.id) { event in
                     Button {
                         selectedEvent = event

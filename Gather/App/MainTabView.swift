@@ -297,19 +297,21 @@ struct MainTabView: View {
         .accessibilityElement(children: .contain)
         .padding(.top, Spacing.sm)
         .padding(.bottom, Spacing.xs)
+        .padding(.horizontal, Spacing.xs)
         .background(
-            // Glass floating bar hovering over scrolling content, capped with a
-            // hairline top edge so it reads as a distinct surface on dark.
-            Rectangle()
+            // A detached glass dock hovering over the content — inset from the
+            // edges, hairline-bordered, with a deep drop shadow. The Create
+            // circle intentionally overflows its top edge.
+            RoundedRectangle(cornerRadius: CornerRadius.full, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.06))
-                        .frame(height: 1)
-                }
-                .shadow(color: .black.opacity(0.25), radius: 15, y: -6)
-                .ignoresSafeArea(edges: .bottom)
+                .overlay(
+                    RoundedRectangle(cornerRadius: CornerRadius.full, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.35), radius: 20, y: 8)
         )
+        .padding(.horizontal, Spacing.md)
+        .padding(.bottom, Spacing.xs)
     }
 
     private func tabButton(_ tab: AppState.Tab) -> some View {

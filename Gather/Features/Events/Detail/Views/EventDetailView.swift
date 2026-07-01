@@ -263,14 +263,16 @@ struct EventDetailView: View {
                 .padding(Spacing.lg)
                 .padding(.top, 30)
 
-            // Dark gradient overlay
+            // Dark gradient overlay — grain sits above the scrim, below the
+            // text, so the hero reads printed rather than flat-digital.
             LinearGradient(
                 colors: [.clear, .clear, .black.opacity(0.5), .black.opacity(0.75)],
                 startPoint: .top,
                 endPoint: .bottom
             )
+            .grain(0.08)
 
-            // Event title overlay — bold poster hierarchy
+            // Event title overlay — editorial serif poster hierarchy
             VStack(alignment: .leading, spacing: 8) {
                 Spacer()
 
@@ -282,10 +284,11 @@ struct EventDetailView: View {
                     .background(.black.opacity(0.28), in: Capsule())
 
                 Text(event.title)
-                    .gatherPosterTitle()
+                    .gatherSerifHero()
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
                     .lineLimit(3)
+                    .minimumScaleFactor(0.7)
 
                 HStack(spacing: Spacing.md) {
                     Label(heroFormattedDate, systemImage: "calendar")
@@ -382,6 +385,12 @@ struct EventDetailView: View {
         EventDetailTab.allCases.filter { $0.isVisible(for: event) }
     }
 
+    /// The event's category accent, threaded through the tab bar and CTAs so
+    /// the whole screen carries the invitation's color story.
+    private var categoryAccent: Color {
+        Color.forCategory(event.category)
+    }
+
     private var floatingTabBar: some View {
         HStack(spacing: 0) {
             ForEach(visibleTabs, id: \.self) { tab in
@@ -395,22 +404,22 @@ struct EventDetailView: View {
                         ZStack {
                             if selectedTab == tab {
                                 Circle()
-                                    .fill(LinearGradient.gatherAccentGradient)
+                                    .fill(categoryAccent)
                                     .matchedGeometryEffect(id: "activeTab", in: tabNamespace)
                                     .frame(width: 36, height: 36)
-                                    .shadow(color: Color.accentPurpleFallback.opacity(0.4), radius: 8, y: 2)
+                                    .shadow(color: categoryAccent.opacity(0.4), radius: 8, y: 2)
                             }
 
                             Image(systemName: tab.icon)
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(selectedTab == tab ? .white : Color.gatherSecondaryText)
+                                .foregroundStyle(selectedTab == tab ? Color.onCategory(event.category) : Color.gatherSecondaryText)
                                 .scaleEffect(selectedTab == tab ? 1.1 : 1.0)
                         }
 
                         Text(tab.rawValue)
                             .font(.caption2)
                             .fontWeight(selectedTab == tab ? .bold : .medium)
-                            .foregroundStyle(selectedTab == tab ? Color.accentPurpleFallback : Color.gatherSecondaryText)
+                            .foregroundStyle(selectedTab == tab ? Color.gatherPrimaryText : Color.gatherSecondaryText)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
@@ -504,6 +513,7 @@ struct EventDetailView: View {
                     .padding(.vertical, Spacing.sm)
                     .background(LinearGradient.gatherAccentGradient)
                     .clipShape(Capsule())
+                    .accentGlow(Color.accentPurpleFallback, radius: 14)
                 }
                 .accessibilityLabel("Publish event")
             }
@@ -731,6 +741,7 @@ struct EventDetailView: View {
                     .padding(.vertical, Spacing.sm)
                     .background(LinearGradient.gatherAccentGradient)
                     .clipShape(Capsule())
+                    .accentGlow(Color.accentPurpleFallback, radius: 14)
                 }
             } else {
                 Button {
@@ -746,6 +757,7 @@ struct EventDetailView: View {
                     .padding(.vertical, Spacing.sm)
                     .background(LinearGradient.gatherAccentGradient)
                     .clipShape(Capsule())
+                    .accentGlow(Color.accentPurpleFallback, radius: 14)
                 }
             }
         }
@@ -798,6 +810,7 @@ struct EventDetailView: View {
                     .padding(.vertical, Spacing.sm)
                     .background(LinearGradient.gatherAccentGradient)
                     .clipShape(Capsule())
+                    .accentGlow(Color.accentPurpleFallback, radius: 14)
             }
         }
         .padding()

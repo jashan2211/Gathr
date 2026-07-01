@@ -134,7 +134,7 @@ struct CreateEventView: View {
                     .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
                 Text(step.title)
-                    .gatherPosterTitle()
+                    .font(.system(size: 24, weight: .bold, design: .serif))
                     .foregroundStyle(Color.gatherPrimaryText)
             }
         }
@@ -327,12 +327,14 @@ struct CreateEventView: View {
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                 } else {
                     RoundedRectangle(cornerRadius: CornerRadius.sm)
-                        .fill(Color.gatherSurface)
+                        .fill(LinearGradient.categoryGradientVibrant(for: selectedCategory))
                         .frame(width: 64, height: 48)
+                        .grain(0.07)
+                        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
                         .overlay {
                             Image(systemName: "photo.badge.plus")
                                 .font(.callout)
-                                .foregroundStyle(Color.forCategory(selectedCategory))
+                                .foregroundStyle(Color.onCategory(selectedCategory))
                         }
                 }
 
@@ -528,6 +530,7 @@ struct CreateEventView: View {
                                 : AnyShapeStyle(Color.gatherElevated)
                         )
                         .clipShape(Capsule())
+                        .accentGlow(canProceed ? Color.accentPurpleFallback : .clear, radius: 12)
                         .opacity(canProceed ? 1 : 0.6)
                     }
                     .disabled(!canProceed || isSubmitting)

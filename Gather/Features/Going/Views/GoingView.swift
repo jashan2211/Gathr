@@ -673,7 +673,7 @@ struct HomeView: View {
                     .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
                 Text("Home")
-                    .gatherScreenTitle()
+                    .gatherSerifScreenTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
             }
             Spacer()
@@ -755,7 +755,7 @@ struct HomePosterHero: View {
 
     /// Give the poster more presence in its column on the wide iPad canvas.
     private var posterHeight: CGFloat {
-        horizontalSizeClass == .regular ? 340 : 240
+        horizontalSizeClass == .regular ? 340 : 280
     }
 
     private var attendingCount: Int {
@@ -793,9 +793,9 @@ struct HomePosterHero: View {
                     }
                     Spacer()
                     Text(event.title)
-                        .gatherPosterTitle()
+                        .gatherSerifPosterTitle()
                         .foregroundStyle(.white)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .multilineTextAlignment(.leading)
                         .padding(.bottom, 6)
                     HStack(spacing: 6) {
@@ -826,8 +826,12 @@ struct HomePosterHero: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .frame(height: posterHeight)
+            // Film grain over the gradient (before the clip) so the poster
+            // reads as printed, not a flat digital gradient.
+            .grain(0.08)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.featured, style: .continuous))
             .shadow(color: .black.opacity(0.28), radius: 18, y: 10)
+            .accentGlow(Color.forCategory(event.category))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
@@ -851,54 +855,70 @@ struct HomePosterHero: View {
     }
 }
 
-// MARK: - Home compact row
+// MARK: - Home compact row (ticket)
 
+/// An upcoming event drawn as a real ticket: the date is the tear-off stub on
+/// the left, separated from the content by a perforation with edge notches.
 struct HomeUpcomingRow: View {
     let event: Event
     let hosting: Bool
     var isDraft: Bool = false
+
+    /// Where the stub's perforation sits, as a fraction of the ticket width.
+    private let stubFraction: CGFloat = 0.26
+    private let ticketHeight: CGFloat = 76
 
     private var tagColor: Color {
         isDraft ? Color.gatherSecondaryText : (hosting ? Color.accentPurpleFallback : Color.rsvpYesFallback)
     }
 
     var body: some View {
-        HStack(spacing: Spacing.sm) {
-            VStack(spacing: 0) {
-                Text(event.startDate.formatted(.dateTime.month(.abbreviated)).uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.forCategory(event.category))
-                Text(event.startDate.formatted(.dateTime.day()))
-                    .font(.system(size: 20, weight: .heavy))
-                    .foregroundStyle(Color.gatherPrimaryText)
-            }
-            .frame(width: 52, height: 52)
-            .background(Color.gatherElevated, in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(event.title)
-                    .gatherRowTitle()
-                    .foregroundStyle(Color.gatherPrimaryText)
-                    .lineLimit(1)
-                HStack(spacing: 4) {
-                    Text(event.startDate.formatted(.dateTime.hour().minute()))
-                    if let loc = event.location?.name {
-                        Text("· \(loc)").lineLimit(1)
-                    }
+        GeometryReader { geo in
+            HStack(spacing: 0) {
+                // Date stub — centered in the tear-off portion.
+                VStack(spacing: 1) {
+                    Text(event.startDate.formatted(.dateTime.month(.abbreviated)).uppercased())
+                        .gatherEyebrow()
+                        .foregroundStyle(Color.forCategory(event.category))
+                    Text(event.startDate.formatted(.dateTime.day()))
+                        .font(.system(size: 24, weight: .heavy))
+                        .foregroundStyle(Color.gatherPrimaryText)
                 }
-                .gatherMetaText()
-                .foregroundStyle(Color.gatherSecondaryText)
+                .frame(width: geo.size.width * stubFraction)
+                .frame(maxHeight: .infinity)
+
+                // Content — right of the perforation.
+                HStack(spacing: Spacing.sm) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(event.title)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.gatherPrimaryText)
+                            .lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(event.startDate.formatted(.dateTime.hour().minute()))
+                            if let loc = event.location?.name {
+                                Text("· \(loc)").lineLimit(1)
+                            }
+                        }
+                        .gatherMetaText()
+                        .foregroundStyle(Color.gatherSecondaryText)
+                    }
+                    Spacer(minLength: Spacing.xs)
+                    Text(isDraft ? "Draft" : (hosting ? "Hosting" : "Going"))
+                        .gatherEyebrow()
+                        .foregroundStyle(tagColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(tagColor.opacity(0.15), in: Capsule())
+                }
+                .padding(.horizontal, Spacing.sm)
+                .frame(maxHeight: .infinity)
             }
-            Spacer()
-            Text(isDraft ? "Draft" : (hosting ? "Hosting" : "Going"))
-                .gatherEyebrow()
-                .foregroundStyle(tagColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(tagColor.opacity(0.15), in: Capsule())
         }
-        .padding(12)
-        .surfaceCard()
+        .frame(height: ticketHeight)
+        .background(Color.gatherSurface)
+        .clipShape(TicketShape(cornerRadius: 18, notchRadius: 7, stubFraction: stubFraction))
+        .overlay(TicketPerforation(stubFraction: stubFraction))
     }
 }
 
@@ -952,6 +972,10 @@ struct HomeInviteCard: View {
             RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
                 .strokeBorder(Color.accentPinkFallback.opacity(0.4), lineWidth: 1)
         )
+        // Category colors the accent, and the whole card gets a soft pink
+        // lift so a waiting invite feels like the room's warmest object.
+        .categoryAccentBar(Color.forCategory(event.category))
+        .accentGlow(Color.accentPinkFallback, radius: 12)
     }
 
     private func respondButton(_ label: String, _ status: RSVPStatus, _ color: Color) -> some View {

@@ -65,9 +65,9 @@ struct MyTicketsView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.gatherSecondaryText)
 
+                // Serif display moment — the editorial signature
                 Text("Tickets")
-                    .font(.system(size: 34, weight: .heavy))
-                    .kerning(-1)
+                    .gatherSerifScreenTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
                     .accessibilityAddTraits(.isHeader)
             }
@@ -98,102 +98,134 @@ struct MyTicketsView: View {
 
 // MARK: - Ticket Card
 
+/// A REAL ticket: surface card clipped to the signature `TicketShape` with a
+/// dashed `TicketPerforation` tear line. The left stub carries the QR code
+/// (light backing for scannability) and date; the body carries the event
+/// title and meta.
 private struct TicketCard: View {
     let ticket: Ticket
     let event: Event?
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private static let stubFraction: CGFloat = 0.3
 
     private var category: EventCategory {
         event?.category ?? .custom
     }
 
+    private var ticketSilhouette: TicketShape {
+        TicketShape(cornerRadius: 18, notchRadius: 8, stubFraction: Self.stubFraction)
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Poster header: category gradient band with bold event title
-            VStack(alignment: .leading, spacing: Spacing.sm) {
-                HStack(alignment: .top) {
-                    Text(category.emoji)
-                        .font(.system(size: 30))
-                    Spacer()
-                    statusBadge
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(event?.title ?? "Event")
-                        .font(.system(size: 22, weight: .heavy))
-                        .kerning(-0.5)
-                        .foregroundStyle(Color.onCategory(category))
-                        .lineLimit(2)
-
-                    if let event {
-                        HStack(spacing: Spacing.xs) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 11, weight: .bold))
-                            Text(GatherDateFormatter.fullEventDate.string(from: event.startDate))
-                                .font(.system(size: 13, weight: .semibold))
-                        }
-                        .foregroundStyle(Color.onCategory(category).opacity(0.85))
-
-                        if let location = event.location {
-                            HStack(spacing: Spacing.xs) {
-                                Image(systemName: "mappin")
-                                    .font(.system(size: 11, weight: .bold))
-                                Text(location.name)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .lineLimit(1)
-                            }
-                            .foregroundStyle(Color.onCategory(category).opacity(0.85))
-                        }
-                    }
-                }
-            }
-            .padding(Spacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color.forCategory(category),
-                        Color.forCategory(category).opacity(0.78)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-
-            // Perforated stub divider
-            DashedDivider()
-                .padding(.horizontal, Spacing.sm)
-                .padding(.vertical, Spacing.xs)
-
-            // QR Code + Ticket details
-            HStack(spacing: Spacing.md) {
-                // QR Code on a light backing so the code stays scannable
-                if let qrImage = generateQRCode(from: ticket.qrCodeData) {
-                    Image(uiImage: qrImage)
-                        .interpolation(.none)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 72, height: 72)
-                        .padding(Spacing.xs)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
-                }
-
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    ticketDetail(label: "Ticket", value: ticket.ticketNumber)
-                    ticketDetail(label: "Guest", value: ticket.guestName)
-                    ticketDetail(label: "Qty", value: "\(ticket.quantity)")
-                    if ticket.totalPrice > 0 {
-                        ticketDetail(label: "Total", value: GatherPriceFormatter.format(ticket.totalPrice))
-                    } else {
-                        ticketDetail(label: "Total", value: "Free")
-                    }
-                }
-
-                Spacer()
-            }
-            .padding(Spacing.md)
+        TicketSplitLayout(stubFraction: Self.stubFraction) {
+            stub
+            content
         }
-        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
-        .surfaceCard()
+        .background(Color.gatherSurface)
+        .clipShape(ticketSilhouette)
+        .overlay(TicketPerforation(stubFraction: Self.stubFraction))
+        .overlay(
+            ticketSilhouette
+                .stroke(
+                    Color.white.opacity(colorScheme == .dark ? 0.06 : 0),
+                    lineWidth: 1
+                )
+        )
+        .shadow(
+            color: .black.opacity(colorScheme == .dark ? 0 : 0.05),
+            radius: 8, y: 4
+        )
+    }
+
+    // MARK: Stub — QR + date (the tear-off half)
+
+    private var stub: some View {
+        VStack(spacing: Spacing.xs) {
+            // QR code on a light backing so the code stays scannable
+            if let qrImage = generateQRCode(from: ticket.qrCodeData) {
+                Image(uiImage: qrImage)
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 64, height: 64)
+                    .padding(6)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
+                    .accessibilityLabel("Ticket QR code")
+            }
+
+            if let event {
+                VStack(spacing: 0) {
+                    Text(event.startDate.formatted(.dateTime.month(.abbreviated)).uppercased())
+                        .gatherEyebrow()
+                        .foregroundStyle(Color.gatherSecondaryText)
+                    Text(event.startDate.formatted(.dateTime.day()))
+                        .font(.system(size: 22, weight: .heavy))
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .contentTransition(.numericText())
+                }
+            }
+        }
+        .padding(.vertical, Spacing.md)
+        .padding(.horizontal, Spacing.xs)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.forCategory(category).opacity(0.10))
+    }
+
+    // MARK: Body — event title + meta + details
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            HStack(alignment: .top) {
+                Text(category.emoji)
+                    .font(.system(size: 22))
+                Spacer()
+                statusBadge
+            }
+
+            Text(event?.title ?? "Event")
+                .font(.system(size: 18, weight: .bold))
+                .kerning(-0.3)
+                .foregroundStyle(Color.gatherPrimaryText)
+                .lineLimit(2)
+
+            if let event {
+                HStack(spacing: Spacing.xs) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 11, weight: .bold))
+                    Text(GatherDateFormatter.fullEventDate.string(from: event.startDate))
+                        .gatherMetaText()
+                        .lineLimit(1)
+                }
+                .foregroundStyle(Color.gatherSecondaryText)
+
+                if let location = event.location {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "mappin")
+                            .font(.system(size: 11, weight: .bold))
+                        Text(location.name)
+                            .gatherMetaText()
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(Color.gatherSecondaryText)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                ticketDetail(label: "Ticket", value: ticket.ticketNumber)
+                ticketDetail(label: "Guest", value: ticket.guestName)
+                ticketDetail(label: "Qty", value: "\(ticket.quantity)")
+                if ticket.totalPrice > 0 {
+                    ticketDetail(label: "Total", value: GatherPriceFormatter.format(ticket.totalPrice))
+                } else {
+                    ticketDetail(label: "Total", value: "Free")
+                }
+            }
+            .padding(.top, Spacing.xxs)
+        }
+        .padding(Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var statusBadge: some View {
@@ -204,10 +236,10 @@ private struct TicketCard: View {
                 .font(.caption2)
                 .fontWeight(.bold)
         }
-        .foregroundStyle(Color.onCategory(category))
+        .foregroundStyle(Color.forCategory(category))
         .padding(.horizontal, Spacing.xs)
         .padding(.vertical, 4)
-        .background(Color.onCategory(category).opacity(0.18), in: Capsule())
+        .background(Color.forCategory(category).opacity(0.15), in: Capsule())
     }
 
     private func ticketDetail(label: String, value: String) -> some View {
@@ -237,19 +269,38 @@ private struct TicketCard: View {
     }
 }
 
-// MARK: - Dashed Divider
+// MARK: - Ticket Split Layout
 
-private struct DashedDivider: View {
-    var body: some View {
-        GeometryReader { geo in
-            Path { path in
-                path.move(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: geo.size.width, y: 0))
-            }
-            .stroke(style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-            .foregroundStyle(Color.gatherSecondaryText.opacity(0.4))
-        }
-        .frame(height: 1)
+/// Splits exactly two children at `stubFraction` of the available width so the
+/// stub content lines up with the `TicketShape` notches and the
+/// `TicketPerforation` tear line at any card width.
+/// (Qualified as `SwiftUI.Layout` — the app's `Layout` token enum shadows the
+/// protocol name.)
+private struct TicketSplitLayout: SwiftUI.Layout {
+    var stubFraction: CGFloat = 0.3
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let width = proposal.width ?? 320
+        let stubWidth = width * stubFraction
+        let stubHeight = subviews[0].sizeThatFits(ProposedViewSize(width: stubWidth, height: nil)).height
+        let bodyHeight = subviews[1].sizeThatFits(ProposedViewSize(width: width - stubWidth, height: nil)).height
+        return CGSize(width: width, height: max(stubHeight, bodyHeight))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let stubWidth = bounds.width * stubFraction
+        subviews[0].place(
+            at: CGPoint(x: bounds.minX, y: bounds.minY),
+            anchor: .topLeading,
+            proposal: ProposedViewSize(width: stubWidth, height: bounds.height)
+        )
+        subviews[1].place(
+            at: CGPoint(x: bounds.minX + stubWidth, y: bounds.minY),
+            anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width - stubWidth, height: bounds.height)
+        )
     }
 }
 

@@ -130,6 +130,23 @@ extension View {
     func gatherEyebrow() -> some View { self.font(.system(size: 11, weight: .heavy)).tracking(0.5) }
 }
 
+// MARK: - Serif Display (the Gathr Editorial signature)
+
+/// The signature voice of the app: Apple's New York serif at heavy weights for
+/// event titles and screen headers — an editorial, invitation-like look that
+/// no system-font app has. Body/meta text stays SF for readability; serif is
+/// reserved for display moments so it stays special.
+extension View {
+    /// 40pt heavy serif — hero display (event detail hero, auth wordmark).
+    func gatherSerifHero() -> some View { self.font(.system(size: 40, weight: .heavy, design: .serif)).kerning(-0.5) }
+    /// 32pt heavy serif — screen titles (Home, Explore, Calendar, You).
+    func gatherSerifScreenTitle() -> some View { self.font(.system(size: 32, weight: .heavy, design: .serif)).kerning(-0.5) }
+    /// 26pt heavy serif — poster/card titles over imagery.
+    func gatherSerifPosterTitle() -> some View { self.font(.system(size: 26, weight: .heavy, design: .serif)).kerning(-0.3) }
+    /// 20pt bold serif — prominent inline titles (row/section display moments).
+    func gatherSerifHeadline() -> some View { self.font(.system(size: 20, weight: .bold, design: .serif)) }
+}
+
 // MARK: - Accessibility Helpers
 
 extension Font {

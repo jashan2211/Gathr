@@ -57,6 +57,7 @@ struct HappeningSoonCard: View {
                 }
             }
             .frame(width: 200, height: 110)
+            .grain(0.07) // printed-poster texture, applied before the clip
             .clipped()
 
             // Info
@@ -107,6 +108,7 @@ struct HappeningSoonCard: View {
         }
         .frame(width: 200)
         .surfaceCard()
+        .categoryAccentBar(Color.forCategory(event.category))
         .drawingGroup()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(event.title), \(relativeDay). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending")
@@ -182,6 +184,7 @@ struct ExploreGridCard: View {
                 }
                 .padding(Spacing.xs)
             }
+            .grain(0.07) // printed-poster texture, applied before the clip
             .clipped()
 
             // Content
@@ -258,6 +261,7 @@ struct ExploreGridCard: View {
             .padding(Spacing.sm)
         }
         .surfaceCard()
+        .categoryAccentBar(Color.forCategory(event.category))
         .drawingGroup()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(event.title). \(priceLabel). \(smartDate). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending")

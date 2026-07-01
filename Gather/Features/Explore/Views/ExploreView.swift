@@ -131,12 +131,12 @@ struct ExploreView: View {
     private var greetingHeader: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: Spacing.xxs) {
-                Text(headerSubtitle)
-                    .gatherMetaText()
+                Text(headerSubtitle.uppercased())
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 Text("Explore")
-                    .gatherScreenTitle()
+                    .gatherSerifScreenTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
                     .accessibilityAddTraits(.isHeader)
             }
@@ -356,7 +356,9 @@ struct ExploreView: View {
             selectedEvent = event
         } label: {
             ZStack(alignment: .bottom) {
-                // Mesh gradient background
+                // Mesh gradient background — grain gives it printed-poster
+                // texture instead of a flat digital gradient (applied before
+                // the outer clip).
                 CategoryMeshBackground(category: event.category)
                     .frame(height: Layout.heroHeightFeatured)
                     .overlay(alignment: .topLeading) {
@@ -366,10 +368,11 @@ struct ExploreView: View {
                             .rotationEffect(.degrees(-15))
                             .offset(x: -10, y: -10)
                     }
+                    .grain(0.08)
 
-                // Dark overlay for readability
+                // Dark overlay — deep enough for the serif title to pop
                 LinearGradient(
-                    colors: [.clear, .clear, .black.opacity(0.45), .black.opacity(0.8)],
+                    colors: [.clear, .black.opacity(0.15), .black.opacity(0.6), .black.opacity(0.9)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -412,9 +415,9 @@ struct ExploreView: View {
 
                     Spacer()
 
-                    // Event info
+                    // Event info — serif display, the Gathr editorial signature
                     Text(event.title)
-                        .gatherPosterTitle()
+                        .gatherSerifPosterTitle()
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
@@ -455,8 +458,8 @@ struct ExploreView: View {
                 }
                 .padding(Spacing.lg)
             }
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
-            .shadow(color: .black.opacity(0.25), radius: 14, y: 8)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.featured, style: .continuous))
+            .accentGlow(Color.forCategory(event.category))
         }
         .buttonStyle(CardPressStyle())
         .zoomSource(id: event.id, in: zoomNamespace)
@@ -559,21 +562,22 @@ struct ExploreView: View {
             HStack(spacing: Spacing.md) {
                 ZStack {
                     Circle()
-                        .fill(LinearGradient.gatherAccentGradient)
+                        .fill(.white.opacity(0.22))
                         .frame(width: 44, height: 44)
                     Image(systemName: "plus")
                         .font(.title3)
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Host Your Own Event")
                         .font(GatherFont.headline)
-                        .foregroundStyle(Color.gatherPrimaryText)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
                     Text("Create and share with friends")
                         .font(GatherFont.caption)
-                        .foregroundStyle(Color.gatherSecondaryText)
+                        .foregroundStyle(.white.opacity(0.85))
                 }
 
                 Spacer()
@@ -581,10 +585,13 @@ struct ExploreView: View {
                 Image(systemName: "chevron.right")
                     .font(.callout)
                     .fontWeight(.semibold)
-                    .foregroundStyle(Color.accentPurpleFallback)
+                    .foregroundStyle(.white)
             }
             .padding(Spacing.md)
-            .surfaceCard()
+            .background(LinearGradient.gatherAccentGradient)
+            .grain(0.06)
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+            .accentGlow(Color.accentPurpleFallback)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Host your own event. Create and share with friends.")
             .accessibilityAddTraits(.isButton)

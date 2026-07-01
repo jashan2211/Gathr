@@ -508,7 +508,7 @@ struct CalendarView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.lg) {
                     Text("Calendar")
-                        .gatherScreenTitle()
+                        .gatherSerifScreenTitle()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .padding(.top, Spacing.xs)
 

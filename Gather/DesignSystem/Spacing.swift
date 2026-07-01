@@ -772,9 +772,9 @@ struct TicketStubIllustration: View {
 
     var body: some View {
         ZStack {
-            TicketShape(notchRadius: 9, perforationX: perforationX / ticketWidth)
+            TicketStubShape(notchRadius: 9, perforationX: perforationX / ticketWidth)
                 .fill(Color.gatherSecondaryBackground)
-            TicketShape(notchRadius: 9, perforationX: perforationX / ticketWidth)
+            TicketStubShape(notchRadius: 9, perforationX: perforationX / ticketWidth)
                 .stroke(accent.opacity(0.25), lineWidth: 1.5)
 
             // Dashed perforation between body and stub
@@ -805,8 +805,9 @@ struct TicketStubIllustration: View {
 }
 
 /// A ticket outline: rounded rectangle with semicircular notches punched out
-/// of the top and bottom edges at the perforation line.
-struct TicketShape: Shape {
+/// of the top and bottom edges at the perforation line. (Illustration-only
+/// variant — the signature card silhouette is `TicketShape` below.)
+struct TicketStubShape: Shape {
     var notchRadius: CGFloat = 9
     /// Perforation position as a fraction of the width (0...1)
     var perforationX: CGFloat = 0.68
@@ -941,5 +942,119 @@ struct CategoryMeshBackground: View {
                 neutralFillLight, .gatherSecondaryBackground, .accentPurpleFallback.opacity(0.2)
             ]
         }
+    }
+}
+
+// MARK: - Ticket Shape (signature event-card silhouette)
+
+/// A ticket silhouette: a rounded rectangle with semicircular notches cut into
+/// the top and bottom edges at `stubFraction` of the width, so a left "stub"
+/// (date block) reads as tear-off from the content. Pair with
+/// `TicketPerforation` at the same fraction for the dashed tear line.
+struct TicketShape: Shape {
+    var cornerRadius: CGFloat = 18
+    var notchRadius: CGFloat = 7
+    /// Horizontal position of the notches as a fraction of width (the stub edge).
+    var stubFraction: CGFloat = 0.24
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let nx = rect.minX + rect.width * stubFraction
+
+        p.move(to: CGPoint(x: rect.minX + cornerRadius, y: rect.minY))
+        // Top edge → notch
+        p.addLine(to: CGPoint(x: nx - notchRadius, y: rect.minY))
+        p.addArc(center: CGPoint(x: nx, y: rect.minY), radius: notchRadius,
+                 startAngle: .degrees(180), endAngle: .degrees(0), clockwise: true)
+        // Top edge → top-right corner
+        p.addLine(to: CGPoint(x: rect.maxX - cornerRadius, y: rect.minY))
+        p.addArc(center: CGPoint(x: rect.maxX - cornerRadius, y: rect.minY + cornerRadius),
+                 radius: cornerRadius, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        // Right edge → bottom-right corner
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - cornerRadius))
+        p.addArc(center: CGPoint(x: rect.maxX - cornerRadius, y: rect.maxY - cornerRadius),
+                 radius: cornerRadius, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        // Bottom edge → notch
+        p.addLine(to: CGPoint(x: nx + notchRadius, y: rect.maxY))
+        p.addArc(center: CGPoint(x: nx, y: rect.maxY), radius: notchRadius,
+                 startAngle: .degrees(0), endAngle: .degrees(180), clockwise: true)
+        // Bottom edge → bottom-left corner
+        p.addLine(to: CGPoint(x: rect.minX + cornerRadius, y: rect.maxY))
+        p.addArc(center: CGPoint(x: rect.minX + cornerRadius, y: rect.maxY - cornerRadius),
+                 radius: cornerRadius, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        // Left edge → top-left corner
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + cornerRadius))
+        p.addArc(center: CGPoint(x: rect.minX + cornerRadius, y: rect.minY + cornerRadius),
+                 radius: cornerRadius, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// The dashed tear line drawn at the ticket's stub edge.
+struct TicketPerforation: View {
+    var stubFraction: CGFloat = 0.24
+    var color: Color = Color.white.opacity(0.14)
+
+    var body: some View {
+        GeometryReader { geo in
+            Path { p in
+                let x = geo.size.width * stubFraction
+                p.move(to: CGPoint(x: x, y: 8))
+                p.addLine(to: CGPoint(x: x, y: geo.size.height - 8))
+            }
+            .stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            .foregroundStyle(color)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Grain Texture (kills flat-gradient cheapness)
+
+/// Deterministic pseudo-random generator — `Canvas` bodies re-evaluate, so the
+/// grain must be stable frame to frame (and cheap: no Foundation RNG).
+private struct SeededRandom {
+    var state: UInt64
+    init(seed: UInt64) { state = seed }
+    mutating func next() -> CGFloat {
+        state = state &* 6364136223846793005 &+ 1442695040888963407
+        return CGFloat((state >> 33) % 10_000) / 10_000
+    }
+}
+
+/// A static film-grain speckle. Overlay on gradient heroes and posters to give
+/// them printed-poster texture instead of a flat digital gradient.
+struct GrainOverlay: View {
+    var opacity: Double = 0.07
+
+    var body: some View {
+        Canvas { context, size in
+            var rng = SeededRandom(seed: 0x9E37_79B9)
+            let count = Int(size.width * size.height / 130)
+            for _ in 0..<count {
+                let x = rng.next() * size.width
+                let y = rng.next() * size.height
+                let w = 0.6 + rng.next() * 1.0
+                let bright = rng.next() > 0.45
+                context.fill(
+                    Path(CGRect(x: x, y: y, width: w, height: w)),
+                    with: .color(bright ? .white.opacity(opacity) : .black.opacity(opacity * 1.4))
+                )
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+extension View {
+    /// Film-grain texture over gradient/poster surfaces. Apply before clipping.
+    func grain(_ opacity: Double = 0.07) -> some View {
+        overlay(GrainOverlay(opacity: opacity))
+    }
+
+    /// Soft colored glow under posters and primary CTAs — premium lift.
+    func accentGlow(_ color: Color, radius: CGFloat = 18) -> some View {
+        shadow(color: color.opacity(0.35), radius: radius, y: 8)
     }
 }

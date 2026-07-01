@@ -201,6 +201,7 @@ struct EventFormCategoryGradientPlaceholder: View {
                 .opacity(0.15)
                 .rotationEffect(.degrees(-15))
         }
+        .grain(0.07)
         .frame(height: Layout.heroHeight)
     }
 }
@@ -618,6 +619,7 @@ struct EventLocationSection: View {
             .padding(Spacing.md)
             .background(LinearGradient.gatherAccentGradient)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+            .accentGlow(Color.accentPurpleFallback, radius: 12)
         }
         .buttonStyle(.plain)
     }

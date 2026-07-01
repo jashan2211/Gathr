@@ -103,11 +103,13 @@ struct OverviewTab: View {
     // MARK: - Quick Actions
 
     private var quickActionsSection: some View {
+        // Tiles share the event's category accent so the whole screen carries
+        // one color story instead of a rainbow of unrelated tints.
         HStack(spacing: Spacing.sm) {
             QuickActionCard(
                 icon: "person.badge.plus",
                 title: "Add Guest",
-                color: .accentPurpleFallback
+                color: Color.forCategory(event.category)
             ) {
                 showAddGuest = true
             }
@@ -116,7 +118,7 @@ struct OverviewTab: View {
             QuickActionCard(
                 icon: "paperplane.fill",
                 title: "Send Invites",
-                color: .neonBlue
+                color: Color.forCategory(event.category)
             ) {
                 showSendInvites = true
             }
@@ -125,7 +127,7 @@ struct OverviewTab: View {
             QuickActionCard(
                 icon: "square.and.arrow.up",
                 title: "Share",
-                color: .mintGreen
+                color: Color.forCategory(event.category)
             ) {
                 showShareSheet = true
             }
@@ -227,8 +229,7 @@ struct OverviewTab: View {
                     .background(Color.forCategory(event.category))
 
                 Text(dayNumber)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .gatherSerifHeadline()
                     .foregroundStyle(Color.gatherPrimaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.xs)
@@ -509,9 +510,9 @@ struct QuickActionCard: View {
             VStack(spacing: Spacing.xs) {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(color)
                     .frame(width: 40, height: 40)
-                    .background(color)
+                    .background(color.opacity(0.15))
                     .clipShape(Circle())
 
                 Text(title)

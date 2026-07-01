@@ -9,7 +9,7 @@ struct AuthView: View {
 
     var body: some View {
         ZStack {
-            // Background gradient
+            // Background gradient — film grain so it reads printed, not flat
             LinearGradient(
                 colors: [
                     Color.accentPurpleFallback.opacity(0.12),
@@ -19,6 +19,7 @@ struct AuthView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+            .grain(0.05)
             .ignoresSafeArea()
 
             // Floating decorative orbs
@@ -67,9 +68,9 @@ struct AuthView: View {
                             .opacity(logoVisible ? 1 : 0)
                     }
 
+                    // The brand moment — editorial serif wordmark
                     Text("Gather")
-                        .font(.system(size: 48, weight: .heavy))
-                        .kerning(-1)
+                        .gatherSerifHero()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .scaleEffect(logoVisible ? 1 : 0.8)
                         .opacity(logoVisible ? 1 : 0)
@@ -169,7 +170,7 @@ struct AuthView: View {
                             .background(LinearGradient.gatherAccentGradient)
                             .foregroundStyle(.white)
                             .clipShape(Capsule())
-                            .shadow(color: Color.accentPurpleFallback.opacity(0.3), radius: 12, y: 6)
+                            .accentGlow(Color.accentPinkFallback, radius: 16)
                         }
                         .scaleEffect(buttonsVisible ? 1 : 0.9)
                         .opacity(buttonsVisible ? 1 : 0)

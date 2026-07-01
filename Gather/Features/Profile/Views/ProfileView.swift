@@ -154,8 +154,9 @@ struct ProfileView: View {
                     .modifier(GradientRing(color: Color.accentPurpleFallback, lineWidth: 3))
 
                 VStack(alignment: .leading, spacing: 4) {
+                    // Serif display moment — the editorial signature
                     Text(authManager.currentUser?.name ?? "User")
-                        .gatherPosterTitle()
+                        .gatherSerifScreenTitle()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)

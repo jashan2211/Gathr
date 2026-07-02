@@ -978,13 +978,25 @@ struct HomeUpcomingRow: View {
     let event: Event
     let hosting: Bool
     var isDraft: Bool = false
+    /// Whether the viewer is going. Defaults to true so existing call sites
+    /// (which only list the viewer's own events) keep the "Going" tag; set false
+    /// for a public event the viewer has discovered but not joined → "Public".
+    var attending: Bool = true
 
     /// Where the stub's perforation sits, as a fraction of the ticket width.
     private let stubFraction: CGFloat = 0.26
     private let ticketHeight: CGFloat = 76
 
+    private var tagText: String {
+        if isDraft { return "Draft" }
+        if hosting { return "Hosting" }
+        return attending ? "Going" : "Public"
+    }
+
     private var tagColor: Color {
-        isDraft ? Color.gatherSecondaryText : (hosting ? Color.accentPurpleFallback : Color.rsvpYesFallback)
+        if isDraft { return Color.gatherSecondaryText }
+        if hosting { return Color.accentPurpleFallback }
+        return attending ? Color.rsvpYesFallback : Color.neonBlue
     }
 
     var body: some View {
@@ -1019,7 +1031,7 @@ struct HomeUpcomingRow: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                     }
                     Spacer(minLength: Spacing.xs)
-                    Text(isDraft ? "Draft" : (hosting ? "Hosting" : "Going"))
+                    Text(tagText)
                         .gatherEyebrow()
                         .foregroundStyle(tagColor)
                         .padding(.horizontal, 8)

@@ -473,30 +473,59 @@ struct EventStatPill: View {
 
 /// An agenda of every event you host or attend, grouped by month. Reuses the
 /// Home compact row for a consistent look.
+/// The three lenses on the Events tab.
+enum EventsScope: String, CaseIterable, Identifiable {
+    case future = "Future"
+    case past = "Past"
+    case mine = "My Events"
+    var id: String { rawValue }
+}
+
 struct CalendarView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var selectedEvent: Event?
+    @State private var scope: EventsScope = .future
+    @Namespace private var scopeNS
 
     private var myId: UUID? { authManager.currentUser?.id }
-    private func mine(_ e: Event) -> Bool {
-        e.hostId == myId || (myId != nil && e.guests.contains { $0.userId == myId })
+    private func hosting(_ e: Event) -> Bool { e.hostId == myId }
+    private func attending(_ e: Event) -> Bool {
+        myId != nil && e.guests.contains { $0.userId == myId }
     }
-    private var events: [Event] {
-        allEvents.filter { !$0.isDraft && mine($0) }
+    private func mine(_ e: Event) -> Bool { hosting(e) || attending(e) }
+
+    /// Events for the active scope.
+    private var scopedEvents: [Event] {
+        switch scope {
+        case .future:
+            // Upcoming or in-progress — the viewer's own events AND public events
+            // from anyone (surfaced through the Discover feed).
+            return allEvents.filter { !$0.isDraft && !$0.isPast && (mine($0) || $0.privacy == .publicEvent) }
+        case .past:
+            // What already happened, limited to the viewer's own events.
+            return allEvents.filter { !$0.isDraft && $0.isPast && mine($0) }
+        case .mine:
+            // Everything the viewer hosts or is going to, past and future.
+            return allEvents.filter { !$0.isDraft && mine($0) }
+        }
     }
 
+    /// Month-grouped for display. Past reads newest-first; the others oldest-first.
     private var grouped: [(title: String, key: Int, events: [Event])] {
         let cal = Calendar.current
-        let groups = Dictionary(grouping: events) { event -> Int in
+        let descending = scope == .past
+        let groups = Dictionary(grouping: scopedEvents) { event -> Int in
             let c = cal.dateComponents([.year, .month], from: event.startDate)
             return (c.year ?? 0) * 100 + (c.month ?? 0)
         }
         return groups
-            .sorted { $0.key < $1.key }
-            .map { (title: monthTitle($0.value.first?.startDate ?? Date()), key: $0.key, events: $0.value.sorted { $0.startDate < $1.startDate }) }
+            .sorted { descending ? $0.key > $1.key : $0.key < $1.key }
+            .map { (title: monthTitle($0.value.first?.startDate ?? Date()),
+                    key: $0.key,
+                    events: $0.value.sorted { descending ? $0.startDate > $1.startDate : $0.startDate < $1.startDate }) }
     }
 
     private func monthTitle(_ date: Date) -> String {
@@ -507,12 +536,14 @@ struct CalendarView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.lg) {
-                    Text("Calendar")
+                    Text("Events")
                         .gatherSerifScreenTitle()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .padding(.top, Spacing.xs)
 
-                    if events.isEmpty {
+                    scopePicker
+
+                    if grouped.isEmpty {
                         emptyState
                     } else {
                         ForEach(grouped, id: \.key) { group in
@@ -528,7 +559,9 @@ struct CalendarView: View {
                                 VStack(spacing: Spacing.xs) {
                                     ForEach(group.events, id: \.id) { event in
                                         Button { selectedEvent = event } label: {
-                                            HomeUpcomingRow(event: event, hosting: event.hostId == myId)
+                                            HomeUpcomingRow(event: event,
+                                                            hosting: hosting(event),
+                                                            attending: attending(event))
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -548,17 +581,71 @@ struct CalendarView: View {
             }
             .background(Color.gatherCanvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .refreshable { await loadPublicEvents() }
+            .task { await loadPublicEvents() }
             .navigationDestination(item: $selectedEvent) { EventDetailView(event: $0) }
         }
     }
 
+    /// Keeps the Discover-fed public events fresh so the Future tab shows events
+    /// from other hosts (reconciles insert/refresh/prune; safe to re-run).
+    private func loadPublicEvents() async {
+        await FirestoreService.shared.fetchPublicEvents(into: modelContext)
+    }
+
+    private var scopePicker: some View {
+        HStack(spacing: 4) {
+            ForEach(EventsScope.allCases) { option in
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { scope = option }
+                    HapticService.selection()
+                } label: {
+                    Text(option.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(scope == option ? Color.gatherPrimaryText : Color.gatherSecondaryText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background {
+                            if scope == option {
+                                Capsule()
+                                    .fill(Color.accentPurpleFallback.opacity(0.22))
+                                    .matchedGeometryEffect(id: "scopePill", in: scopeNS)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(Color.gatherSurface, in: Capsule())
+    }
+
     private var emptyState: some View {
-        GatherEmptyState(
-            icon: "calendar",
-            title: "No events yet",
-            message: "Events you host or join show up here, organized by month."
-        )
-        .padding(.top, Spacing.xl)
+        GatherEmptyState(icon: emptyIcon, title: emptyTitle, message: emptyMessage)
+            .padding(.top, Spacing.xl)
+    }
+
+    private var emptyIcon: String {
+        switch scope {
+        case .future: return "sparkles"
+        case .past: return "clock.arrow.circlepath"
+        case .mine: return "calendar"
+        }
+    }
+    private var emptyTitle: String {
+        switch scope {
+        case .future: return "Nothing coming up"
+        case .past: return "No past events"
+        case .mine: return "No events yet"
+        }
+    }
+    private var emptyMessage: String {
+        switch scope {
+        case .future: return "Upcoming events you host or join — plus public events from others — land here."
+        case .past: return "Events you've hosted or attended get archived here once they wrap up."
+        case .mine: return "Events you host or join show up here, organized by month."
+        }
     }
 }
 

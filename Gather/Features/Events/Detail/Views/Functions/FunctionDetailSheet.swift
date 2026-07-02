@@ -502,7 +502,10 @@ struct FunctionDetailSheet: View {
                             guest: guest,
                             isInvited: isInvited(guest),
                             response: response(for: guest),
-                            onToggle: { toggleInvite(for: guest) }
+                            onToggle: { toggleInvite(for: guest) },
+                            isSent: isInviteSent(guest),
+                            availableChannels: InviteService.shared.availableChannels(for: guest),
+                            onSend: { channel in sendInvite(to: guest, via: channel) }
                         )
                     }
                 }
@@ -526,6 +529,24 @@ struct FunctionDetailSheet: View {
 
     private func response(for guest: Guest) -> RSVPResponse? {
         function.invites.first { $0.guestId == guest.id }?.response
+    }
+
+    private func isInviteSent(_ guest: Guest) -> Bool {
+        guard let invite = function.invites.first(where: { $0.guestId == guest.id }) else { return false }
+        return invite.inviteStatus != .notSent
+    }
+
+    /// Sends one guest their unique invite link for THIS function over the chosen
+    /// channel and records the invite as sent.
+    private func sendInvite(to guest: Guest, via channel: InviteChannel) {
+        guard let invite = function.invites.first(where: { $0.guestId == guest.id }) else { return }
+        let sent = InviteService.shared.sendFunctionInvite(guest: guest, event: event, function: function, via: channel)
+        if sent {
+            InviteService.shared.markInviteSent(invite: invite, channel: channel, modelContext: modelContext)
+            function.updatedAt = Date()
+            modelContext.safeSave()
+            HapticService.success()
+        }
     }
 
     /// Toggling ON creates a FunctionInvite for this guest+function; toggling
@@ -772,6 +793,9 @@ struct FunctionGuestRow: View {
     let isInvited: Bool
     let response: RSVPResponse?
     let onToggle: () -> Void
+    var isSent: Bool = false
+    var availableChannels: [InviteChannel] = []
+    var onSend: ((InviteChannel) -> Void)? = nil
 
     var body: some View {
         HStack(spacing: Spacing.sm) {
@@ -801,6 +825,32 @@ struct FunctionGuestRow: View {
 
             Spacer()
 
+            // Per-guest send: each invited guest gets their OWN unique function
+            // invite link over the chosen channel.
+            if isInvited, let onSend, !availableChannels.isEmpty {
+                Menu {
+                    ForEach(availableChannels, id: \.self) { channel in
+                        Button {
+                            onSend(channel)
+                        } label: {
+                            Label(channel.displayName, systemImage: channelIcon(channel))
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: isSent ? "checkmark.circle.fill" : "paperplane.fill")
+                        Text(isSent ? "Sent" : "Send")
+                            .font(GatherFont.caption)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundStyle(isSent ? Color.rsvpYesFallback : Color.accentPurpleFallback)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background((isSent ? Color.rsvpYesFallback : Color.accentPurpleFallback).opacity(0.12), in: Capsule())
+                }
+                .accessibilityLabel(isSent ? "Resend invite to \(guest.name)" : "Send invite to \(guest.name)")
+            }
+
             Toggle("", isOn: Binding(
                 get: { isInvited },
                 set: { _ in onToggle() }
@@ -815,6 +865,15 @@ struct FunctionGuestRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(guest.name), \(isInvited ? "invited to this function" : "not invited")")
         .accessibilityAddTraits(.isButton)
+    }
+
+    private func channelIcon(_ channel: InviteChannel) -> String {
+        switch channel {
+        case .whatsapp: return "bubble.left.and.bubble.right.fill"
+        case .sms: return "message.fill"
+        case .email: return "envelope.fill"
+        case .copied, .inAppLink: return "doc.on.doc.fill"
+        }
     }
 
     private var initials: String {

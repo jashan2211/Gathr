@@ -46,6 +46,13 @@ class InviteService: ObservableObject {
         URL(string: "\(AppConfig.webBaseURL.absoluteString)/invite?e=\(event.id.uuidString)")
     }
 
+    /// A per-guest invite link scoped to a single function (sub-event). Same
+    /// shape as the event invite plus `&f=<functionId>`, so opening it in the
+    /// app routes to that function's RSVP. Each guest gets their own link.
+    func generateFunctionInviteLink(guest: Guest, event: Event, function: EventFunction) -> URL? {
+        URL(string: "\(AppConfig.webBaseURL.absoluteString)/invite?e=\(event.id.uuidString)&g=\(guest.id.uuidString)&f=\(function.id.uuidString)")
+    }
+
     // MARK: - Generate Invite Message
 
     func generateInviteMessage(
@@ -265,6 +272,56 @@ class InviteService: ObservableObject {
     func copyInviteLink(guest: Guest, event: Event) {
         if let link = generateInviteLink(guest: guest, event: event) {
             UIPasteboard.general.string = link.absoluteString
+        }
+    }
+
+    // MARK: - Function Invites (per-guest, per-function)
+
+    /// A personalized message inviting one guest to one specific function, with
+    /// their own unique RSVP link.
+    func generateFunctionInviteMessage(guest: Guest, event: Event, function: EventFunction) -> String {
+        let firstName = guest.name.split(separator: " ").first.map(String.init) ?? "there"
+        var message = "Hi \(firstName)!\n\n"
+        message += "You're invited to \(function.name) — part of \(event.title).\n\n"
+        message += "When: \(GatherDateFormatter.fullWeekdayDateTime.string(from: function.date))\n"
+        if let location = function.location {
+            message += "Where: \(location.name)\n"
+        }
+        if let dress = function.displayDressCode {
+            message += "Dress: \(dress)\n"
+        }
+        message += "\n"
+        if let link = generateFunctionInviteLink(guest: guest, event: event, function: function) {
+            message += "Tap here to RSVP:\n\(link.absoluteString)"
+        }
+        return message
+    }
+
+    /// Copies a guest's unique function-invite link to the clipboard.
+    func copyFunctionInviteLink(guest: Guest, event: Event, function: EventFunction) {
+        if let link = generateFunctionInviteLink(guest: guest, event: event, function: function) {
+            UIPasteboard.general.string = link.absoluteString
+        }
+    }
+
+    /// Sends a guest their unique function invite over the chosen channel.
+    /// Returns whether the send (or copy) succeeded.
+    @discardableResult
+    func sendFunctionInvite(guest: Guest, event: Event, function: EventFunction, via channel: InviteChannel) -> Bool {
+        let message = generateFunctionInviteMessage(guest: guest, event: event, function: function)
+        switch channel {
+        case .whatsapp:
+            return sendViaWhatsApp(guest: guest, message: message)
+        case .sms:
+            return sendViaSMS(guest: guest, message: message)
+        case .email:
+            guard let email = guest.email, !email.isEmpty else { return false }
+            return sendViaEmail(to: [email], bcc: [],
+                                subject: "You're invited to \(function.name)",
+                                body: message)
+        case .copied, .inAppLink:
+            copyFunctionInviteLink(guest: guest, event: event, function: function)
+            return true
         }
     }
 

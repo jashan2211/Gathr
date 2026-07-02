@@ -10,6 +10,10 @@ struct MainTabView: View {
     @State private var deepLinkEvent: Event?
     @State private var showDeepLinkRSVP = false
     @State private var pendingRSVP = false
+    // Set when an invite link is scoped to a specific function (&f=), so the
+    // RSVP opens on that function instead of the whole event.
+    @State private var deepLinkFunction: EventFunction?
+    @State private var showDeepLinkFunctionRSVP = false
 
     var body: some View {
         Group {
@@ -44,6 +48,8 @@ struct MainTabView: View {
             pendingRSVP = false
             appState.showRSVPForDeepLink = false
             appState.deepLinkGuestId = nil
+            appState.deepLinkFunctionId = nil
+            deepLinkFunction = nil
         }) { event in
             NavigationStack {
                 EventDetailView(event: event)
@@ -64,10 +70,24 @@ struct MainTabView: View {
                     .presentationDragIndicator(.visible)
                     .onDisappear { appState.deepLinkGuestId = nil }
             }
+            // Function-scoped invite (&f=): RSVP to just that function.
+            .sheet(isPresented: $showDeepLinkFunctionRSVP) {
+                if let function = deepLinkFunction {
+                    FunctionRSVPSheet(function: function, event: event)
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                        .onDisappear { appState.deepLinkGuestId = nil }
+                }
+            }
             .onAppear {
                 if pendingRSVP {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                        showDeepLinkRSVP = true
+                        // Prefer the function RSVP when the link targeted one.
+                        if deepLinkFunction != nil {
+                            showDeepLinkFunctionRSVP = true
+                        } else {
+                            showDeepLinkRSVP = true
+                        }
                     }
                 }
             }
@@ -89,15 +109,20 @@ struct MainTabView: View {
         appState.deepLinkEventId = nil
         pendingRSVP = appState.showRSVPForDeepLink
         let guestId = appState.deepLinkGuestId
+        let functionId = appState.deepLinkFunctionId
 
         let descriptor = FetchDescriptor<Event>(predicate: #Predicate { $0.id == eventId })
         if let event = try? modelContext.fetch(descriptor).first {
+            deepLinkFunction = functionId.flatMap { fid in event.functions.first { $0.id == fid } }
             deepLinkEvent = event
             bindInvitedGuest(to: event, guestId: guestId)
         } else {
-            // Not on this device — load the shared event from the cloud.
+            // Not on this device — load the shared event from the cloud. (A shared
+            // event carries no functions, so a function-scoped link falls back to
+            // the event RSVP here.)
             Task { @MainActor in
                 if let event = await FirestoreService.shared.fetchEvent(id: eventId, into: modelContext) {
+                    deepLinkFunction = functionId.flatMap { fid in event.functions.first { $0.id == fid } }
                     deepLinkEvent = event
                     bindInvitedGuest(to: event, guestId: guestId)
                 }

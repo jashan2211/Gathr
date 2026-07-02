@@ -175,10 +175,13 @@ struct GatherApp: App {
         let queryItems = components?.queryItems ?? []
         let eventParam = queryItems.first(where: { $0.name == "e" })?.value
         let guestParam = queryItems.first(where: { $0.name == "g" })?.value
+        let functionParam = queryItems.first(where: { $0.name == "f" })?.value
 
         // Preferred: explicit e/g query parameters.
         if let eventParam, let eventId = UUID(uuidString: eventParam) {
             appState.deepLinkEventId = eventId
+            // A function-scoped invite (&f=) routes the RSVP to that function.
+            appState.deepLinkFunctionId = functionParam.flatMap { UUID(uuidString: $0) }
             if let guestParam, let guestId = UUID(uuidString: guestParam) {
                 appState.deepLinkGuestId = guestId
                 appState.showRSVPForDeepLink = true
@@ -251,6 +254,9 @@ class AppState: ObservableObject {
     @Published var isShowingCreateEvent: Bool = false
     @Published var deepLinkEventId: UUID?
     @Published var deepLinkGuestId: UUID?
+    /// When an invite link is scoped to a specific function (`&f=`), the RSVP
+    /// opens on that function instead of the whole event.
+    @Published var deepLinkFunctionId: UUID?
     @Published var showRSVPForDeepLink: Bool = false
 
     /// The four destination tabs. Create is a center action button in the tab

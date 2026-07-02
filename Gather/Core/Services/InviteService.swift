@@ -332,7 +332,12 @@ class InviteService: ObservableObject {
         channel: InviteChannel,
         modelContext: ModelContext
     ) {
-        invite.inviteStatus = .sent
+        // Never downgrade a guest who already responded — resending an invite
+        // records the resend (sentAt/sentVia) but keeps their .responded status,
+        // which drives "has responded" checks and RSVP labels across the app.
+        if invite.inviteStatus != .responded {
+            invite.inviteStatus = .sent
+        }
         invite.sentAt = Date()
         invite.sentVia = channel
     }

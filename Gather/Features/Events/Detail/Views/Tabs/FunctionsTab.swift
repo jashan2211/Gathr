@@ -66,41 +66,89 @@ struct FunctionsTab: View {
                 }
             }
 
-            // Timeline Function Cards
+            // Timeline Function Cards, grouped by day when the schedule
+            // spans multiple days (weddings: Mehendi Fri, Ceremony Sat...).
             VStack(spacing: 0) {
-                ForEach(Array(sortedFunctions.enumerated()), id: \.element.id) { index, function in
-                    HStack(alignment: .top, spacing: Spacing.md) {
-                        // Timeline connector
-                        VStack(spacing: 0) {
-                            Circle()
-                                .fill(function.date > Date()
-                                      ? LinearGradient(colors: [Color.accentPurpleFallback, Color.accentPinkFallback], startPoint: .top, endPoint: .bottom)
-                                      : LinearGradient(colors: [Color.rsvpYesFallback, Color.rsvpYesFallback], startPoint: .top, endPoint: .bottom))
-                                .frame(width: 14, height: 14)
+                ForEach(functionsByDay, id: \.day) { group in
+                    if spansMultipleDays {
+                        dayHeader(group.day)
+                    }
 
-                            if index < sortedFunctions.count - 1 {
-                                Rectangle()
-                                    .fill(Color.gatherSecondaryText.opacity(0.2))
-                                    .frame(width: 2)
-                                    .frame(maxHeight: .infinity)
+                    ForEach(Array(group.functions.enumerated()), id: \.element.id) { index, function in
+                        HStack(alignment: .top, spacing: Spacing.md) {
+                            // Timeline connector
+                            VStack(spacing: 0) {
+                                Circle()
+                                    .fill(function.date > Date()
+                                          ? LinearGradient(colors: [Color.accentPurpleFallback, Color.accentPinkFallback], startPoint: .top, endPoint: .bottom)
+                                          : LinearGradient(colors: [Color.rsvpYesFallback, Color.rsvpYesFallback], startPoint: .top, endPoint: .bottom))
+                                    .frame(width: 14, height: 14)
+
+                                if index < group.functions.count - 1 {
+                                    Rectangle()
+                                        .fill(Color.gatherSecondaryText.opacity(0.2))
+                                        .frame(width: 2)
+                                        .frame(maxHeight: .infinity)
+                                }
                             }
-                        }
-                        .frame(width: 14)
+                            .frame(width: 14)
 
-                        // Function Card
-                        FunctionCard(function: function, event: event)
+                            // Function Card
+                            FunctionCard(
+                                function: function,
+                                event: event,
+                                isNextUp: function.id == nextUpFunctionId
+                            )
                             .onTapGesture {
+                                HapticService.selection()
                                 selectedFunction = function
                             }
+                        }
+                        .bouncyAppear(delay: Double(index) * 0.05)
                     }
-                    .bouncyAppear(delay: Double(index) * 0.05)
                 }
             }
         }
     }
 
+    private func dayHeader(_ day: Date) -> some View {
+        Text(dayHeaderText(day))
+            .gatherEyebrow()
+            .foregroundStyle(Color.gatherSecondaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, Spacing.sm)
+            .padding(.bottom, Spacing.xs)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func dayHeaderText(_ day: Date) -> String {
+        if Calendar.current.isDateInToday(day) {
+            return "TODAY"
+        } else if Calendar.current.isDateInTomorrow(day) {
+            return "TOMORROW"
+        }
+        return GatherDateFormatter.shortWeekdayMonthDay.string(from: day).uppercased()
+    }
+
     private var sortedFunctions: [EventFunction] {
         event.functions.sorted { $0.date < $1.date }
+    }
+
+    /// Functions bucketed by calendar day, days in chronological order.
+    /// `Dictionary(grouping:)` preserves the sorted order within each bucket.
+    private var functionsByDay: [(day: Date, functions: [EventFunction])] {
+        Dictionary(grouping: sortedFunctions) { Calendar.current.startOfDay(for: $0.date) }
+            .sorted { $0.key < $1.key }
+            .map { (day: $0.key, functions: $0.value) }
+    }
+
+    private var spansMultipleDays: Bool {
+        functionsByDay.count > 1
+    }
+
+    /// The first function that hasn't ended yet — gets the "next up" accent.
+    private var nextUpFunctionId: UUID? {
+        sortedFunctions.first { !$0.isPast }?.id
     }
 
     // MARK: - Live Activity

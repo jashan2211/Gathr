@@ -12,7 +12,6 @@ struct PhotosTab: View {
 
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var selectedItem: MediaItem?
-    @State private var showPhotoViewer = false
     @State private var isLoadingPhoto = false
     @State private var loadingProgress = ""
     @State private var showPhotoError = false
@@ -49,16 +48,26 @@ struct PhotosTab: View {
                 if photos.isEmpty {
                     emptyState
                 } else {
-                    // Photo count
+                    // Section header with photo count
                     HStack {
-                        Text("\(photos.count) \(photos.count == 1 ? "photo" : "photos")")
-                            .font(GatherFont.caption)
-                            .foregroundStyle(Color.gatherSecondaryText)
+                        Text("Album")
+                            .gatherSectionHeader()
+                            .foregroundStyle(Color.gatherPrimaryText)
+                            .accessibilityAddTraits(.isHeader)
                         Spacer()
+                        Text("\(photos.count)")
+                            .font(GatherFont.caption)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.gatherElevated)
+                            .clipShape(Capsule())
+                            .accessibilityLabel("\(photos.count) \(photos.count == 1 ? "photo" : "photos")")
                     }
                     .horizontalPadding()
 
-                    // Photo grid
+                    // Photo grid — square cells, 3 per row on phone
                     LazyVGrid(columns: columns, spacing: 2) {
                         ForEach(photos) { item in
                             photoCell(item)
@@ -69,15 +78,15 @@ struct PhotosTab: View {
             }
             .padding(.vertical, Spacing.sm)
         }
-        .fullScreenCover(isPresented: $showPhotoViewer) {
-            if let item = selectedItem {
-                PhotoViewerView(
-                    mediaItem: item,
-                    allPhotos: photos,
-                    isHost: isHost,
-                    onDelete: { deletePhoto(item) }
-                )
-            }
+        // Item-based presentation: the cover always opens with the tapped
+        // photo (no first-tap blank cover from a stale isPresented flag).
+        .fullScreenCover(item: $selectedItem) { item in
+            PhotoViewerView(
+                mediaItem: item,
+                allPhotos: photos,
+                isHost: isHost,
+                onDelete: { deletePhoto(item) }
+            )
         }
         .onChange(of: selectedPhotos) { _, newItems in
             guard !newItems.isEmpty else { return }
@@ -193,52 +202,62 @@ struct PhotosTab: View {
     private func photoCell(_ item: MediaItem) -> some View {
         Button {
             selectedItem = item
-            showPhotoViewer = true
         } label: {
-            ZStack(alignment: .bottom) {
-                Group {
-                    if let imageData = item.imageData, let uiImage = UIImage(data: imageData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else if let url = item.url {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.gatherElevated
-                        }
-                    } else {
-                        Color.gatherElevated
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundStyle(Color.gatherSecondaryText)
+            // Square cell: height derives from the column width, so the grid
+            // sizes itself cleanly inside the outer page scroll — no fixed
+            // heights, no rows stretched by portrait photos.
+            Color.gatherElevated
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    photoThumbnail(item)
+                }
+                .clipped()
+                .overlay(alignment: .bottom) {
+                    // Caption overlay
+                    if let caption = item.caption, !caption.isEmpty {
+                        Text(caption)
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                LinearGradient(
+                                    colors: [.clear, .black.opacity(0.6)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
                     }
                 }
-                .frame(minHeight: 120)
-                .clipped()
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel((item.caption?.isEmpty == false ? item.caption! : "Photo by \(item.uploaderName)"))
+        .accessibilityHint("Double tap to view full screen")
+    }
 
-                // Caption overlay
-                if let caption = item.caption, !caption.isEmpty {
-                    Text(caption)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            LinearGradient(
-                                colors: [.clear, .black.opacity(0.6)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
+    @ViewBuilder
+    private func photoThumbnail(_ item: MediaItem) -> some View {
+        if let imageData = item.imageData, let uiImage = UIImage(data: imageData) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else if let url = item.url {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Color.gatherElevated
             }
+        } else {
+            Color.gatherElevated
+                .overlay(
+                    Image(systemName: "photo")
+                        .foregroundStyle(Color.gatherSecondaryText)
+                )
         }
     }
 
@@ -273,7 +292,6 @@ struct PhotosTab: View {
     private func deletePhoto(_ item: MediaItem) {
         modelContext.delete(item)
         modelContext.safeSave()
-        showPhotoViewer = false
         selectedItem = nil
     }
 }

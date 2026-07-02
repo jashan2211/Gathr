@@ -103,8 +103,10 @@ struct ActivityPostCard: View {
                             Image(systemName: "ellipsis")
                                 .font(.caption)
                                 .foregroundStyle(Color.gatherSecondaryText)
-                                .frame(width: 28, height: 28)
+                                .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                                .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("Post options")
                     }
                 }
 
@@ -128,7 +130,7 @@ struct ActivityPostCard: View {
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
                 }
 
-                // Actions bar
+                // Actions bar — 44pt targets so likes/replies land one-handed
                 HStack(spacing: Spacing.lg) {
                     // Like
                     Button(action: onLike) {
@@ -142,7 +144,11 @@ struct ActivityPostCard: View {
                             }
                         }
                         .font(.subheadline)
+                        .frame(minWidth: Layout.minTouchTarget, minHeight: Layout.minTouchTarget, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
+                    .accessibilityLabel(isLiked ? "Unlike" : "Like")
+                    .accessibilityValue(post.likes > 0 ? "\(post.likes) \(post.likes == 1 ? "like" : "likes")" : "")
 
                     // Reply
                     Button(action: onReply) {
@@ -155,10 +161,16 @@ struct ActivityPostCard: View {
                         }
                         .font(.subheadline)
                         .foregroundStyle(Color.gatherSecondaryText)
+                        .frame(minWidth: Layout.minTouchTarget, minHeight: Layout.minTouchTarget, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
+                    .accessibilityLabel("Reply")
+                    .accessibilityValue(replies.isEmpty ? "" : "\(replies.count) \(replies.count == 1 ? "reply" : "replies")")
 
                     Spacer()
                 }
+                // Pull the tall tap targets back toward the old visual density
+                .padding(.vertical, -Spacing.xxs)
 
                 // Replies
                 if !replies.isEmpty {
@@ -174,6 +186,8 @@ struct ActivityPostCard: View {
                                 .font(GatherFont.caption)
                         }
                         .foregroundStyle(Color.accentPurpleFallback)
+                        .frame(minHeight: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
                     }
 
                     if showReplies {
@@ -336,6 +350,7 @@ struct ComposePostSheet: View {
     @State private var allowMultipleVotes = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
+    @FocusState private var textFieldFocused: Bool
 
     private var isHost: Bool {
         event.hostId == authManager.currentUser?.id
@@ -373,6 +388,7 @@ struct ComposePostSheet: View {
                     TextField(placeholderText, text: $text, axis: .vertical)
                         .font(GatherFont.body)
                         .lineLimit(3...10)
+                        .focused($textFieldFocused)
                         .padding(Spacing.md)
                         .background(Color.gatherSecondaryBackground)
                         .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
@@ -400,6 +416,12 @@ struct ComposePostSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .task {
+                // Focus the composer once the sheet has settled so the
+                // keyboard is up and ready — no extra tap needed.
+                try? await Task.sleep(for: .milliseconds(400))
+                textFieldFocused = true
+            }
         }
     }
 
@@ -407,6 +429,9 @@ struct ComposePostSheet: View {
 
     private var postBar: some View {
         Button {
+            // Drop the keyboard before dismissing so the sheet animates
+            // cleanly; createPost() fires the success haptic.
+            textFieldFocused = false
             createPost()
             dismiss()
         } label: {

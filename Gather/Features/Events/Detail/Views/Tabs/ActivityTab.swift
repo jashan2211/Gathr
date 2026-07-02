@@ -98,7 +98,7 @@ struct ActivityTab: View {
                         .foregroundStyle(.white)
                 )
 
-            // Composer button
+            // Composer button — 44pt tap target for one-handed use
             Button {
                 composerType = isHost ? .announcement : .question
                 replyingTo = nil
@@ -112,7 +112,10 @@ struct ActivityTab: View {
                     .padding(.vertical, Spacing.sm)
                     .background(Color.gatherElevated)
                     .clipShape(Capsule())
+                    .frame(minHeight: Layout.minTouchTarget)
+                    .contentShape(Rectangle())
             }
+            .accessibilityHint("Opens the composer")
 
             // Quick actions
             if isHost {
@@ -142,6 +145,8 @@ struct ActivityTab: View {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
                         .foregroundStyle(Color.accentPurpleFallback)
+                        .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("New post")
             }
@@ -159,10 +164,11 @@ struct ActivityTab: View {
             message: isHost
                 ? "Post an announcement or create a poll to engage your guests"
                 : "Be the first to ask a question about this event",
-            actionTitle: isHost ? "Share an Update" : "Ask a Question",
+            actionTitle: "Start the conversation",
             action: {
                 composerType = isHost ? .announcement : .question
                 replyingTo = nil
+                HapticService.buttonTap()
                 showComposer = true
             }
         )
@@ -186,11 +192,14 @@ struct ActivityTab: View {
             post.likedByUserIds.append(userId)
             post.likes += 1
         }
+        modelContext.safeSave()
         HapticService.buttonTap()
     }
 
     private func togglePin(_ post: ActivityPost) {
         post.isPinned.toggle()
+        modelContext.safeSave()
+        HapticService.buttonTap()
     }
 
     private func canDelete(_ post: ActivityPost) -> Bool {
@@ -231,6 +240,7 @@ struct ActivityTab: View {
             }
             post.pollOptions = options
         }
+        modelContext.safeSave()
         HapticService.buttonTap()
     }
 }

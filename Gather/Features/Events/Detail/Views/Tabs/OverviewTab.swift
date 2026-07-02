@@ -87,10 +87,11 @@ struct OverviewTab: View {
             Text(calendarAlertMessage)
         }
         .sheet(isPresented: $showShareSheet) {
-            let deepLink = "gather://event/\(event.id.uuidString)"
+            // Share the universal link — clickable in any chat, opens the app
+            // when installed and the web RSVP page when not.
+            let link = InviteService.shared.generateShareableLink(event: event)?.absoluteString ?? ""
             let shareText = "\(event.title)\n\(event.startDate.formatted(date: .abbreviated, time: .shortened))"
-            let shareItems: [String] = [shareText, deepLink]
-            ShareActivitySheet(items: shareItems)
+            ShareActivitySheet(items: [shareText, link])
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
@@ -132,6 +133,19 @@ struct OverviewTab: View {
                 color: Color.forCategory(event.category)
             ) {
                 showShareSheet = true
+            }
+            // Long-press shortcut: grab the invite link without opening the
+            // share sheet — handy when pasting straight into a group chat.
+            .contextMenu {
+                Button {
+                    // The universal link works for anyone — app or browser.
+                    if let link = InviteService.shared.generateShareableLink(event: event) {
+                        UIPasteboard.general.string = link.absoluteString
+                        HapticService.success()
+                    }
+                } label: {
+                    Label("Copy Invite Link", systemImage: "link")
+                }
             }
             .bouncyAppear(delay: 0.1)
         }
@@ -249,6 +263,12 @@ struct OverviewTab: View {
                     .font(GatherFont.callout)
                     .foregroundStyle(Color.gatherSecondaryText)
 
+                // Compact countdown so "when" is answerable without math.
+                Text(countdownText)
+                    .font(GatherFont.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.forCategory(event.category))
+
                 if let endDate = event.endDate, !Calendar.current.isDate(event.startDate, inSameDayAs: endDate) {
                     Text("Multi-day event")
                         .font(GatherFont.caption)
@@ -278,7 +298,26 @@ struct OverviewTab: View {
 
     // MARK: - Location Section
 
+    @ViewBuilder
     private func locationSection(_ location: EventLocation) -> some View {
+        if location.isVirtual {
+            locationCardContent(location)
+        } else {
+            // Whole card is one tap target — a big, thumb-friendly hit area
+            // that jumps straight to Apple Maps. The "Directions" capsule
+            // stays as the visual affordance inside it.
+            Button {
+                HapticService.buttonTap()
+                openInMaps(location)
+            } label: {
+                locationCardContent(location)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens directions in Apple Maps")
+        }
+    }
+
+    private func locationCardContent(_ location: EventLocation) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack(spacing: Spacing.md) {
                 Image(systemName: location.isVirtual ? "video.fill" : "mappin.circle.fill")
@@ -303,17 +342,17 @@ struct OverviewTab: View {
                 Spacer()
 
                 if !location.isVirtual {
-                    Button {
-                        openInMaps(location)
-                    } label: {
+                    HStack(spacing: Spacing.xxs) {
+                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                            .font(.caption2)
                         Text("Directions")
                             .font(GatherFont.caption)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, Spacing.sm)
-                            .padding(.vertical, Spacing.xs)
-                            .background(Color.accentPinkFallback)
-                            .clipShape(Capsule())
                     }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xs)
+                    .background(Color.accentPinkFallback)
+                    .clipShape(Capsule())
                 }
             }
 
@@ -326,13 +365,13 @@ struct OverviewTab: View {
                 }
                 .frame(height: 140)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
-                .allowsHitTesting(true)
-                .onTapGesture {
-                    openInMaps(location)
-                }
+                // Preview only — taps fall through to the card button, which
+                // opens the real Maps app (no accidental pan-scroll fights).
+                .allowsHitTesting(false)
             }
         }
         .padding()
+        .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .surfaceCard()
     }
 
@@ -489,10 +528,52 @@ struct OverviewTab: View {
         return result
     }
 
+    /// Plain computed countdown — recomputed on each render, no timers.
+    private var countdownText: String {
+        let now = Date()
+        if now < event.startDate {
+            let interval = event.startDate.timeIntervalSince(now)
+            if interval < 3600 {
+                let minutes = max(1, Int(interval / 60))
+                return "In \(minutes) minute\(minutes == 1 ? "" : "s")"
+            } else if interval < 86400 {
+                let hours = Int(interval / 3600)
+                return "In \(hours) hour\(hours == 1 ? "" : "s")"
+            } else {
+                let calendar = Calendar.current
+                let days = calendar.dateComponents(
+                    [.day],
+                    from: calendar.startOfDay(for: now),
+                    to: calendar.startOfDay(for: event.startDate)
+                ).day ?? 0
+                return days == 1 ? "Tomorrow" : "In \(days) days"
+            }
+        }
+        // Already started: still "now" until the end date — or, for
+        // open-ended events, until the start day is over.
+        let effectiveEnd = event.endDate
+            ?? Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: event.startDate)
+            ?? event.startDate
+        return now <= effectiveEnd ? "Happening now" : "Ended"
+    }
+
+    /// Opens Apple Maps: precise pin when we have coordinates, otherwise a
+    /// search query built from the venue name and address.
     private func openInMaps(_ location: EventLocation) {
-        guard let lat = location.latitude, let lon = location.longitude else { return }
-        guard let url = URL(string: "maps://?daddr=\(lat),\(lon)") else { return }
-        if UIApplication.shared.canOpenURL(url) {
+        if let lat = location.latitude, let lon = location.longitude {
+            let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+            let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+            mapItem.name = location.name
+            mapItem.openInMaps(launchOptions: [
+                MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDefault
+            ])
+        } else {
+            var parts: [String] = [location.name]
+            if let address = location.address { parts.append(address) }
+            if let city = location.city { parts.append(city) }
+            let query = parts.joined(separator: ", ")
+            guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let url = URL(string: "https://maps.apple.com/?q=\(encoded)") else { return }
             UIApplication.shared.open(url)
         }
     }

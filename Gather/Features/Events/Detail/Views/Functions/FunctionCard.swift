@@ -3,6 +3,12 @@ import SwiftUI
 struct FunctionCard: View {
     let function: EventFunction
     let event: Event
+    /// Highlights the next upcoming function with a category-accent border.
+    var isNextUp: Bool = false
+
+    private var accent: Color {
+        Color.forCategory(event.category)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -37,6 +43,11 @@ struct FunctionCard: View {
 
                 // Status indicator
                 statusBadge
+
+                // The whole card opens the detail sheet — say so.
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.gatherTertiaryText)
             }
 
             // Location
@@ -64,11 +75,11 @@ struct FunctionCard: View {
             Divider()
 
             // RSVP Stats
-            HStack(spacing: Spacing.lg) {
+            HStack(spacing: Spacing.md) {
                 StatPill(
                     icon: "checkmark.circle.fill",
                     count: function.attendingCount,
-                    label: "Attending",
+                    label: "Going",
                     color: .rsvpYesFallback
                 )
 
@@ -90,9 +101,19 @@ struct FunctionCard: View {
             }
         }
         .padding()
+        .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .surfaceCard()
+        // "Next up" reads as a category-accent ring around the card.
+        .overlay {
+            if isNextUp {
+                RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
+                    .strokeBorder(accent.opacity(0.65), lineWidth: 1.5)
+            }
+        }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(function.name), \(formattedTime)\(function.location.map { ", \($0.name)" } ?? "")")
+        .accessibilityLabel("\(function.name), \(formattedTime)\(function.location.map { ", \($0.name)" } ?? "")\(isNextUp ? ", next up" : "")")
+        .accessibilityHint("Double tap to view details and RSVP")
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Status Badge
@@ -114,6 +135,15 @@ struct FunctionCard: View {
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, Spacing.xxs)
                     .background(Color.rsvpYesFallback)
+                    .clipShape(Capsule())
+            } else if isNextUp {
+                Text("Next up")
+                    .font(GatherFont.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.onCategory(event.category))
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xxs)
+                    .background(accent)
                     .clipShape(Capsule())
             }
         }
@@ -155,6 +185,11 @@ struct StatPill: View {
                 .font(GatherFont.caption)
                 .fontWeight(.semibold)
                 .foregroundStyle(Color.gatherPrimaryText)
+            // Visible label so counts read at a glance ("8 Going", not
+            // an icon-decoder puzzle).
+            Text(label)
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(count) \(label)")

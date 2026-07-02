@@ -8,6 +8,17 @@ private struct PayerTotal: Identifiable {
     var id: String { name }
 }
 
+/// Quick-nav slices of the Finance tab. `.all` shows everything; any other
+/// case shows just that section so the page stays short on phones.
+private enum BudgetSection: String, CaseIterable {
+    case all = "All"
+    case overview = "Overview"
+    case categories = "Categories"
+    case vendors = "Vendors"
+    case splits = "Splits"
+    case transactions = "Transactions"
+}
+
 struct BudgetTab: View {
     @Bindable var event: Event
     @State private var filterFunction: EventFunction?
@@ -23,6 +34,8 @@ struct BudgetTab: View {
     @State private var recordingSplit: PaymentSplit?
     @State private var showSplitPaymentAlert = false
     @State private var splitPaymentText = ""
+    @State private var visibleSection: BudgetSection = .all
+    @State private var showAllTransactions = false
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
 
@@ -45,48 +58,61 @@ struct BudgetTab: View {
                     let expenses = allExpenses(budget)
                     let categoryLookup = buildCategoryLookup(budget)
 
-                    // Overdue / Over-budget alerts
+                    // Overdue / Over-budget alerts (always visible)
                     alertBanners(budget, expenses: expenses)
 
-                    // Budget Summary
-                    summaryCard(budget)
+                    // Quick-nav: filter the long page down to one section.
+                    sectionNav(budget, expenses: expenses)
 
-                    // Payment Breakdown (Paid / Owed / Overdue)
-                    paymentBreakdown(budget, expenses: expenses)
+                    if isVisible(.overview) {
+                        // Budget Summary
+                        summaryCard(budget)
 
-                    // Spending by category (visual share of spend)
-                    spendingByCategory(budget)
+                        // Payment Breakdown (Paid / Owed / Overdue)
+                        paymentBreakdown(budget, expenses: expenses)
 
-                    // Who Paid What
-                    whoPaidWhat(budget, expenses: expenses)
+                        // Spending by category (visual share of spend)
+                        spendingByCategory(budget)
 
-                    // Settle Up (even split among payers)
-                    settleUp(budget, expenses: expenses)
+                        // Who Paid What
+                        whoPaidWhat(budget, expenses: expenses)
 
-                    // Quick Actions
+                        // Settle Up (even split among payers)
+                        settleUp(budget, expenses: expenses)
+                    }
+
+                    // Quick Actions (always visible)
                     quickActions(budget)
 
-                    // Function Filter
-                    if !event.functions.isEmpty {
+                    // Function Filter — drives the overview figures and categories
+                    if !event.functions.isEmpty, isVisible(.overview) || isVisible(.categories) {
                         functionFilterPicker
                     }
 
-                    // Upcoming Payments
-                    upcomingPayments(budget, expenses: expenses, categoryLookup: categoryLookup)
+                    if isVisible(.overview) {
+                        // Upcoming Payments
+                        upcomingPayments(budget, expenses: expenses, categoryLookup: categoryLookup)
+                    }
 
                     // Categories
-                    categoriesSection(budget)
+                    if isVisible(.categories) {
+                        categoriesSection(budget)
+                    }
 
                     // Vendors
-                    vendorSection(budget, expenses: expenses)
+                    if isVisible(.vendors) {
+                        vendorSection(budget, expenses: expenses)
+                    }
 
                     // Co-Host Splits
-                    if !budget.splits.isEmpty || isHost {
+                    if isVisible(.splits), !budget.splits.isEmpty || isHost {
                         splitsSection(budget)
                     }
 
                     // All Transactions
-                    allTransactions(budget, expenses: expenses, categoryLookup: categoryLookup)
+                    if isVisible(.transactions) {
+                        allTransactions(budget, expenses: expenses, categoryLookup: categoryLookup)
+                    }
                 } else {
                     emptyState
                 }
@@ -867,6 +893,61 @@ struct BudgetTab: View {
         }
     }
 
+    // MARK: - Section Quick-Nav
+
+    /// True when `section` should render — either everything is shown
+    /// or the user picked exactly this slice from the quick-nav chips.
+    private func isVisible(_ section: BudgetSection) -> Bool {
+        visibleSection == .all || visibleSection == section
+    }
+
+    /// Only offer chips for sections that actually have content, so a tap
+    /// never lands on an empty page.
+    private func availableSections(_ budget: Budget, expenses: [Expense]) -> [BudgetSection] {
+        var sections: [BudgetSection] = [.all, .overview, .categories]
+        if !budget.vendorSummaries.isEmpty {
+            sections.append(.vendors)
+        }
+        if !budget.splits.isEmpty || isHost {
+            sections.append(.splits)
+        }
+        if !expenses.isEmpty {
+            sections.append(.transactions)
+        }
+        return sections
+    }
+
+    /// Compact horizontal chip row that toggles section visibility.
+    /// A simple state filter — the outer page scroll stays untouched.
+    @ViewBuilder
+    private func sectionNav(_ budget: Budget, expenses: [Expense]) -> some View {
+        let sections = availableSections(budget, expenses: expenses)
+
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.xs) {
+                ForEach(sections, id: \.self) { section in
+                    BudgetFilterChip(title: section.rawValue, isSelected: visibleSection == section) {
+                        HapticService.selection()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            visibleSection = section
+                        }
+                    }
+                    .accessibilityLabel(section == .all ? "Show all finance sections" : "Show only \(section.rawValue)")
+                    .accessibilityAddTraits(visibleSection == section ? [.isSelected] : [])
+                }
+            }
+        }
+        .onChange(of: sections) { _, newSections in
+            // If the selected slice disappears (e.g. last vendor removed),
+            // fall back to showing everything instead of a blank page.
+            if !newSections.contains(visibleSection) {
+                visibleSection = .all
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Finance sections")
+    }
+
     // MARK: - Function Filter
 
     private var functionFilterPicker: some View {
@@ -1594,6 +1675,10 @@ struct BudgetTab: View {
     @ViewBuilder
     private func allTransactions(_ budget: Budget, expenses: [Expense], categoryLookup: [UUID: String]) -> some View {
         if !expenses.isEmpty {
+            // Latest 5 by default; the expander reveals the full history so
+            // the page stays short on phones.
+            let visibleExpenses = showAllTransactions ? expenses : Array(expenses.prefix(5))
+
             VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack {
                     Text("All Transactions")
@@ -1607,7 +1692,7 @@ struct BudgetTab: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
 
-                ForEach(expenses.prefix(10)) { expense in
+                ForEach(visibleExpenses) { expense in
                     Button {
                         editingExpense = expense
                     } label: {
@@ -1650,6 +1735,29 @@ struct BudgetTab: View {
                         .padding(.vertical, Spacing.xxs)
                     }
                     .buttonStyle(CardPressStyle())
+                }
+
+                if expenses.count > 5 {
+                    Button {
+                        HapticService.buttonTap()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            showAllTransactions.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(showAllTransactions ? "Show less" : "Show all (\(expenses.count))")
+                            Image(systemName: showAllTransactions ? "chevron.up" : "chevron.down")
+                        }
+                        .font(GatherFont.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.accentPurpleFallback)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.xs)
+                    }
+                    // A11Y: expander touch target
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel(showAllTransactions ? "Show fewer transactions" : "Show all \(expenses.count) transactions")
                 }
             }
             .padding()

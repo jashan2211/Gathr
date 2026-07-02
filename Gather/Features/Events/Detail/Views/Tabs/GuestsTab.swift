@@ -250,10 +250,7 @@ struct GuestsTab: View {
                         filter: filter,
                         count: countForFilter(filter),
                         isSelected: filterStatus == filter && !showWaitlistedOnly,
-                        onTap: {
-                            showWaitlistedOnly = false
-                            filterStatus = filter
-                        }
+                        onTap: { selectFilter(filter) }
                     )
                 }
 
@@ -261,13 +258,36 @@ struct GuestsTab: View {
                     WaitlistPill(
                         count: event.guests.filter { $0.status == .waitlisted }.count,
                         isSelected: showWaitlistedOnly,
-                        onTap: { showWaitlistedOnly = true }
+                        onTap: { toggleWaitlistFilter() }
                     )
                 }
             }
             .horizontalPadding()
             .padding(.vertical, Spacing.sm)
         }
+    }
+
+    /// Tap a status pill to filter; tap the active pill again to clear back to All.
+    private func selectFilter(_ filter: GuestFilter) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            if filterStatus == filter && !showWaitlistedOnly {
+                filterStatus = .all
+            } else {
+                filterStatus = filter
+            }
+            showWaitlistedOnly = false
+        }
+        HapticService.selection()
+    }
+
+    /// Waitlist pill toggles on/off; leaving waitlist mode returns to All so
+    /// the visible selection always matches the list.
+    private func toggleWaitlistFilter() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            showWaitlistedOnly.toggle()
+            filterStatus = .all
+        }
+        HapticService.selection()
     }
 
     // MARK: - Headcount Summary Strip
@@ -717,9 +737,9 @@ struct GuestsTab: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        VStack {
-            Spacer()
-
+        // Content-only: Spacers don't expand inside the outer page scroll,
+        // so use fixed vertical breathing room instead.
+        Group {
             if event.guests.isEmpty {
                 GatherEmptyState(
                     icon: "person.2",
@@ -732,12 +752,20 @@ struct GuestsTab: View {
                 GatherEmptyState(
                     icon: "person.2",
                     title: "No Matching Guests",
-                    message: "Try adjusting your search or filters."
+                    message: "Try adjusting your search or filters.",
+                    actionTitle: "Clear Filters",
+                    action: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            searchText = ""
+                            filterStatus = .all
+                            showWaitlistedOnly = false
+                        }
+                        HapticService.buttonTap()
+                    }
                 )
             }
-
-            Spacer()
         }
+        .padding(.vertical, Spacing.xl)
         .horizontalPadding()
     }
 
@@ -768,6 +796,7 @@ struct GuestsTab: View {
                             sendInvite(to: guest)
                         } : nil,
                         onRemove: isHost ? {
+                            HapticService.warning()
                             guestPendingRemoval = guest
                         } : nil
                     )
@@ -963,25 +992,24 @@ struct GuestsTab: View {
             .horizontalPadding()
             .padding(.vertical, Spacing.md)
 
-            // Simple first-name list
-            ScrollView {
-                LazyVStack(spacing: Spacing.xs) {
-                    ForEach(event.guests.filter { $0.status == .attending }) { guest in
-                        FirstNameGuestCard(guest: guest)
-                    }
+            // Simple first-name list — content-only; the outer page scroll
+            // owns scrolling, so no nested ScrollView here.
+            LazyVStack(spacing: Spacing.xs) {
+                ForEach(event.guests.filter { $0.status == .attending }) { guest in
+                    FirstNameGuestCard(guest: guest)
                 }
-                .horizontalPadding()
-                .padding(.bottom, Layout.scrollBottomInset)
             }
+            .horizontalPadding()
+            .padding(.bottom, Layout.scrollBottomInset)
         }
     }
 
     // MARK: - Count Only View
 
     private var countOnlyView: some View {
+        // Content-only: fixed vertical padding instead of Spacers, which
+        // collapse inside the outer page scroll.
         VStack(spacing: Spacing.lg) {
-            Spacer()
-
             Image(systemName: "person.3.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(Color.accentPurpleFallback.opacity(0.5))
@@ -996,25 +1024,21 @@ struct GuestsTab: View {
                     .font(GatherFont.callout)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
-
-            Spacer()
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.xxl)
     }
 
     // MARK: - Hidden View
 
     private var hiddenView: some View {
-        VStack {
-            Spacer()
-
-            GatherEmptyState(
-                icon: "eye.slash",
-                title: "Guest list is private",
-                message: "Only the host can see who's attending."
-            )
-
-            Spacer()
-        }
+        // Content-only: fixed vertical padding instead of Spacers.
+        GatherEmptyState(
+            icon: "eye.slash",
+            title: "Guest list is private",
+            message: "Only the host can see who's attending."
+        )
+        .padding(.vertical, Spacing.xl)
         .horizontalPadding()
     }
 }
@@ -1074,6 +1098,7 @@ struct StatusPill: View {
                     .font(.caption)
                 Text("\(filter.rawValue)")
                     .font(GatherFont.caption)
+                    .fontWeight(isSelected ? .semibold : .regular)
                 Text("\(count)")
                     .font(GatherFont.caption)
                     .fontWeight(.bold)
@@ -1088,9 +1113,21 @@ struct StatusPill: View {
             .padding(.vertical, Spacing.xs)
             .background(isSelected ? filter.color : Color.gatherElevated)
             .clipShape(Capsule())
+            .overlay(
+                Capsule().strokeBorder(
+                    isSelected ? filter.color : Color.gatherSeparator.opacity(0.5),
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+            )
+            .shadow(color: isSelected ? filter.color.opacity(0.35) : .clear, radius: 5, y: 2)
+            // Keep the pill visually compact but give it a full 44pt tap target.
+            .frame(minHeight: Layout.minTouchTarget)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
         .accessibilityLabel("\(filter.rawValue) filter, \(count) guests")
-        .accessibilityHint("Double tap to filter by \(filter.rawValue.lowercased())")
+        .accessibilityHint(isSelected ? "Double tap to clear filter" : "Double tap to filter by \(filter.rawValue.lowercased())")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
@@ -1111,6 +1148,7 @@ struct WaitlistPill: View {
                     .font(.caption)
                 Text("Waitlist")
                     .font(GatherFont.caption)
+                    .fontWeight(isSelected ? .semibold : .regular)
                 Text("\(count)")
                     .font(GatherFont.caption)
                     .fontWeight(.bold)
@@ -1125,9 +1163,21 @@ struct WaitlistPill: View {
             .padding(.vertical, Spacing.xs)
             .background(isSelected ? Color.rsvpMaybeFallback : Color.gatherElevated)
             .clipShape(Capsule())
+            .overlay(
+                Capsule().strokeBorder(
+                    isSelected ? Color.rsvpMaybeFallback : Color.gatherSeparator.opacity(0.5),
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+            )
+            .shadow(color: isSelected ? Color.rsvpMaybeFallback.opacity(0.35) : .clear, radius: 5, y: 2)
+            // Keep the pill visually compact but give it a full 44pt tap target.
+            .frame(minHeight: Layout.minTouchTarget)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
         .accessibilityLabel("Waitlist filter, \(count) guests")
-        .accessibilityHint("Double tap to show waitlisted guests")
+        .accessibilityHint(isSelected ? "Double tap to clear filter" : "Double tap to show waitlisted guests")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

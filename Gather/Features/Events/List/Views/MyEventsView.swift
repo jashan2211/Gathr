@@ -561,3 +561,283 @@ struct CalendarView: View {
         .padding(.top, Spacing.xl)
     }
 }
+
+// MARK: - Functions Hub (cross-event runsheet)
+
+/// The Functions tab: every sub-event across all your events in one place —
+/// the runsheet an event manager actually works from on the day. Grouped by
+/// day, filterable by event, with add/manage flowing through the same
+/// AddFunctionSheet / FunctionDetailSheet used inside an event.
+struct FunctionsHubView: View {
+    @EnvironmentObject var authManager: AuthManager
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @State private var selectedFunction: FunctionHubEntry?
+    @State private var addFunctionEvent: Event?
+    @State private var eventFilter: UUID?
+    @State private var showPast = false
+
+    /// A (function, event) pair — Identifiable so sheets can bind to it.
+    struct FunctionHubEntry: Identifiable {
+        let function: EventFunction
+        let event: Event
+        var id: UUID { function.id }
+    }
+
+    private var myId: UUID? { authManager.currentUser?.id }
+
+    /// Events I host or attend that have (or can have) functions.
+    private var myEvents: [Event] {
+        allEvents.filter { event in
+            !event.isDraft &&
+            (event.hostId == myId || (myId != nil && event.guests.contains { $0.userId == myId }))
+        }
+    }
+
+    private var hostedEvents: [Event] {
+        myEvents.filter { $0.hostId == myId }
+    }
+
+    private var allEntries: [FunctionHubEntry] {
+        myEvents
+            .filter { eventFilter == nil || $0.id == eventFilter }
+            .flatMap { event in event.functions.map { FunctionHubEntry(function: $0, event: event) } }
+            .sorted { $0.function.date < $1.function.date }
+    }
+
+    private var upcomingEntries: [FunctionHubEntry] {
+        allEntries.filter { ($0.function.endTime ?? $0.function.date) >= Date().addingTimeInterval(-3600) }
+    }
+
+    private var pastEntries: [FunctionHubEntry] {
+        allEntries.filter { ($0.function.endTime ?? $0.function.date) < Date().addingTimeInterval(-3600) }
+    }
+
+    /// Upcoming entries grouped by calendar day, chronological.
+    private var entriesByDay: [(day: Date, entries: [FunctionHubEntry])] {
+        let cal = Calendar.current
+        return Dictionary(grouping: upcomingEntries) { cal.startOfDay(for: $0.function.date) }
+            .sorted { $0.key < $1.key }
+            .map { (day: $0.key, entries: $0.value) }
+    }
+
+    private var nextUpId: UUID? { upcomingEntries.first?.function.id }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
+                    header
+
+                    if myEvents.allSatisfy({ $0.functions.isEmpty }) {
+                        emptyState
+                    } else {
+                        if hostedEvents.count + (myEvents.count - hostedEvents.count) > 1 {
+                            eventFilterChips
+                        }
+
+                        ForEach(entriesByDay, id: \.day) { group in
+                            VStack(alignment: .leading, spacing: Spacing.sm) {
+                                Text(dayLabel(group.day).uppercased())
+                                    .gatherEyebrow()
+                                    .foregroundStyle(Color.gatherSecondaryText)
+                                    .accessibilityAddTraits(.isHeader)
+
+                                ForEach(group.entries) { entry in
+                                    hubCard(entry)
+                                }
+                            }
+                        }
+
+                        if upcomingEntries.isEmpty && !pastEntries.isEmpty {
+                            Text("No upcoming functions — everything here has wrapped.")
+                                .gatherMetaText()
+                                .foregroundStyle(Color.gatherSecondaryText)
+                        }
+
+                        if !pastEntries.isEmpty {
+                            pastSection
+                        }
+                    }
+                }
+                .padding(.horizontal, Layout.horizontalPadding)
+                .padding(.top, Spacing.xs)
+                .padding(.bottom, 120)
+                .frame(maxWidth: horizontalSizeClass == .regular ? 700 : .infinity)
+                .frame(maxWidth: .infinity)
+            }
+            .background(Color.gatherCanvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .sheet(item: $selectedFunction) { entry in
+                FunctionDetailSheet(function: entry.function, event: entry.event)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $addFunctionEvent) { event in
+                AddFunctionSheet(event: event)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("YOUR RUNSHEET")
+                    .gatherEyebrow()
+                    .foregroundStyle(Color.gatherSecondaryText)
+                Text("Functions")
+                    .gatherSerifScreenTitle()
+                    .foregroundStyle(Color.gatherPrimaryText)
+            }
+            Spacer()
+            if !hostedEvents.isEmpty {
+                addMenu
+            }
+        }
+    }
+
+    /// Add a function — picks the hosted event it belongs to.
+    private var addMenu: some View {
+        Menu {
+            ForEach(hostedEvents, id: \.id) { event in
+                Button {
+                    addFunctionEvent = event
+                } label: {
+                    Label(event.title, systemImage: "calendar.badge.plus")
+                }
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(LinearGradient.gatherAccentGradient, in: Circle())
+                .accentGlow(Color.accentPurpleFallback, radius: 10)
+        }
+        .accessibilityLabel("Add function")
+    }
+
+    // MARK: Filter chips
+
+    private var eventFilterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.xs) {
+                filterChip(title: "All", isSelected: eventFilter == nil) { eventFilter = nil }
+                ForEach(myEvents.filter { !$0.functions.isEmpty }, id: \.id) { event in
+                    filterChip(
+                        title: "\(event.category.emoji) \(event.title)",
+                        isSelected: eventFilter == event.id
+                    ) {
+                        eventFilter = eventFilter == event.id ? nil : event.id
+                    }
+                }
+            }
+        }
+    }
+
+    private func filterChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            HapticService.selection()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { action() }
+        } label: {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? .white : Color.gatherSecondaryText)
+                .padding(.horizontal, Spacing.sm)
+                .padding(.vertical, 8)
+                .background(
+                    isSelected
+                        ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                        : AnyShapeStyle(Color.gatherSurface),
+                    in: Capsule()
+                )
+        }
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    // MARK: Cards
+
+    /// A FunctionCard with its parent event named above it — context matters
+    /// when functions from several events share one runsheet.
+    private func hubCard(_ entry: FunctionHubEntry) -> some View {
+        Button {
+            selectedFunction = entry
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                if eventFilter == nil {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.forCategory(entry.event.category))
+                            .frame(width: 6, height: 6)
+                        Text(entry.event.title)
+                            .gatherMetaText()
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .lineLimit(1)
+                    }
+                    .padding(.leading, 2)
+                }
+                FunctionCard(function: entry.function, event: entry.event, isNextUp: entry.function.id == nextUpId)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Past
+
+    private var pastSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPast.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Past functions")
+                        .gatherSectionHeader()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Text("\(pastEntries.count)")
+                        .gatherMetaText()
+                        .foregroundStyle(Color.gatherSecondaryText)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .rotationEffect(.degrees(showPast ? 180 : 0))
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(minHeight: Layout.minTouchTarget)
+
+            if showPast {
+                ForEach(pastEntries.reversed()) { entry in
+                    hubCard(entry)
+                        .opacity(0.7)
+                }
+            }
+        }
+        .padding(.top, Spacing.sm)
+    }
+
+    // MARK: Empty state
+
+    private var emptyState: some View {
+        GatherEmptyState(
+            icon: "list.bullet.below.rectangle",
+            title: "No functions yet",
+            message: "Functions are the sub-events inside an event — like Mehendi, Sangeet, and Reception in a wedding. Add them from any event you host.",
+            actionTitle: hostedEvents.isEmpty ? nil : "Add a function",
+            action: hostedEvents.isEmpty ? nil : { addFunctionEvent = hostedEvents.first }
+        )
+        .padding(.top, Spacing.xxl)
+    }
+
+    private func dayLabel(_ day: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(day) { return "Today" }
+        if cal.isDateInTomorrow(day) { return "Tomorrow" }
+        return GatherDateFormatter.shortWeekdayMonthDay.string(from: day)
+    }
+}

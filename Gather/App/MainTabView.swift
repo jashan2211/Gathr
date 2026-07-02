@@ -134,10 +134,10 @@ struct MainTabView: View {
         switch appState.selectedTab {
         case .home:
             HomeView()
-        case .explore:
-            ExploreView()
         case .calendar:
             CalendarView()
+        case .functions:
+            FunctionsHubView()
         case .profile:
             ProfileView()
         }
@@ -289,9 +289,9 @@ struct MainTabView: View {
     private var floatingTabBar: some View {
         HStack(spacing: 0) {
             tabButton(.home)
-            tabButton(.explore)
-            createButton
             tabButton(.calendar)
+            createButton
+            tabButton(.functions)
             tabButton(.profile)
         }
         .accessibilityElement(children: .contain)

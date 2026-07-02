@@ -137,6 +137,7 @@ final class FirestoreService {
                         if guest.metadata != nil { guest.metadata?.notes = note }
                         else { guest.metadata = GuestMetadata(notes: note) }
                     }
+                    notifyHostOfRSVP(name: guest.name, status: status, event: event, remoteDate: remoteDate, into: modelContext)
                     changed = true
                 } else {
                     // A response from the shareable "anyone with the link" link:
@@ -153,6 +154,7 @@ final class FirestoreService {
                     )
                     newGuest.respondedAt = remoteDate
                     event.guests.append(newGuest)
+                    notifyHostOfRSVP(name: newGuest.name, status: status, event: event, remoteDate: remoteDate, into: modelContext)
                     changed = true
                 }
             }
@@ -163,6 +165,27 @@ final class FirestoreService {
         } catch {
             logger.error("RSVP fetch failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Drops an in-app notification for the host when a guest's RSVP arrives.
+    /// Recency-gated so opening an old event doesn't flood the notification
+    /// center with a backlog of historical responses.
+    private func notifyHostOfRSVP(name: String, status: RSVPStatus, event: Event, remoteDate: Date, into modelContext: ModelContext) {
+        guard remoteDate > Date().addingTimeInterval(-7 * 86400) else { return }
+        let verb: String
+        switch status {
+        case .attending: verb = "is going to"
+        case .maybe: verb = "might attend"
+        case .declined: verb = "can't make it to"
+        default: verb = "responded to"
+        }
+        modelContext.insert(AppNotification(
+            type: .rsvpUpdate,
+            title: "New RSVP",
+            body: "\(name) \(verb) \(event.title)",
+            eventId: event.id,
+            eventTitle: event.title
+        ))
     }
 
     /// Removes a guest's cloud RSVP. Called when a host deletes a guest so an

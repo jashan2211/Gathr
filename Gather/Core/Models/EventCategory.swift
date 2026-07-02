@@ -128,9 +128,11 @@ enum EventFeature: String, Codable, CaseIterable, Hashable {
     }
 
     /// Coming-soon features are shown greyed out and can't be enabled yet.
+    /// Photos is fully built (local storage) and wired into the event detail —
+    /// seating/schedule have no presentation yet, so they stay gated.
     var isAvailable: Bool {
         switch self {
-        case .photos, .seating, .schedule: return false
+        case .seating, .schedule: return false
         default: return true
         }
     }

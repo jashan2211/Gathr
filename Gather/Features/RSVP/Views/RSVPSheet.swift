@@ -448,6 +448,13 @@ struct RSVPSheet: View {
         // "Auto-sync RSVPs to Calendar" preference on (silent, deduped).
         if selectedStatus == .attending {
             Task { await CalendarService.shared.autoSyncIfEnabled(event: event) }
+            // Schedule day-before + day-of reminders (self-guards on the
+            // "Event Reminders" preference + notification authorization).
+            NotificationService.shared.scheduleEventReminder(event: event, function: nil, daysBefore: 1)
+            NotificationService.shared.scheduleEventReminder(event: event, function: nil, daysBefore: 0)
+        } else {
+            // No longer going — clear any reminders we set.
+            NotificationService.shared.cancelEventReminders(for: event.id)
         }
 
         // Haptic success feedback

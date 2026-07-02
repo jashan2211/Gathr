@@ -70,6 +70,7 @@ struct SendInvitesSheet: View {
 
     // Share-link hero
     @State private var linkCopied = false
+    @State private var templateCopied = false
     @State private var showShareSheet = false
     @State private var showQRSheet = false
     @State private var showQRShareSheet = false
@@ -305,9 +306,81 @@ struct SendInvitesSheet: View {
                 }
                 .accessibilityLabel("Share event link")
             }
+
+            Divider()
+
+            // Ready-to-paste blurb (title, date/functions, location + link) —
+            // one tap to copy, one paste into the group chat.
+            Button {
+                copyMessageTemplate()
+            } label: {
+                HStack(spacing: Spacing.sm) {
+                    Image(systemName: templateCopied ? "checkmark.circle.fill" : "text.bubble.fill")
+                        .font(.callout)
+                        .foregroundStyle(templateCopied ? Color.rsvpYesFallback : Color.accentPurpleFallback)
+                        .frame(width: 24)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("MESSAGE TEMPLATE")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .tracking(0.5)
+                            .foregroundStyle(Color.gatherSecondaryText)
+
+                        Text(messageTemplatePreviewText)
+                            .font(GatherFont.caption)
+                            .foregroundStyle(Color.gatherPrimaryText)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer(minLength: Spacing.xs)
+
+                    Text(templateCopied ? "Copied!" : "Copy")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(templateCopied ? Color.rsvpYesFallback : Color.accentPurpleFallback)
+                        .padding(.horizontal, Spacing.sm)
+                        .padding(.vertical, Spacing.xxs)
+                        .background((templateCopied ? Color.rsvpYesFallback : Color.accentPurpleFallback).opacity(0.1))
+                        .clipShape(Capsule())
+                }
+            }
+            .accessibilityLabel(templateCopied
+                ? "Message template copied"
+                : "Copy message template with event details and RSVP link, ready to paste in a group chat")
         }
         .padding(Spacing.md)
         .surfaceCard(cornerRadius: CornerRadius.md)
+    }
+
+    /// Group-chat blurb: the blast body already carries the title, the
+    /// date/functions, the location, and the universal share link.
+    private var messageTemplate: String {
+        inviteService.generateEmailBlastBody(event: event, functions: selectedFunctionsList)
+    }
+
+    /// The template collapsed to one flowing line for the two-line preview.
+    private var messageTemplatePreviewText: String {
+        messageTemplate
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "  ")
+    }
+
+    private func copyMessageTemplate() {
+        UIPasteboard.general.string = messageTemplate
+        HapticService.success()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            templateCopied = true
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                templateCopied = false
+            }
+        }
     }
 
     private func copyShareLink() {

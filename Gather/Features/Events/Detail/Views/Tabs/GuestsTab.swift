@@ -19,6 +19,8 @@ struct GuestsTab: View {
     // Bulk-invite action row (host)
     @State private var showShareLinkSheet = false
     @State private var shareLinkCopied = false
+    // Export guest list (host)
+    @State private var showExportSheet = false
     @AppStorage("guestSortOrder") private var guestSortOrderRaw = GuestSortOrder.name.rawValue
     @EnvironmentObject var authManager: AuthManager
 
@@ -44,6 +46,12 @@ struct GuestsTab: View {
     /// "Invite everyone". Falls back to all guests if everyone's been invited.
     private var guestsNotYetInvited: [Guest] {
         event.guests.filter { $0.inviteSentAt == nil }
+    }
+
+    /// Guests who were sent an invite but still haven't responded — the
+    /// natural target for "Remind pending".
+    private var pendingInvitedGuests: [Guest] {
+        event.guests.filter { $0.status == .pending && $0.inviteSentAt != nil }
     }
 
     /// A single link anyone can RSVP through, for pasting into a group chat.
@@ -151,6 +159,11 @@ struct GuestsTab: View {
                     // Prominent bulk-invite actions
                     if !event.guests.isEmpty {
                         bulkInviteRow
+
+                        // Nudge invited-but-unresponded guests in one tap
+                        if !pendingInvitedGuests.isEmpty {
+                            remindPendingRow
+                        }
                     }
 
                     // Dietary needs summary
@@ -197,6 +210,9 @@ struct GuestsTab: View {
         }
         .sheet(isPresented: $showShareLinkSheet) {
             ShareActivitySheet(items: shareLinkItems)
+        }
+        .sheet(isPresented: $showExportSheet) {
+            ShareActivitySheet(items: [exportGuestListText])
         }
         .alert(
             "Remove Guest",
@@ -428,6 +444,56 @@ struct GuestsTab: View {
     private func inviteEveryone() {
         let targets = guestsNotYetInvited.isEmpty ? event.guests : guestsNotYetInvited
         selectedGuests = Set(targets.map { $0.id })
+        HapticService.buttonTap()
+        showSendInvites = true
+    }
+
+    // MARK: - Remind Pending Row
+
+    /// Compact nudge affordance below the bulk-invite actions: preselects
+    /// every guest who was sent an invite but hasn't responded and opens
+    /// SendInvitesSheet — its remind mode auto-detects already-invited guests
+    /// and switches to reminder copy.
+    private var remindPendingRow: some View {
+        Button {
+            remindPending()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "bell.badge")
+                    .font(.caption)
+                    .foregroundStyle(Color.rsvpMaybeFallback)
+                Text("Remind \(pendingInvitedGuests.count) pending")
+                    .font(GatherFont.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .contentTransition(.numericText())
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Color.gatherTertiaryText)
+            }
+            .padding(.horizontal, Spacing.md)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: Layout.minTouchTarget)
+            .background(Color.rsvpMaybeFallback.opacity(0.1))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.rsvpMaybeFallback.opacity(0.25), lineWidth: 1)
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .horizontalPadding()
+        .padding(.bottom, Spacing.sm)
+        .accessibilityLabel("Remind \(pendingInvitedGuests.count) pending guest\(pendingInvitedGuests.count == 1 ? "" : "s")")
+        .accessibilityHint("Opens the send sheet with invited guests who haven't responded preselected")
+    }
+
+    /// Preselect exactly the invited-but-pending guests and open the send
+    /// sheet. Uses the shared selection set (same pattern as inviteEveryone)
+    /// so the sheet's preselection picks it up.
+    private func remindPending() {
+        selectedGuests = Set(pendingInvitedGuests.map { $0.id })
         HapticService.buttonTap()
         showSendInvites = true
     }
@@ -688,6 +754,21 @@ struct GuestsTab: View {
                         .foregroundStyle(Color.accentPurpleFallback)
                 }
                 .accessibilityLabel("Send invites")
+
+                // More actions (export)
+                Menu {
+                    Button {
+                        HapticService.buttonTap()
+                        showExportSheet = true
+                    } label: {
+                        Label("Export guest list", systemImage: "square.and.arrow.up")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                .accessibilityLabel("More guest actions")
             }
 
             // Add button
@@ -962,6 +1043,73 @@ struct GuestsTab: View {
         HapticService.success()
     }
 
+    // MARK: - Export Guest List
+
+    /// Plain-text guest list for pasting into a message to caterers/venues:
+    /// totals header, then one section per status with one line per guest
+    /// (name, status, party size, contact, dietary needs).
+    private var exportGuestListText: String {
+        var lines: [String] = []
+        lines.append("Guest list — \(event.title)")
+        lines.append("\(event.attendingCount) going / \(event.maybeCount) maybe / \(event.pendingCount) pending")
+        lines.append("Expected headcount: \(expectedHeadcount)")
+
+        let sections: [(status: RSVPStatus, title: String)] = [
+            (.attending, "GOING"),
+            (.maybe, "MAYBE"),
+            (.pending, "PENDING"),
+            (.waitlisted, "WAITLISTED"),
+            (.declined, "DECLINED")
+        ]
+
+        for section in sections {
+            let group = event.guests
+                .filter { $0.status == section.status }
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            guard !group.isEmpty else { continue }
+
+            lines.append("")
+            lines.append("\(section.title) (\(group.count))")
+            for guest in group {
+                lines.append(exportLine(for: guest))
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    /// One line per guest: name, status, +N party, contact, dietary — the
+    /// optional fields only appear when present.
+    private func exportLine(for guest: Guest) -> String {
+        var parts: [String] = []
+
+        var name = "• \(guest.name) — \(guest.status.displayName)"
+        if guest.totalHeadcount > 1 {
+            name += " (+\(guest.totalHeadcount - 1) party)"
+        }
+        parts.append(name)
+
+        if let phone = guest.phone, !phone.isEmpty {
+            parts.append(phone)
+        }
+        if let email = guest.email, !email.isEmpty {
+            parts.append(email)
+        }
+
+        let dietary = [guest.metadata?.dietaryRestrictions, guest.metadata?.mealChoice]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let memberDietary = guest.partyMembers
+            .compactMap { $0.dietaryRestrictions?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let allDietary = dietary + memberDietary
+        if !allDietary.isEmpty {
+            parts.append("Dietary: \(allDietary.joined(separator: ", "))")
+        }
+
+        return parts.joined(separator: " — ")
+    }
+
     // MARK: - Privacy Mode Guest List (first names + avatars)
 
     private var privacyGuestList: some View {
@@ -1199,6 +1347,21 @@ struct ImprovedGuestCard: View {
         !isSelectionMode && (onSetStatus != nil || onSendInvite != nil || onRemove != nil)
     }
 
+    /// "Invited 4d ago" for pending guests whose invite went out — helps the
+    /// host decide who's overdue for a nudge. Nil for everyone else.
+    private var invitedAgoText: String? {
+        guard guest.status == .pending, let sentAt = guest.inviteSentAt else { return nil }
+        let calendar = Calendar.current
+        let days = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: sentAt),
+            to: calendar.startOfDay(for: Date())
+        ).day ?? 0
+        if days <= 0 { return "Invited today" }
+        if days == 1 { return "Invited yesterday" }
+        return "Invited \(days)d ago"
+    }
+
     var body: some View {
         Button(action: onTap) {
             if isSelected {
@@ -1223,7 +1386,7 @@ struct ImprovedGuestCard: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(guest.name), \(guest.status.displayName)\(guest.totalHeadcount > 1 ? ", plus \(guest.totalHeadcount - 1)" : "")")
+        .accessibilityLabel("\(guest.name), \(guest.status.displayName)\(guest.totalHeadcount > 1 ? ", plus \(guest.totalHeadcount - 1)" : "")\(invitedAgoText.map { ", \($0.lowercased())" } ?? "")")
         .accessibilityHint(isSelectionMode ? "Double tap to toggle selection" : "Double tap for details")
         .accessibilityValue(isSelectionMode ? (isSelected ? "Selected" : "Not selected") : "")
         .accessibilityActions {
@@ -1370,6 +1533,19 @@ struct ImprovedGuestCard: View {
                             .font(GatherFont.caption)
                     }
                     .foregroundStyle(Color.gatherSecondaryText)
+                    .lineLimit(1)
+                }
+
+                // Invite-age meta: pending + invite sent → show how long ago,
+                // so the host can spot who's overdue for a reminder.
+                if let invitedAgo = invitedAgoText {
+                    HStack(spacing: 4) {
+                        Image(systemName: "paperplane")
+                            .font(.system(size: 9))
+                        Text(invitedAgo)
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(Color.gatherTertiaryText)
                     .lineLimit(1)
                 }
 

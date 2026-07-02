@@ -487,6 +487,9 @@ struct GuestDetailSheet: View {
             }
             function.invites.removeAll { $0.guestId == guest.id }
         }
+        // Also drop any cloud RSVP so this guest can't be re-created from an
+        // orphaned rsvps doc on the next sync.
+        FirestoreService.shared.deleteRSVP(eventId: event.id, guestId: guest.id)
         modelContext.delete(guest)
         modelContext.safeSave()
         dismiss()

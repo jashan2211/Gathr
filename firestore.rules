@@ -90,7 +90,10 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(
                          ['guestId', 'status', 'partySize', 'name', 'note', 'respondedAt', 'source']
                        );
-        allow delete: if false;
+        // The event owner may delete an RSVP — used when a host removes a guest,
+        // so the guest can't be re-created from an orphaned rsvp doc on next sync.
+        allow delete: if request.auth != null
+                      && get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid == request.auth.uid;
       }
     }
   }

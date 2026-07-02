@@ -165,6 +165,20 @@ final class FirestoreService {
         }
     }
 
+    /// Removes a guest's cloud RSVP. Called when a host deletes a guest so an
+    /// orphaned `rsvps/{guestId}` doc can't re-create that guest on the next
+    /// `fetchRSVPs`. Owner-only (enforced by the security rules); fire-and-forget.
+    func deleteRSVP(eventId: UUID, guestId: UUID) {
+        guard Auth.auth().currentUser != nil else { return }
+        eventsCollection.document(eventId.uuidString)
+            .collection("rsvps").document(guestId.uuidString)
+            .delete { error in
+                if let error {
+                    logger.error("RSVP delete failed: \(error.localizedDescription)")
+                }
+            }
+    }
+
     // MARK: - Invited Events (a guest's personal index)
 
     /// Records, under `users/{uid}/invitedEvents/{eventId}`, that the signed-in

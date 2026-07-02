@@ -575,41 +575,76 @@ struct TicketPurchaseSheet: View {
         for (tierId, quantity) in selectedTiers {
             guard let tier = sortedTiers.first(where: { $0.id == tierId }), quantity > 0 else { continue }
 
-            let discountForTier = groupDiscount + promoDiscount
-            let ticket = Ticket(
-                eventId: event.id,
-                tierId: tierId,
-                guestName: guestName,
-                guestEmail: guestEmail,
-                quantity: quantity,
-                unitPrice: tier.price,
-                promoCodeUsed: appliedPromo?.code,
-                discountAmount: discountForTier
-            )
-            ticket.paymentStatus = .completed
-            ticket.paymentMethod = paymentMethod
-            ticket.userId = authManager.currentUser?.id
+            if tier.isFree {
+                // Free tier: issue ONE unique ticket per admission so each guest
+                // gets their own QR code and independent check-in state. No money,
+                // no fees, no promo — a claimed free ticket is exactly free.
+                for _ in 0..<quantity {
+                    let ticket = Ticket(
+                        eventId: event.id,
+                        tierId: tierId,
+                        guestName: guestName,
+                        guestEmail: guestEmail,
+                        quantity: 1,
+                        unitPrice: 0
+                    )
+                    ticket.paymentStatus = .completed
+                    ticket.paymentMethod = .free
+                    ticket.userId = authManager.currentUser?.id
+                    modelContext.insert(ticket)
 
-            // Update tier sold count
-            tier.soldCount += quantity
+                    let transaction = PaymentTransaction(
+                        ticketId: ticket.id,
+                        eventId: event.id,
+                        buyerAmount: 0,
+                        ticketAmount: 0,
+                        serviceFeeAmount: 0,
+                        creatorPayoutAmount: 0,
+                        discountAmount: 0,
+                        paymentMethod: .free
+                    )
+                    modelContext.insert(transaction)
+                    lastTicket = ticket
+                }
+                tier.soldCount += quantity
+            } else {
+                // Paid tier: keep the single-record order (fee/discount math intact).
+                let discountForTier = groupDiscount + promoDiscount
+                let ticket = Ticket(
+                    eventId: event.id,
+                    tierId: tierId,
+                    guestName: guestName,
+                    guestEmail: guestEmail,
+                    quantity: quantity,
+                    unitPrice: tier.price,
+                    promoCodeUsed: appliedPromo?.code,
+                    discountAmount: discountForTier
+                )
+                ticket.paymentStatus = .completed
+                ticket.paymentMethod = paymentMethod
+                ticket.userId = authManager.currentUser?.id
 
-            // Save ticket
-            modelContext.insert(ticket)
+                // Update tier sold count
+                tier.soldCount += quantity
 
-            // Create transaction record
-            let transaction = PaymentTransaction(
-                ticketId: ticket.id,
-                eventId: event.id,
-                buyerAmount: ticket.totalPrice,
-                ticketAmount: ticket.creatorPayout,
-                serviceFeeAmount: ticket.serviceFee,
-                creatorPayoutAmount: ticket.creatorPayout,
-                discountAmount: discountForTier,
-                paymentMethod: paymentMethod
-            )
-            modelContext.insert(transaction)
+                // Save ticket
+                modelContext.insert(ticket)
 
-            lastTicket = ticket
+                // Create transaction record
+                let transaction = PaymentTransaction(
+                    ticketId: ticket.id,
+                    eventId: event.id,
+                    buyerAmount: ticket.totalPrice,
+                    ticketAmount: ticket.creatorPayout,
+                    serviceFeeAmount: ticket.serviceFee,
+                    creatorPayoutAmount: ticket.creatorPayout,
+                    discountAmount: discountForTier,
+                    paymentMethod: paymentMethod
+                )
+                modelContext.insert(transaction)
+
+                lastTicket = ticket
+            }
         }
 
         // Update promo code usage

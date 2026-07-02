@@ -32,6 +32,16 @@ final class Event {
     // Demo/sample event flag
     var isDemo: Bool = false
 
+    // Materialized from the public Discover feed (a PUBLIC event hosted by
+    // someone else). Marks events that `fetchPublicEvents` owns so it can
+    // refresh or prune them without ever touching a hosted or invited event.
+    var isDiscovered: Bool = false
+
+    // Attendee headcount carried on the Discover card. A discovered event has
+    // no local guest list, so its own `attendingCount` is 0 — use this for
+    // display instead. Ignored for events the user hosts or is invited to.
+    var discoveredAttendingCount: Int = 0
+
     // Store host ID for reference
     var hostId: UUID?
 
@@ -280,6 +290,13 @@ extension Event {
     var totalAttendingHeadcount: Int {
         guests.filter { $0.status == RSVPStatus.attending }
             .reduce(0) { $0 + $1.totalHeadcount }
+    }
+
+    /// Headcount to show in discovery UIs. Discovered events (from the public
+    /// feed) have no local guest list, so fall back to the count carried on
+    /// their Discover card; everything else uses the real local headcount.
+    var displayAttendingCount: Int {
+        isDiscovered ? discoveredAttendingCount : totalAttendingHeadcount
     }
 
     var maybeCount: Int {

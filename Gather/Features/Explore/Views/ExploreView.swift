@@ -452,14 +452,14 @@ struct ExploreView: View {
                         if !attendingNames.isEmpty {
                             HStack(spacing: 4) {
                                 AvatarStack(names: Array(attendingNames), maxDisplay: 3, size: 20)
-                                Text("\(event.totalAttendingHeadcount)+")
+                                Text("\(event.displayAttendingCount)+")
                                     .fontWeight(.semibold)
                             }
                         } else {
                             HStack(spacing: 4) {
                                 Image(systemName: "person.2.fill")
                                     .font(.system(size: 10))
-                                Text("\(event.totalAttendingHeadcount)+")
+                                Text("\(event.displayAttendingCount)+")
                                     .fontWeight(.semibold)
                             }
                         }
@@ -475,7 +475,7 @@ struct ExploreView: View {
         .buttonStyle(CardPressStyle())
         .zoomSource(id: event.id, in: zoomNamespace)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Featured event: \(event.title). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending.")
+        .accessibilityLabel("Featured event: \(event.title). \(event.location?.name ?? ""). \(event.displayAttendingCount) attending.")
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to view event details")
     }
@@ -661,7 +661,7 @@ struct ExploreView: View {
     }
 
     private func featuredScore(_ event: Event) -> Int {
-        var score = event.totalAttendingHeadcount * 3
+        var score = event.displayAttendingCount * 3
 
         // Hero media bonus
         if event.heroMediaURL != nil { score += 5 }

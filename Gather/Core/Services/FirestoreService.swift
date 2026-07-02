@@ -282,12 +282,13 @@ final class FirestoreService {
         }
     }
 
-    /// Pulls the public discovery feed and inserts a lightweight local `Event`
-    /// for any card the device doesn't have yet, so `ExploreView`'s existing
-    /// `@Query` surfaces PUBLIC events created by OTHER users. Insert-only — it
-    /// never modifies or deletes an existing local event, so it can't clobber a
-    /// hosted event or a fuller copy fetched elsewhere. The user's own cards are
-    /// skipped (already local) and only upcoming events are requested.
+    /// Reconciles the local store with the public discovery feed so `ExploreView`
+    /// surfaces PUBLIC events created by OTHER users. It inserts cards the device
+    /// doesn't have, refreshes ones it already materialized (so host edits show
+    /// up), and prunes discovered events that dropped out of the feed (the host
+    /// unpublished/deleted them or they've passed). It ONLY ever touches events
+    /// flagged `isDiscovered` — a hosted or invited event is never modified or
+    /// deleted. The user's own cards are skipped (already local as hosted events).
     func fetchPublicEvents(into modelContext: ModelContext) async {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         do {
@@ -296,23 +297,51 @@ final class FirestoreService {
                 .order(by: "startDate")
                 .limit(to: 60)
                 .getDocuments()
-            let cards = snapshot.documents.compactMap { try? $0.data(as: DiscoverCard.self) }
+            let cards = snapshot.documents
+                .compactMap { try? $0.data(as: DiscoverCard.self) }
+                .filter { $0.ownerUid != uid }
 
-            let existing = (try? modelContext.fetch(FetchDescriptor<Event>())) ?? []
-            let existingIds = Set(existing.map { $0.id })
+            let allLocal = (try? modelContext.fetch(FetchDescriptor<Event>())) ?? []
+            var localById = [UUID: Event]()
+            for event in allLocal where localById[event.id] == nil { localById[event.id] = event }
 
-            var insertedCount = 0
+            var feedIds = Set<UUID>()
+            var changed = false
+
             for card in cards {
-                // Skip our own events — they're already local.
-                guard card.ownerUid != uid,
-                      let eventId = UUID(uuidString: card.id),
-                      !existingIds.contains(eventId) else { continue }
-                modelContext.insert(card.makeEvent())
-                insertedCount += 1
+                guard let eventId = UUID(uuidString: card.id) else { continue }
+                feedIds.insert(eventId)
+                if let existing = localById[eventId] {
+                    // Refresh only our own discovered copies; never a hosted or
+                    // invited event that happens to share this id.
+                    if existing.isDiscovered {
+                        card.apply(to: existing)
+                        changed = true
+                    }
+                } else {
+                    modelContext.insert(card.makeEvent())
+                    changed = true
+                }
             }
-            if insertedCount > 0 {
+
+            // Prune discovered events the feed no longer lists (unpublished,
+            // deleted, or now past). Guards:
+            //  - `isDiscovered`: never delete a hosted or invited event.
+            //  - `guests.isEmpty`: never delete one the user has RSVP'd to — an
+            //    RSVP appends a local Guest (carrying plus-ones + note that live
+            //    only on-device), so pruning it would cascade-delete their RSVP.
+            //    Once the user commits, the event persists like an invited one.
+            // The feed is capped at 60, so a not-yet-RSVP'd discovered event
+            // ranked beyond that may be pruned and re-inserted later — harmless.
+            for event in allLocal
+            where event.isDiscovered && event.guests.isEmpty && !feedIds.contains(event.id) {
+                modelContext.delete(event)
+                changed = true
+            }
+
+            if changed {
                 modelContext.safeSave()
-                logger.info("Merged \(insertedCount) public event(s) from Discover.")
+                logger.info("Reconciled \(feedIds.count) public event(s) from Discover.")
             }
         } catch {
             logger.error("Public event fetch failed: \(error.localizedDescription)")
@@ -360,6 +389,9 @@ struct DiscoverCard: Codable {
     var category: String
     var city: String
     var locationName: String
+    // Optional so older cards written before these fields existed still decode.
+    var state: String?
+    var country: String?
     var hostName: String?
     var capacity: Int?
     var attendingCount: Int
@@ -374,10 +406,24 @@ struct DiscoverCard: Codable {
         self.category = event.category.rawValue
         self.city = event.location?.city ?? ""
         self.locationName = event.location?.name ?? ""
+        self.state = event.location?.state
+        self.country = event.location?.country
         self.hostName = hostName
         self.capacity = event.capacity
         self.attendingCount = event.attendingCount
         self.updatedAt = nil
+    }
+
+    /// Rebuilds an `EventLocation` from the card's place fields (name/city/state/
+    /// country), preserving the state/country so Explore's region filters match.
+    private var makeLocation: EventLocation? {
+        guard !locationName.isEmpty || !city.isEmpty || !(state ?? "").isEmpty else { return nil }
+        return EventLocation(
+            name: locationName.isEmpty ? city : locationName,
+            city: city.isEmpty ? nil : city,
+            state: (state ?? "").isEmpty ? nil : state,
+            country: (country ?? "").isEmpty ? nil : country
+        )
     }
 
     /// Builds a lightweight local `Event` from this card so it shows in Explore.
@@ -385,22 +431,33 @@ struct DiscoverCard: Codable {
     /// viewer is correctly treated as a non-host and can RSVP; privacy is
     /// `.publicEvent` so `ExploreView.publicEvents` picks it up.
     func makeEvent() -> Event {
-        var location: EventLocation?
-        if !locationName.isEmpty || !city.isEmpty {
-            location = EventLocation(name: locationName.isEmpty ? city : locationName,
-                                     city: city.isEmpty ? nil : city)
-        }
-        return Event(
+        let event = Event(
             id: UUID(uuidString: id) ?? UUID(),
             title: title,
             startDate: startDate,
             endDate: endDate,
-            location: location,
+            location: makeLocation,
             capacity: capacity,
             privacy: .publicEvent,
             category: EventCategory(rawValue: category) ?? .custom,
             hostId: AuthManager.deterministicUUID(from: ownerUid)
         )
+        event.isDiscovered = true
+        event.discoveredAttendingCount = attendingCount
+        return event
+    }
+
+    /// Refreshes an already-materialized discovered `Event` in place so edits the
+    /// host made (title, date, place, attendance) show up on the next fetch.
+    /// Only ever called for events flagged `isDiscovered`.
+    func apply(to event: Event) {
+        event.title = title
+        event.startDate = startDate
+        event.endDate = endDate
+        event.capacity = capacity
+        event.category = EventCategory(rawValue: category) ?? .custom
+        event.location = makeLocation
+        event.discoveredAttendingCount = attendingCount
     }
 }
 

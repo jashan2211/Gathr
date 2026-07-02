@@ -86,23 +86,33 @@ struct EventDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Hero + Floating Tab Bar
-            ZStack(alignment: .bottom) {
+        // One scroll owns the whole page: the hero poster scrolls away with
+        // content while the tab bar (a pinned section header) rises and
+        // settles below the nav controls — the header itself is not sticky.
+        ScrollView {
+            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                 heroSection
-                floatingTabBar
-                    .offset(y: 20)
-            }
-            .zIndex(1)
+                    .padding(.horizontal, Layout.horizontalPadding)
+                    .padding(.top, Spacing.xs)
 
-            // Tab Content
-            tabContent
-                .id(selectedTab)
-                .transition(.opacity)
-                .padding(.top, 24)
+                Section {
+                    tabContent
+                        .id(selectedTab)
+                        .transition(.opacity)
+                        .padding(.top, Spacing.md)
+                } header: {
+                    pinnedTabBar
+                }
+            }
         }
-        .ignoresSafeArea(edges: .top)
+        .scrollDismissesKeyboard(.interactively)
         .background(Color.gatherCanvas.ignoresSafeArea())
+        .refreshable {
+            // Pull-to-refresh: hosts re-sync guest RSVPs from the cloud.
+            if isHost {
+                await FirestoreService.shared.fetchRSVPs(for: event, into: modelContext)
+            }
+        }
         .task {
             // Host opens the event — pull any RSVPs guests submitted from the
             // web invite page or their own app and merge them into the list.
@@ -120,6 +130,11 @@ struct EventDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        // Solid canvas behind the nav controls so scrolled content (the serif
+        // hero title) slides cleanly under the status bar instead of colliding
+        // with the clock and back/edit chips.
+        .toolbarBackground(Color.gatherCanvas, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             if isHost {
                 ToolbarItem(placement: .primaryAction) {
@@ -261,7 +276,6 @@ struct EventDetailView: View {
                 .opacity(0.15)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .padding(Spacing.lg)
-                .padding(.top, 30)
 
             // Dark gradient overlay — grain sits above the scrim, below the
             // text, so the hero reads printed rather than flat-digital.
@@ -318,7 +332,7 @@ struct EventDetailView: View {
                         .background(.ultraThinMaterial)
                         .clipShape(Circle())
                         .padding(.leading)
-                        .padding(.top, 56)
+                        .padding(.top, Spacing.md)
                     Spacer()
                 }
                 Spacer()
@@ -334,7 +348,6 @@ struct EventDetailView: View {
                             capacity: capacity
                         )
                         .padding()
-                        .padding(.top, 40)
                     }
                     Spacer()
                 }
@@ -355,7 +368,7 @@ struct EventDetailView: View {
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, Spacing.xs)
                     .background(.ultraThinMaterial, in: Capsule())
-                    .padding(.top, 52)
+                    .padding(.top, Spacing.md)
                     .transition(.opacity.combined(with: .move(edge: .top)))
                     .accessibilityLabel("Syncing RSVPs")
 
@@ -365,14 +378,24 @@ struct EventDetailView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: isLoadingRSVPs)
         .frame(height: Layout.heroHeightDetail)
-        .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: CornerRadius.featured,
-                bottomTrailingRadius: CornerRadius.featured,
-                topTrailingRadius: 0
+        // Full poster card now that it scrolls with content (matches Home).
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.featured, style: .continuous))
+        .accentGlow(categoryAccent)
+    }
+
+    /// The tab bar as a pinned section header: a solid canvas backdrop with a
+    /// hairline so content scrolls cleanly underneath when it settles at top.
+    private var pinnedTabBar: some View {
+        floatingTabBar
+            .padding(.vertical, Spacing.xs)
+            .background(
+                Color.gatherCanvas
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.05))
+                            .frame(height: 1)
+                    }
             )
-        )
     }
 
     private var heroFormattedDate: String {

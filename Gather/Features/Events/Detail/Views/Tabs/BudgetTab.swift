@@ -37,7 +37,8 @@ struct BudgetTab: View {
     }
 
     var body: some View {
-        ScrollView {
+        // Content-only: EventDetailView owns the page scroll.
+        Group {
             VStack(spacing: Spacing.lg) {
                 if let budget = eventBudget {
                     // PERF-004: Compute expenses once and build category lookup

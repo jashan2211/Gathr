@@ -744,7 +744,8 @@ struct GuestsTab: View {
     // MARK: - Guest List
 
     private var guestList: some View {
-        ScrollView {
+        // Content-only: EventDetailView owns the page scroll.
+        Group {
             LazyVStack(spacing: Spacing.sm) {
                 ForEach(filteredGuests) { guest in
                     ImprovedGuestCard(

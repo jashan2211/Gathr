@@ -38,7 +38,8 @@ struct ActivityTab: View {
     }
 
     var body: some View {
-        ScrollView {
+        // Content-only: EventDetailView owns the page scroll.
+        Group {
             LazyVStack(spacing: Spacing.md) {
                 // Composer bar
                 composerBar

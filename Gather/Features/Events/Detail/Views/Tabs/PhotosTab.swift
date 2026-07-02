@@ -40,7 +40,8 @@ struct PhotosTab: View {
     ]
 
     var body: some View {
-        ScrollView {
+        // Content-only: EventDetailView owns the page scroll.
+        Group {
             VStack(spacing: Spacing.md) {
                 // Upload bar
                 uploadBar

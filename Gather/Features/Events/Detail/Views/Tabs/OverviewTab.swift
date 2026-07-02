@@ -14,7 +14,9 @@ struct OverviewTab: View {
     @State private var showShareSheet = false
 
     var body: some View {
-        ScrollView {
+        // No ScrollView here — EventDetailView owns the single page scroll
+        // (hero scrolls away, tab bar pins). This tab renders content only.
+        Group {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 // Quick Actions (for hosts)
                 if isHost {

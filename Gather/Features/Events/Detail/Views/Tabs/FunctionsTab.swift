@@ -7,7 +7,8 @@ struct FunctionsTab: View {
     @State private var liveActivityOn = false
 
     var body: some View {
-        ScrollView {
+        // Content-only: EventDetailView owns the page scroll.
+        Group {
             VStack(spacing: Spacing.md) {
                 if event.functions.isEmpty {
                     emptyState

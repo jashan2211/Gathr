@@ -145,13 +145,13 @@ struct GatherApp: App {
                 }
                 .keyboardShortcut("1", modifiers: .command)
 
-                Button("Calendar") {
-                    appState.selectedTab = .calendar
+                Button("Events") {
+                    appState.selectedTab = .events
                 }
                 .keyboardShortcut("2", modifiers: .command)
 
-                Button("Functions") {
-                    appState.selectedTab = .functions
+                Button("Explore") {
+                    appState.selectedTab = .explore
                 }
                 .keyboardShortcut("3", modifiers: .command)
 
@@ -254,20 +254,18 @@ class AppState: ObservableObject {
     @Published var showRSVPForDeepLink: Bool = false
 
     /// The four destination tabs. Create is a center action button in the tab
-    /// bar, not a destination, so it isn't a case here. Explore was retired —
-    /// with no public events yet it duplicated Home; Functions (a cross-event
-    /// runsheet of every sub-event) earns the slot instead.
+    /// bar, not a destination, so it isn't a case here.
     enum Tab: Int, CaseIterable {
         case home
-        case calendar
-        case functions
+        case events
+        case explore
         case profile
 
         var title: String {
             switch self {
             case .home: return "Home"
-            case .calendar: return "Calendar"
-            case .functions: return "Functions"
+            case .events: return "Events"
+            case .explore: return "Explore"
             case .profile: return "You"
             }
         }
@@ -275,8 +273,8 @@ class AppState: ObservableObject {
         var icon: String {
             switch self {
             case .home: return "house"
-            case .calendar: return "calendar"
-            case .functions: return "list.bullet.below.rectangle"
+            case .events: return "calendar"
+            case .explore: return "safari"
             case .profile: return "person.circle"
             }
         }
@@ -284,8 +282,8 @@ class AppState: ObservableObject {
         var selectedIcon: String {
             switch self {
             case .home: return "house.fill"
-            case .calendar: return "calendar"
-            case .functions: return "list.bullet.below.rectangle"
+            case .events: return "calendar"
+            case .explore: return "safari.fill"
             case .profile: return "person.circle.fill"
             }
         }

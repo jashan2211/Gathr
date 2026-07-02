@@ -268,8 +268,8 @@ struct GoingView: View {
             icon: "ticket",
             title: emptyStateTitle,
             message: emptyStateSubtitle,
-            actionTitle: filter == .upcoming ? "Open Calendar" : nil,
-            action: filter == .upcoming ? { appState.selectedTab = .calendar } : nil
+            actionTitle: filter == .upcoming ? "Browse Events" : nil,
+            action: filter == .upcoming ? { appState.selectedTab = .events } : nil
         )
         .padding(.top, Spacing.xl)
     }

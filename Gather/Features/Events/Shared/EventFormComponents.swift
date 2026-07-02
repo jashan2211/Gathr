@@ -709,6 +709,12 @@ struct EventSettingsSection: View {
 
                 HStack(spacing: Spacing.xs) {
                     EventFormPrivacyCard(
+                        option: .publicEvent,
+                        icon: "globe",
+                        isSelected: privacy == .publicEvent
+                    ) { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { privacy = .publicEvent } }
+
+                    EventFormPrivacyCard(
                         option: .unlisted,
                         icon: "link",
                         isSelected: privacy == .unlisted

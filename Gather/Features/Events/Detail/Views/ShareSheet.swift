@@ -108,7 +108,10 @@ struct ShareSheet: View {
         }
         .presentationDetents([.medium])
         .onAppear {
-            shareURL = "gather://event/\(event.id.uuidString)"
+            // Use the real universal link (opens the app when installed, else the
+            // web RSVP page) — the old gather:// scheme did nothing for recipients.
+            shareURL = InviteService.shared.generateShareableLink(event: event)?.absoluteString
+                ?? "\(AppConfig.webBaseURL.absoluteString)/invite?e=\(event.id.uuidString)"
         }
     }
 

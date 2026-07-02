@@ -268,7 +268,11 @@ struct TicketConfirmationView: View {
                 addToCalendar()
             }
 
-            ActionButton(icon: "wallet.pass", title: "Wallet", color: .gatherPrimaryText) {
+            // Real Wallet passes need a signed pass (not set up); until then this
+            // saves a ticket card to Photos — label it honestly.
+            ActionButton(icon: AppConfig.walletPassEnabled ? "wallet.pass" : "square.and.arrow.down",
+                         title: AppConfig.walletPassEnabled ? "Wallet" : "Save Card",
+                         color: .gatherPrimaryText) {
                 addToWallet()
             }
 

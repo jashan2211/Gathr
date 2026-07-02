@@ -4,6 +4,7 @@ import SwiftData
 struct NotificationsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appState: AppState
     @Query(sort: \AppNotification.createdAt, order: .reverse) private var notifications: [AppNotification]
 
     var body: some View {
@@ -138,6 +139,11 @@ struct NotificationsView: View {
     private func notificationRow(_ notification: AppNotification, isUnread: Bool = false) -> some View {
         Button {
             notification.isRead = true
+            // Open the related event, if the notification points to one.
+            if let eventId = notification.eventId {
+                appState.deepLinkEventId = eventId
+                dismiss()
+            }
         } label: {
             HStack(alignment: .top, spacing: Spacing.sm) {
                 // Icon

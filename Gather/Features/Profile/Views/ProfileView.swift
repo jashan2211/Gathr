@@ -924,7 +924,6 @@ struct NotificationSettingsView: View {
 struct PrivacySettingsView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.modelContext) private var modelContext
-    @AppStorage("showMeAsAttending") private var showMeAsAttending = true
     @AppStorage("defaultPrivacy") private var defaultPrivacy = "inviteOnly"
     @State private var isExporting = false
     @State private var exportURL: URL?
@@ -933,12 +932,6 @@ struct PrivacySettingsView: View {
 
     var body: some View {
         List {
-            Section {
-                Toggle("Show me as attending", isOn: $showMeAsAttending)
-            } footer: {
-                Text("Allow friends to see when you're attending events")
-            }
-
             Section("Default Event Privacy") {
                 Picker("Privacy", selection: $defaultPrivacy) {
                     Text("Public").tag("public")
@@ -1688,7 +1681,7 @@ struct AboutGatherView: View {
                 // Info cards
                 VStack(spacing: Spacing.sm) {
                     aboutRow(icon: "heart.fill", title: "Made with love", subtitle: "Built for event organizers everywhere")
-                    aboutRow(icon: "shield.checkered", title: "Privacy First", subtitle: "Your data stays on your device")
+                    aboutRow(icon: "shield.checkered", title: "Privacy First", subtitle: "Only what's needed to sync your events is stored")
                     aboutRow(icon: "sparkles", title: "Thoughtful Design", subtitle: "Calm, modern event management")
                 }
                 .padding()

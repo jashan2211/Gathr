@@ -9,38 +9,49 @@ struct InviteQuickActionPill: View {
     let count: Int
     let icon: String
     let isSelected: Bool
+    /// When false the pill is a passive status indicator (e.g. "Custom" reflects
+    /// the current hand-picked count) rather than a tappable action.
+    var isInteractive: Bool = true
     let action: () -> Void
 
     var body: some View {
-        Button(action: {
-            action()
-            HapticService.buttonTap()
-        }) {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-
-                Text("\(count)")
-                    .font(GatherFont.headline)
-                    .fontWeight(.bold)
-
-                Text(title)
-                    .font(.caption2)
-                    .fontWeight(.medium)
+        Group {
+            if isInteractive {
+                Button(action: {
+                    action()
+                    HapticService.buttonTap()
+                }) { pillContent }
+            } else {
+                pillContent
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.sm)
-            .background(
-                isSelected
-                    ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                    : AnyShapeStyle(Color.gatherSecondaryBackground)
-            )
-            .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
         }
         .scaleEffect(isSelected ? 1.03 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+    }
+
+    private var pillContent: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption)
+                .fontWeight(.semibold)
+
+            Text("\(count)")
+                .font(GatherFont.headline)
+                .fontWeight(.bold)
+
+            Text(title)
+                .font(.caption2)
+                .fontWeight(.medium)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.sm)
+        .background(
+            isSelected
+                ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                : AnyShapeStyle(Color.gatherSecondaryBackground)
+        )
+        .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
     }
 }
 

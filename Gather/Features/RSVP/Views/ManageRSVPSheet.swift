@@ -492,6 +492,17 @@ struct ManageRSVPSheet: View {
     private func cancelRSVP() {
         guest.status = .declined
         guest.respondedAt = Date()
+
+        // Cancel the guest's ticket too, so declining doesn't leave a live QR
+        // that still counts as sold / could be checked in at the door.
+        if let ticket, ticket.cancelledAt == nil {
+            ticket.cancelledAt = Date()
+            ticket.cancellationReason = "Guest cancelled RSVP"
+            ticket.paymentStatus = .cancelled
+            if let tier = event.ticketTiers.first(where: { $0.id == ticket.tierId }), tier.soldCount > 0 {
+                tier.soldCount -= 1
+            }
+        }
         modelContext.safeSave()
 
         HapticService.success()

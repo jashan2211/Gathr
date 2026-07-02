@@ -504,6 +504,7 @@ struct SendInvitesSheet: View {
                 count: selectedGuestIds.count,
                 icon: "hand.tap",
                 isSelected: !selectedGuestIds.isEmpty && !allGuestsSelected && selectedGuestIds != Set(guestsNotSent.map { $0.id }),
+                isInteractive: false,
                 action: {}
             )
         }

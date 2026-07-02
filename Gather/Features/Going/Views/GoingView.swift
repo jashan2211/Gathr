@@ -491,6 +491,7 @@ struct HomeView: View {
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var selectedEvent: Event?
     @State private var showCreate = false
+    @State private var selectedTemplate: EventTemplate?
 
     /// On the wide iPad canvas, keep content at a comfortable reading width and
     /// let the next-event poster sit beside the lists.
@@ -558,6 +559,9 @@ struct HomeView: View {
             .navigationDestination(item: $selectedEvent) { EventDetailView(event: $0) }
             .sheet(isPresented: $showCreate) {
                 CreateEventView().presentationDragIndicator(.visible)
+            }
+            .sheet(item: $selectedTemplate) { tmpl in
+                CreateEventView(template: tmpl).presentationDragIndicator(.visible)
             }
         }
     }
@@ -711,15 +715,126 @@ struct HomeView: View {
         }
     }
 
+    /// The first-run welcome: instead of a bare "nothing here", new users get
+    /// template shortcuts that open the create flow pre-filled, plus a quick
+    /// tour of what the app does — the Home earns its keep from minute one.
     private var emptyState: some View {
-        GatherEmptyState(
-            icon: "sparkles",
-            title: "Nothing on the calendar",
-            message: "Create your first event, or explore what's happening near you.",
-            actionTitle: "Create event",
-            action: { showCreate = true }
-        )
-        .padding(.top, Spacing.xl)
+        VStack(alignment: .leading, spacing: Spacing.xl) {
+            // Hero welcome poster
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Text("PLAN SOMETHING WORTH GATHERING FOR")
+                    .gatherEyebrow()
+                    .foregroundStyle(.white.opacity(0.85))
+                Text("Your first event\nstarts here")
+                    .gatherSerifPosterTitle()
+                    .foregroundStyle(.white)
+                Button {
+                    HapticService.mediumImpact()
+                    showCreate = true
+                } label: {
+                    Text("Create an event")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.accentPurpleFallback)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 12)
+                        .background(.white, in: Capsule())
+                }
+                .padding(.top, Spacing.xs)
+            }
+            .padding(Spacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                LinearGradient.gatherAccentGradient
+                    .grain(0.07)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.featured, style: .continuous))
+            .accentGlow(Color.accentPinkFallback)
+
+            // Template shortcuts — one tap into a pre-filled create flow
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Text("START FROM A TEMPLATE")
+                    .gatherEyebrow()
+                    .foregroundStyle(Color.gatherSecondaryText)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Spacing.sm) {
+                        ForEach(EventTemplate.allTemplates) { tmpl in
+                            Button {
+                                HapticService.buttonTap()
+                                selectedTemplate = tmpl
+                            } label: {
+                                VStack(spacing: Spacing.xs) {
+                                    ZStack {
+                                        LinearGradient.categoryGradientVibrant(for: tmpl.category)
+                                            .grain(0.06)
+                                            .frame(width: 64, height: 64)
+                                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+                                        Image(systemName: tmpl.icon)
+                                            .font(.title3.weight(.semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    Text(tmpl.name)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Color.gatherPrimaryText)
+                                        .lineLimit(1)
+                                }
+                                .frame(width: 84)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Create \(tmpl.name) from template")
+                        }
+                    }
+                }
+            }
+
+            // What Gathr can do
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Text("WHAT GATHR CAN DO")
+                    .gatherEyebrow()
+                    .foregroundStyle(Color.gatherSecondaryText)
+                welcomeFeatureRow(
+                    icon: "paperplane.fill",
+                    tint: Color.accentPurpleFallback,
+                    title: "Invites that work for everyone",
+                    detail: "Guests RSVP from one link — in the app or a browser, responses land in your guest list."
+                )
+                welcomeFeatureRow(
+                    icon: "chart.pie.fill",
+                    tint: Color.rsvpYesFallback,
+                    title: "Money without the mess",
+                    detail: "Track costs, split any bill between people, and settle up at the end."
+                )
+                welcomeFeatureRow(
+                    icon: "list.bullet.below.rectangle",
+                    tint: Color.accentPinkFallback,
+                    title: "Functions with their own guest lists",
+                    detail: "Mehendi, ceremony, reception — each sub-event picks its own people and place."
+                )
+            }
+        }
+        .padding(.top, Spacing.sm)
+    }
+
+    private func welcomeFeatureRow(icon: String, tint: Color, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: Spacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .gatherRowTitle()
+                    .foregroundStyle(Color.gatherPrimaryText)
+                Text(detail)
+                    .gatherMetaText()
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.sm)
+        .surfaceCard()
+        .accessibilityElement(children: .combine)
     }
 
     private var greeting: String {

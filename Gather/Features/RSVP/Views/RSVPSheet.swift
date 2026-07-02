@@ -444,6 +444,12 @@ struct RSVPSheet: View {
             response: rsvpResponseFromStatus(selectedStatus)
         )
 
+        // Auto-add to the guest's calendar when they're going and have the
+        // "Auto-sync RSVPs to Calendar" preference on (silent, deduped).
+        if selectedStatus == .attending {
+            Task { await CalendarService.shared.autoSyncIfEnabled(event: event) }
+        }
+
         // Haptic success feedback
         Task {
             try? await Task.sleep(for: .seconds(0.5))

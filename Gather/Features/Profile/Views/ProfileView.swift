@@ -15,6 +15,8 @@ struct ProfileView: View {
     @State private var isLoadingData = false
     @State private var loadedDataMessage: String?
     @State private var showEditProfile = false
+    @State private var verificationMessage: String?
+    @State private var isResendingVerification = false
 
     private var profileStats: (hosted: Int, attending: Int, totalGuests: Int, publicCount: Int) {
         let userId = authManager.currentUser?.id
@@ -34,6 +36,9 @@ struct ProfileView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
+                    // Nudge unverified email accounts to confirm their address.
+                    emailVerificationBanner
+
                     // Editorial header — big avatar + name + handle
                     profileHeader
                         .bouncyAppear()
@@ -112,6 +117,85 @@ struct ProfileView: View {
             .sheet(isPresented: $showEditProfile) {
                 EditProfileSheet()
             }
+        }
+    }
+
+    // MARK: - Email Verification Banner
+
+    /// Shown only for real (non-anonymous) email accounts that haven't confirmed
+    /// their address yet. Anonymous/demo accounts report as verified, so they
+    /// never see this.
+    @ViewBuilder
+    private var emailVerificationBanner: some View {
+        if !authManager.isEmailVerified {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                HStack(spacing: Spacing.sm) {
+                    Image(systemName: "envelope.badge.fill")
+                        .font(.title3)
+                        .foregroundStyle(Color.sunshineYellow)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Verify your email")
+                            .gatherRowTitle()
+                            .foregroundStyle(Color.gatherPrimaryText)
+                        Text("Confirm \(authManager.currentUser?.email ?? "your address") to secure your account.")
+                            .gatherMetaText()
+                            .foregroundStyle(Color.gatherSecondaryText)
+                    }
+                    Spacer()
+                }
+
+                if let verificationMessage {
+                    Text(verificationMessage)
+                        .gatherMetaText()
+                        .foregroundStyle(Color.rsvpYesFallback)
+                }
+
+                HStack(spacing: Spacing.sm) {
+                    Button {
+                        Task {
+                            isResendingVerification = true
+                            await authManager.resendVerificationEmail()
+                            isResendingVerification = false
+                            HapticService.success()
+                            withAnimation { verificationMessage = "Verification email sent — check your inbox." }
+                        }
+                    } label: {
+                        Text(isResendingVerification ? "Sending…" : "Resend email")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, Spacing.md)
+                            .padding(.vertical, 8)
+                            .background(Color.accentPurpleFallback, in: Capsule())
+                    }
+                    .disabled(isResendingVerification)
+
+                    Button {
+                        Task {
+                            await authManager.refreshVerificationStatus()
+                            if authManager.isEmailVerified {
+                                HapticService.success()
+                            } else {
+                                withAnimation { verificationMessage = "Still not verified — tap the link in the email first." }
+                            }
+                        }
+                    } label: {
+                        Text("I've verified")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.accentPurpleFallback)
+                            .padding(.horizontal, Spacing.md)
+                            .padding(.vertical, 8)
+                            .background(Color.accentPurpleFallback.opacity(0.12), in: Capsule())
+                    }
+                }
+            }
+            .padding(Spacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.sunshineYellow.opacity(0.1), in: RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous)
+                    .strokeBorder(Color.sunshineYellow.opacity(0.3), lineWidth: 1)
+            )
+            .task { await authManager.refreshVerificationStatus() }
         }
     }
 

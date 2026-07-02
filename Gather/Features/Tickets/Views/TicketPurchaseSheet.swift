@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AVFoundation
 
 struct TicketPurchaseSheet: View {
     let event: Event
@@ -842,9 +843,15 @@ struct TicketManagementSheet: View {
 
     @State private var showAddTier = false
     @State private var tierToDelete: TicketTier?
+    @State private var showCheckIn = false
 
     private var sortedTiers: [TicketTier] {
         event.ticketTiers.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    /// Any tickets claimed yet? Gates the "Check In" action.
+    private var hasClaimedTickets: Bool {
+        event.ticketTiers.contains { $0.soldCount > 0 }
     }
 
     var body: some View {
@@ -881,6 +888,15 @@ struct TicketManagementSheet: View {
             .navigationTitle("Manage Tickets")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if hasClaimedTickets {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button {
+                            showCheckIn = true
+                        } label: {
+                            Label("Check In", systemImage: "person.badge.checkmark")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
@@ -890,6 +906,9 @@ struct TicketManagementSheet: View {
                 AddTicketTierSheet(event: event)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showCheckIn) {
+                TicketCheckInView(event: event)
             }
             .alert(
                 "Delete Tier?",
@@ -1112,6 +1131,326 @@ struct AddTicketTierSheet: View {
         modelContext.safeSave()
         HapticService.success()
         dismiss()
+    }
+}
+
+// MARK: - Ticket Check-In (Host)
+
+/// Door tool for the host: mark ticket-holders as arrived — by tapping a name,
+/// or by scanning each guest's unique QR. Sets `isCheckedIn`/`checkedInAt` on the
+/// Ticket, and a QR that's already checked in is flagged so it can't wave in two
+/// people. Works fully offline; the scan path needs a real camera (device).
+struct TicketCheckInView: View {
+    let event: Event
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Query private var tickets: [Ticket]
+    @State private var searchText = ""
+    @State private var showScanner = false
+
+    init(event: Event) {
+        self.event = event
+        let eventId = event.id
+        _tickets = Query(
+            filter: #Predicate<Ticket> { $0.eventId == eventId },
+            sort: [SortDescriptor(\Ticket.guestName)]
+        )
+    }
+
+    private var validTickets: [Ticket] {
+        tickets.filter { $0.paymentStatus == .completed && $0.cancelledAt == nil }
+    }
+    private var filteredTickets: [Ticket] {
+        guard !searchText.isEmpty else { return validTickets }
+        return validTickets.filter {
+            $0.guestName.localizedCaseInsensitiveContains(searchText) ||
+            $0.ticketNumber.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    private var checkedInCount: Int { validTickets.filter { $0.isCheckedIn }.count }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: Spacing.md) {
+                    progressCard
+
+                    if validTickets.isEmpty {
+                        GatherEmptyState(
+                            icon: "person.badge.checkmark",
+                            title: "No tickets yet",
+                            message: "Once guests claim tickets, check them in here."
+                        )
+                        .padding(.top, Spacing.xl)
+                    } else {
+                        LazyVStack(spacing: Spacing.xs) {
+                            ForEach(filteredTickets) { ticket in
+                                checkInRow(ticket)
+                            }
+                        }
+                    }
+
+                    Color.clear.frame(height: 80)
+                }
+                .horizontalPadding()
+                .padding(.vertical)
+            }
+            .background(Color.gatherCanvas.ignoresSafeArea())
+            .navigationTitle("Check In")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "Search name or ticket #")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.fontWeight(.semibold)
+                }
+            }
+            .safeAreaInset(edge: .bottom) { scanBar }
+            .sheet(isPresented: $showScanner) {
+                QRScannerView(process: processScan)
+            }
+        }
+    }
+
+    private var progressCard: some View {
+        let total = validTickets.count
+        let fraction = total > 0 ? Double(checkedInCount) / Double(total) : 0
+        return VStack(alignment: .leading, spacing: Spacing.sm) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(checkedInCount)")
+                    .font(.system(size: 34, weight: .heavy))
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .contentTransition(.numericText())
+                Text("of \(total) checked in")
+                    .gatherMetaText()
+                    .foregroundStyle(Color.gatherSecondaryText)
+                Spacer()
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.gatherElevated).frame(height: 8)
+                    Capsule().fill(Color.rsvpYesFallback)
+                        .frame(width: max(0, geo.size.width * fraction), height: 8)
+                }
+            }
+            .frame(height: 8)
+        }
+        .padding(Spacing.md)
+        .surfaceCard()
+    }
+
+    private func checkInRow(_ ticket: Ticket) -> some View {
+        let tierName = event.ticketTiers.first { $0.id == ticket.tierId }?.name ?? "Ticket"
+        return Button {
+            toggleCheckIn(ticket)
+        } label: {
+            HStack(spacing: Spacing.sm) {
+                Image(systemName: ticket.isCheckedIn ? "checkmark.circle.fill" : "circle")
+                    .font(.title2)
+                    .foregroundStyle(ticket.isCheckedIn ? Color.rsvpYesFallback : Color.gatherSecondaryText.opacity(0.5))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ticket.guestName.isEmpty ? "Guest" : ticket.guestName)
+                        .gatherRowTitle()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .lineLimit(1)
+                    Text("\(tierName) · \(ticket.ticketNumber)")
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                }
+                Spacer()
+                if ticket.isCheckedIn, let at = ticket.checkedInAt {
+                    Text(at.formatted(.dateTime.hour().minute()))
+                        .font(GatherFont.caption)
+                        .foregroundStyle(Color.rsvpYesFallback)
+                }
+            }
+            .padding(Spacing.sm)
+            .background(Color.gatherElevated.opacity(ticket.isCheckedIn ? 0.6 : 0))
+            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(ticket.guestName), \(ticket.isCheckedIn ? "checked in" : "not checked in")")
+        .accessibilityHint("Double tap to toggle check-in")
+    }
+
+    private var scanBar: some View {
+        Button {
+            showScanner = true
+        } label: {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "qrcode.viewfinder")
+                Text("Scan Tickets")
+            }
+            .font(GatherFont.headline)
+            .fontWeight(.bold)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(LinearGradient.gatherAccentGradient)
+            .clipShape(Capsule())
+        }
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Spacing.sm)
+        .background(
+            Rectangle().fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+                .ignoresSafeArea()
+        )
+        .accessibilityLabel("Scan ticket QR codes")
+    }
+
+    private func toggleCheckIn(_ ticket: Ticket) {
+        ticket.isCheckedIn.toggle()
+        ticket.checkedInAt = ticket.isCheckedIn ? Date() : nil
+        modelContext.safeSave()
+        HapticService.selection()
+    }
+
+    /// Processes a scanned QR string and returns feedback for the scanner overlay.
+    private func processScan(_ code: String) -> (text: String, ok: Bool) {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let ticket = validTickets.first(where: { $0.qrCodeData == trimmed }) else {
+            HapticService.error()
+            return ("Not a ticket for this event", false)
+        }
+        if ticket.isCheckedIn {
+            HapticService.warning()
+            return ("\(ticket.guestName) already checked in", false)
+        }
+        ticket.isCheckedIn = true
+        ticket.checkedInAt = Date()
+        modelContext.safeSave()
+        HapticService.success()
+        return ("✓ \(ticket.guestName) checked in", true)
+    }
+}
+
+// MARK: - QR Scanner
+
+/// A live camera QR scanner. `process` is called for each detected code and
+/// returns feedback to show on the overlay; the scanner keeps running so the
+/// host can scan guests one after another. Camera-only (no simulator camera).
+struct QRScannerView: View {
+    let process: (String) -> (text: String, ok: Bool)
+    @Environment(\.dismiss) private var dismiss
+    @State private var feedback: (text: String, ok: Bool)?
+    @State private var lastCode: String?
+    @State private var lastScanAt: Date = .distantPast
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                CameraScanRepresentable { code in handle(code) }
+                    .ignoresSafeArea()
+
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.white.opacity(0.85), lineWidth: 3)
+                    .frame(width: 230, height: 230)
+
+                VStack {
+                    Spacer()
+                    Text(feedback?.text ?? "Point the camera at a guest's ticket QR")
+                        .font(.system(size: 15, weight: .semibold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.md)
+                        .padding(.vertical, Spacing.sm)
+                        .background(
+                            (feedback == nil ? Color.black.opacity(0.55)
+                             : (feedback!.ok ? Color.rsvpYesFallback : Color.rsvpNoFallback)).opacity(0.9),
+                            in: Capsule()
+                        )
+                        .padding(.bottom, 60)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: feedback?.text)
+                }
+            }
+            .navigationTitle("Scan Tickets")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }.foregroundStyle(.white)
+                }
+            }
+            .toolbarBackground(.black, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        }
+    }
+
+    private func handle(_ code: String) {
+        let now = Date()
+        // Debounce repeats of the same code so one guest isn't processed twice.
+        if code == lastCode && now.timeIntervalSince(lastScanAt) < 2.5 { return }
+        lastCode = code
+        lastScanAt = now
+        withAnimation { feedback = process(code) }
+    }
+}
+
+/// UIKit AVFoundation camera bridge that reports decoded QR strings.
+struct CameraScanRepresentable: UIViewControllerRepresentable {
+    let onCode: (String) -> Void
+
+    func makeUIViewController(context: Context) -> QRScanViewController {
+        let vc = QRScanViewController()
+        vc.onCode = onCode
+        return vc
+    }
+    func updateUIViewController(_ uiViewController: QRScanViewController, context: Context) {}
+}
+
+final class QRScanViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
+    var onCode: ((String) -> Void)?
+    private let session = AVCaptureSession()
+    private var previewLayer: AVCaptureVideoPreviewLayer?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        configureSession()
+    }
+
+    private func configureSession() {
+        guard let device = AVCaptureDevice.default(for: .video),
+              let input = try? AVCaptureDeviceInput(device: device),
+              session.canAddInput(input) else { return }
+        session.addInput(input)
+
+        let output = AVCaptureMetadataOutput()
+        guard session.canAddOutput(output) else { return }
+        session.addOutput(output)
+        output.setMetadataObjectsDelegate(self, queue: .main)
+        output.metadataObjectTypes = [.qr]
+
+        let layer = AVCaptureVideoPreviewLayer(session: session)
+        layer.videoGravity = .resizeAspectFill
+        layer.frame = view.layer.bounds
+        view.layer.addSublayer(layer)
+        previewLayer = layer
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard !session.isRunning else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.session.startRunning() }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        guard session.isRunning else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.session.stopRunning() }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        previewLayer?.frame = view.layer.bounds
+    }
+
+    func metadataOutput(_ output: AVCaptureMetadataOutput,
+                        didOutput metadataObjects: [AVMetadataObject],
+                        from connection: AVCaptureConnection) {
+        guard let object = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+              let value = object.stringValue else { return }
+        onCode?(value)
     }
 }
 

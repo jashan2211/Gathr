@@ -45,6 +45,8 @@
 	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Gather needs calendar access to add events to your calendar.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Gather uses the camera to scan guests' ticket QR codes for check-in.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Gather needs access to your contacts to help you invite guests.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

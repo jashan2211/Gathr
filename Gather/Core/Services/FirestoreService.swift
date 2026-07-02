@@ -21,6 +21,7 @@ final class FirestoreService {
 
     private var usersCollection: CollectionReference { db.collection("users") }
     private var eventsCollection: CollectionReference { db.collection("events") }
+    private var discoverCollection: CollectionReference { db.collection("discover") }
 
     private init() {}
 
@@ -62,6 +63,21 @@ final class FirestoreService {
             try eventsCollection.document(document.id)
                 .collection("public").document("info")
                 .setData(from: publicDoc, merge: true)
+
+            // Discovery card: a truly public, non-draft event gets a lightweight
+            // top-level card at `discover/{eventId}` so it can surface in Explore
+            // for other users. Anything else (private/unlisted, or a draft) has
+            // its card removed so it stops showing.
+            if event.privacy == .publicEvent && !event.isDraft {
+                let card = DiscoverCard(event: event, ownerUid: uid, hostName: hostName)
+                try discoverCollection.document(document.id).setData(from: card, merge: true)
+            } else {
+                discoverCollection.document(document.id).delete { error in
+                    if let error {
+                        logger.error("Discover card delete failed: \(error.localizedDescription)")
+                    }
+                }
+            }
         } catch {
             logger.error("Event push failed: \(error.localizedDescription)")
         }
@@ -221,11 +237,17 @@ final class FirestoreService {
         }
     }
 
-    /// Removes an event from Firestore.
+    /// Removes an event from Firestore, including its discovery card so it stops
+    /// appearing in Explore for other users.
     func deleteEvent(id: UUID) {
         eventsCollection.document(id.uuidString).delete { error in
             if let error {
                 logger.error("Event delete failed: \(error.localizedDescription)")
+            }
+        }
+        discoverCollection.document(id.uuidString).delete { error in
+            if let error {
+                logger.error("Discover card delete failed: \(error.localizedDescription)")
             }
         }
     }
@@ -260,6 +282,43 @@ final class FirestoreService {
         }
     }
 
+    /// Pulls the public discovery feed and inserts a lightweight local `Event`
+    /// for any card the device doesn't have yet, so `ExploreView`'s existing
+    /// `@Query` surfaces PUBLIC events created by OTHER users. Insert-only — it
+    /// never modifies or deletes an existing local event, so it can't clobber a
+    /// hosted event or a fuller copy fetched elsewhere. The user's own cards are
+    /// skipped (already local) and only upcoming events are requested.
+    func fetchPublicEvents(into modelContext: ModelContext) async {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        do {
+            let snapshot = try await discoverCollection
+                .whereField("startDate", isGreaterThanOrEqualTo: Date())
+                .order(by: "startDate")
+                .limit(to: 60)
+                .getDocuments()
+            let cards = snapshot.documents.compactMap { try? $0.data(as: DiscoverCard.self) }
+
+            let existing = (try? modelContext.fetch(FetchDescriptor<Event>())) ?? []
+            let existingIds = Set(existing.map { $0.id })
+
+            var insertedCount = 0
+            for card in cards {
+                // Skip our own events — they're already local.
+                guard card.ownerUid != uid,
+                      let eventId = UUID(uuidString: card.id),
+                      !existingIds.contains(eventId) else { continue }
+                modelContext.insert(card.makeEvent())
+                insertedCount += 1
+            }
+            if insertedCount > 0 {
+                modelContext.safeSave()
+                logger.info("Merged \(insertedCount) public event(s) from Discover.")
+            }
+        } catch {
+            logger.error("Public event fetch failed: \(error.localizedDescription)")
+        }
+    }
+
     /// Fetches a single event by id for someone opening a shared invite link to
     /// an event they don't host. Reads the sanitized public projection (no other
     /// guests' contact info), inserts it locally so it persists, and returns it.
@@ -283,6 +342,65 @@ final class FirestoreService {
             logger.error("Shared event fetch failed: \(error.localizedDescription)")
             return nil
         }
+    }
+}
+
+// MARK: - Discover Card
+
+/// A lightweight, cross-user discovery card for a PUBLIC, non-draft event. Lives
+/// at the top-level `discover/{eventId}` collection so Explore can list public
+/// events created by anyone, without exposing the owner-only full event doc.
+/// Carries only poster-level fields — no guest list, no contact info.
+struct DiscoverCard: Codable {
+    var id: String
+    var ownerUid: String
+    var title: String
+    var startDate: Date
+    var endDate: Date?
+    var category: String
+    var city: String
+    var locationName: String
+    var hostName: String?
+    var capacity: Int?
+    var attendingCount: Int
+    @ServerTimestamp var updatedAt: Timestamp?
+
+    init(event: Event, ownerUid: String, hostName: String?) {
+        self.id = event.id.uuidString
+        self.ownerUid = ownerUid
+        self.title = event.title
+        self.startDate = event.startDate
+        self.endDate = event.endDate
+        self.category = event.category.rawValue
+        self.city = event.location?.city ?? ""
+        self.locationName = event.location?.name ?? ""
+        self.hostName = hostName
+        self.capacity = event.capacity
+        self.attendingCount = event.attendingCount
+        self.updatedAt = nil
+    }
+
+    /// Builds a lightweight local `Event` from this card so it shows in Explore.
+    /// `hostId` is set to the OWNER's derived id (never the viewer's) so the
+    /// viewer is correctly treated as a non-host and can RSVP; privacy is
+    /// `.publicEvent` so `ExploreView.publicEvents` picks it up.
+    func makeEvent() -> Event {
+        var location: EventLocation?
+        if !locationName.isEmpty || !city.isEmpty {
+            location = EventLocation(name: locationName.isEmpty ? city : locationName,
+                                     city: city.isEmpty ? nil : city)
+        }
+        return Event(
+            id: UUID(uuidString: id) ?? UUID(),
+            title: title,
+            startDate: startDate,
+            endDate: endDate,
+            location: location,
+            capacity: capacity,
+            privacy: .publicEvent,
+            category: EventCategory(rawValue: category) ?? .custom,
+            hostId: AuthManager.deterministicUUID(from: ownerUid)
+        )
     }
 }
 

@@ -3,7 +3,9 @@ import SwiftData
 
 struct ExploreView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Event.startDate) private var allEvents: [Event]
+    @State private var isLoadingPublicEvents = false
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
     @State private var searchTask: Task<Void, Never>?
@@ -85,8 +87,11 @@ struct ExploreView: View {
                 .padding(.bottom, Layout.tabBarHeight + 20)
             }
             .background(Color.gatherCanvas.ignoresSafeArea())
+            .task {
+                await loadPublicEvents()
+            }
             .refreshable {
-                try? await Task.sleep(for: .milliseconds(500))
+                await loadPublicEvents()
             }
             .scrollDismissesKeyboard(.interactively)
             .toolbar(.hidden, for: .navigationBar)
@@ -143,7 +148,8 @@ struct ExploreView: View {
 
             Spacer()
 
-            // Event count pill
+            // Event count pill — or a subtle spinner while the Discover feed
+            // loads and we don't have anything to show yet.
             if !publicEvents.isEmpty {
                 Text("\(publicEvents.count) events")
                     .font(.system(size: 12, weight: .semibold))
@@ -151,6 +157,11 @@ struct ExploreView: View {
                     .padding(.horizontal, Spacing.sm)
                     .padding(.vertical, 6)
                     .background(Color.gatherSurface, in: Capsule())
+            } else if isLoadingPublicEvents {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Color.accentPurpleFallback)
+                    .accessibilityLabel("Loading events")
             }
         }
         .padding(.top, Spacing.xl)
@@ -609,6 +620,15 @@ struct ExploreView: View {
             action: hasActiveFilters ? clearAllFilters : nil
         )
         .padding(.top, Spacing.xl)
+    }
+
+    /// Pulls PUBLIC events created by other users from the Discover feed and
+    /// inserts any this device doesn't have yet, so Explore shows more than the
+    /// signed-in user's own public events. Insert-only and safe to re-run.
+    private func loadPublicEvents() async {
+        isLoadingPublicEvents = true
+        await FirestoreService.shared.fetchPublicEvents(into: modelContext)
+        isLoadingPublicEvents = false
     }
 
     private func clearAllFilters() {

@@ -63,6 +63,13 @@ struct TicketPurchaseSheet: View {
         ticketSubtotal == 0
     }
 
+    /// This app issues free tickets only. True when every selected tier is free
+    /// (or nothing is selected yet) — used to hide all money/fee/promo UI.
+    private var isFreeOnlyOrder: Bool {
+        let selected = sortedTiers.filter { (selectedTiers[$0.id] ?? 0) > 0 }
+        return selected.allSatisfy { $0.isFree }
+    }
+
     private var isSingleTier: Bool {
         sortedTiers.count == 1
     }
@@ -86,12 +93,17 @@ struct TicketPurchaseSheet: View {
                         // Tier Selection
                         tierSection
 
-                        // Promo Code
-                        promoSection
+                        // Money-only UI (promo, group discounts, order summary)
+                        // is hidden entirely for free-ticket orders — this app
+                        // issues free tickets only.
+                        if !isFreeOnlyOrder {
+                            // Promo Code
+                            promoSection
 
-                        // Group Discount Nudge
-                        if totalQuantity > 0 {
-                            groupDiscountInfo
+                            // Group Discount Nudge
+                            if totalQuantity > 0 {
+                                groupDiscountInfo
+                            }
                         }
 
                         // Your Info
@@ -99,8 +111,8 @@ struct TicketPurchaseSheet: View {
                             yourInfoSection
                         }
 
-                        // Order Summary
-                        if totalQuantity > 0 {
+                        // Order Summary — only when there's a price to summarize
+                        if totalQuantity > 0 && !isFreeOnlyOrder {
                             orderSummarySection
                         }
 
@@ -129,7 +141,7 @@ struct TicketPurchaseSheet: View {
                     processingOverlay
                 }
             }
-            .navigationTitle("Get Tickets")
+            .navigationTitle("Get Free Ticket")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -431,19 +443,22 @@ struct TicketPurchaseSheet: View {
 
             VStack(spacing: Spacing.sm) {
                 if isFreeOrder {
-                    // Free order - single confirm button
+                    // Free order — issues a unique ticket (QR) per claim, no payment.
                     Button {
                         completePurchase(paymentMethod: .free)
                     } label: {
-                        Text("Confirm - Free")
-                            .font(GatherFont.headline)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, minHeight: 52)
-                            .background(LinearGradient.gatherAccentGradient)
-                            .clipShape(Capsule())
+                        HStack(spacing: Spacing.xs) {
+                            Image(systemName: "ticket.fill")
+                            Text(totalQuantity == 1 ? "Get Free Ticket" : "Get \(totalQuantity) Free Tickets")
+                        }
+                        .font(GatherFont.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(LinearGradient.gatherAccentGradient)
+                        .clipShape(Capsule())
                     }
-                    .accessibilityLabel("Confirm free order, \(totalQuantity) ticket\(totalQuantity == 1 ? "" : "s")")
+                    .accessibilityLabel("Get \(totalQuantity) free ticket\(totalQuantity == 1 ? "" : "s")")
                 } else {
                     // Paid tickets - coming soon
                     VStack(spacing: Spacing.xs) {
@@ -481,9 +496,10 @@ struct TicketPurchaseSheet: View {
                     Text("\(totalQuantity) ticket\(totalQuantity == 1 ? "" : "s")")
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
-                    Text(formatPrice(totalPrice))
+                    Text(isFreeOnlyOrder ? "Free" : formatPrice(totalPrice))
                         .font(GatherFont.title2)
                         .fontWeight(.bold)
+                        .foregroundStyle(isFreeOnlyOrder ? Color.rsvpYesFallback : Color.gatherPrimaryText)
                 }
                 Spacer()
                 Text("Fill in details above")
@@ -512,14 +528,14 @@ struct TicketPurchaseSheet: View {
                     .scaleEffect(1.5)
                     .tint(Color.accentPurpleFallback)
 
-                Text("Processing payment...")
+                Text("Issuing your ticket...")
                     .font(GatherFont.headline)
                     .foregroundStyle(Color.gatherPrimaryText)
             }
             .padding(Spacing.xl)
             .surfaceCard()
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Processing payment, please wait")
+            .accessibilityLabel("Issuing your ticket, please wait")
             .accessibilityAddTraits(.updatesFrequently)
         }
     }
@@ -771,6 +787,292 @@ struct TierCard: View {
         .accessibilityLabel("\(tier.name), \(tier.formattedPrice), \(tier.isSoldOut ? "Sold out" : "\(tier.remainingCount) available")")
         .accessibilityValue(quantity > 0 ? "\(quantity) selected" : "None selected")
         .accessibilityAddTraits(quantity > 0 ? .isSelected : [])
+    }
+}
+
+// MARK: - Ticket Management Sheet (Host)
+
+/// Host-facing sheet to create and remove FREE ticket tiers on an event.
+/// This app issues free tickets only, so there is no price entry — every tier
+/// is locked to "Free". Each tier lists its sold / remaining counts and can be
+/// deleted (which also removes it from the event's `ticketTiers` relationship).
+struct TicketManagementSheet: View {
+    @Bindable var event: Event
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var showAddTier = false
+    @State private var tierToDelete: TicketTier?
+
+    private var sortedTiers: [TicketTier] {
+        event.ticketTiers.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
+                    header
+
+                    if sortedTiers.isEmpty {
+                        GatherEmptyState(
+                            icon: "ticket",
+                            title: "No Ticket Tiers Yet",
+                            message: "Create a free tier so guests can claim a unique ticket with its own QR code.",
+                            accent: Color.forCategory(event.category)
+                        )
+                        .padding(.top, Spacing.xl)
+                    } else {
+                        VStack(spacing: Spacing.sm) {
+                            ForEach(sortedTiers) { tier in
+                                tierRow(tier)
+                            }
+                        }
+                    }
+
+                    Color.clear.frame(height: 90)
+                }
+                .horizontalPadding()
+                .padding(.vertical)
+            }
+            .background(Color.gatherCanvas.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                addTierBar
+            }
+            .navigationTitle("Manage Tickets")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
+            .sheet(isPresented: $showAddTier) {
+                AddTicketTierSheet(event: event)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+            .alert(
+                "Delete Tier?",
+                isPresented: Binding(
+                    get: { tierToDelete != nil },
+                    set: { if !$0 { tierToDelete = nil } }
+                ),
+                presenting: tierToDelete
+            ) { tier in
+                Button("Delete", role: .destructive) { deleteTier(tier) }
+                Button("Cancel", role: .cancel) { tierToDelete = nil }
+            } message: { tier in
+                Text(tier.soldCount > 0
+                     ? "\(tier.name) has \(tier.soldCount) ticket\(tier.soldCount == 1 ? "" : "s") already claimed. Deleting it won't cancel those tickets."
+                     : "Remove \(tier.name) from this event?")
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: Spacing.xxs) {
+            Text("Free tickets, one QR each")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color.gatherSecondaryText)
+            Text("Ticket Tiers")
+                .gatherSerifScreenTitle()
+                .foregroundStyle(Color.gatherPrimaryText)
+                .accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    private func tierRow(_ tier: TicketTier) -> some View {
+        HStack(spacing: Spacing.md) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                HStack(spacing: Spacing.xs) {
+                    Text(tier.name)
+                        .font(GatherFont.headline)
+                        .foregroundStyle(Color.gatherPrimaryText)
+
+                    // Locked "Free" label — this app issues free tickets only.
+                    Text("Free")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(Color.rsvpYesFallback)
+                        .padding(.horizontal, Spacing.xs)
+                        .padding(.vertical, 2)
+                        .background(Color.rsvpYesFallback.opacity(0.15), in: Capsule())
+                }
+
+                Text("\(tier.soldCount) claimed · \(tier.remainingCount) of \(tier.capacity) left")
+                    .font(GatherFont.caption)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .contentTransition(.numericText())
+            }
+
+            Spacer()
+
+            Button {
+                tierToDelete = tier
+            } label: {
+                Image(systemName: "trash")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Color.rsvpNoFallback)
+                    .frame(width: 40, height: 40)
+                    .background(Color.rsvpNoFallback.opacity(0.1), in: Circle())
+            }
+            .accessibilityLabel("Delete \(tier.name)")
+        }
+        .padding(Spacing.md)
+        .surfaceCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(tier.name), Free, \(tier.soldCount) claimed, \(tier.remainingCount) of \(tier.capacity) remaining")
+    }
+
+    private var addTierBar: some View {
+        Button {
+            showAddTier = true
+        } label: {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "plus.circle.fill")
+                Text("Add Free Tier")
+            }
+            .font(GatherFont.headline)
+            .fontWeight(.bold)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(LinearGradient.gatherAccentGradient)
+            .clipShape(Capsule())
+        }
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Spacing.sm)
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 15, y: -6)
+                .ignoresSafeArea()
+        )
+        .accessibilityLabel("Add a free ticket tier")
+    }
+
+    private func deleteTier(_ tier: TicketTier) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            event.ticketTiers.removeAll { $0.id == tier.id }
+        }
+        modelContext.delete(tier)
+        modelContext.safeSave()
+        HapticService.success()
+        tierToDelete = nil
+    }
+}
+
+// MARK: - Add Ticket Tier Sheet (Host)
+
+/// Create a single FREE ticket tier: name + capacity only. Price is fixed at
+/// $0 (free) and never shown as an editable field — this app issues free
+/// tickets exclusively.
+struct AddTicketTierSheet: View {
+    @Bindable var event: Event
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var name: String = ""
+    @State private var capacityText: String = "50"
+
+    private var capacity: Int? {
+        guard let value = Int(capacityText.trimmingCharacters(in: .whitespaces)), value > 0 else { return nil }
+        return value
+    }
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && capacity != nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
+                    // Free label — locked, not editable.
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "tag.fill")
+                            .foregroundStyle(Color.rsvpYesFallback)
+                        Text("This tier is free — guests claim a unique ticket at no cost.")
+                            .font(GatherFont.caption)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                    }
+                    .padding(Spacing.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.rsvpYesFallback.opacity(0.1), in: RoundedRectangle(cornerRadius: CornerRadius.sm, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text("Tier Name")
+                            .gatherEyebrow()
+                            .foregroundStyle(Color.gatherSecondaryText)
+                        TextField("e.g. General Admission", text: $name)
+                            .textFieldStyle(.plain)
+                            .submitLabel(.done)
+                            .padding(Spacing.sm)
+                            .background(Color.gatherElevated)
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                    }
+
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text("Capacity")
+                            .gatherEyebrow()
+                            .foregroundStyle(Color.gatherSecondaryText)
+                        TextField("Number of tickets", text: $capacityText)
+                            .textFieldStyle(.plain)
+                            .keyboardType(.numberPad)
+                            .padding(Spacing.sm)
+                            .background(Color.gatherElevated)
+                            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.sm))
+                        Text("Guests can claim tickets until this many are gone.")
+                            .font(GatherFont.caption)
+                            .foregroundStyle(Color.gatherTertiaryText)
+                    }
+
+                    // Price row — locked to Free (read-only).
+                    HStack {
+                        Text("Price")
+                            .gatherEyebrow()
+                            .foregroundStyle(Color.gatherSecondaryText)
+                        Spacer()
+                        Text("Free")
+                            .font(GatherFont.headline)
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.rsvpYesFallback)
+                    }
+                    .padding(Spacing.sm)
+                    .surfaceCard(cornerRadius: CornerRadius.sm)
+                }
+                .horizontalPadding()
+                .padding(.vertical)
+            }
+            .background(Color.gatherCanvas.ignoresSafeArea())
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("New Free Tier")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { saveTier() }
+                        .fontWeight(.semibold)
+                        .disabled(!canSave)
+                }
+            }
+        }
+    }
+
+    private func saveTier() {
+        guard let capacity else { return }
+        let tier = TicketTier(
+            name: name.trimmingCharacters(in: .whitespaces),
+            price: 0,                     // Free-only — never anything but 0.
+            capacity: capacity,
+            eventId: event.id
+        )
+        tier.sortOrder = (event.ticketTiers.map { $0.sortOrder }.max() ?? -1) + 1
+        event.ticketTiers.append(tier)
+        modelContext.safeSave()
+        HapticService.success()
+        dismiss()
     }
 }
 

@@ -85,7 +85,9 @@ class AuthManager: ObservableObject {
 
     /// Derives a stable UUID from an account identifier so the app's UUID-keyed
     /// models map consistently to a Firebase account across launches.
-    static func deterministicUUID(from seed: String) -> UUID {
+    // Pure function (SHA-256 of the seed) — safe to call off the main actor,
+    // e.g. from Codable `makeEvent()` builders on background-decoded data.
+    nonisolated static func deterministicUUID(from seed: String) -> UUID {
         let digest = SHA256.hash(data: Data(seed.utf8))
         var bytes = Array(digest.prefix(16))
         bytes[6] = (bytes[6] & 0x0F) | 0x50  // version 5

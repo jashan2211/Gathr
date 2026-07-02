@@ -68,6 +68,7 @@ struct EventDetailView: View {
     @State private var showAddGuest = false
     @State private var showBudget = false
     @State private var showTicketPurchase = false
+    @State private var showTicketManagement = false
     @State private var showWaitlist = false
     @State private var isLoadingRSVPs = false
     @State private var showDuplicateConfirmation = false
@@ -159,6 +160,14 @@ struct EventDetailView: View {
                                 Label("Add Guest", systemImage: "person.badge.plus")
                             }
 
+                            if event.hasTicketing {
+                                Button {
+                                    showTicketManagement = true
+                                } label: {
+                                    Label("Manage Tickets", systemImage: "ticket")
+                                }
+                            }
+
                             Divider()
 
                             Button {
@@ -205,6 +214,11 @@ struct EventDetailView: View {
         }
         .sheet(isPresented: $showTicketPurchase) {
             TicketPurchaseSheet(event: event)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showTicketManagement) {
+            TicketManagementSheet(event: event)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -772,7 +786,7 @@ struct EventDetailView: View {
                 } label: {
                     HStack(spacing: Spacing.xs) {
                         Image(systemName: "ticket.fill")
-                        Text("Get Tickets")
+                        Text("Get Free Ticket")
                     }
                     .font(GatherFont.headline)
                     .foregroundStyle(.white)

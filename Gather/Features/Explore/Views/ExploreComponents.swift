@@ -96,7 +96,7 @@ struct HappeningSoonCard: View {
                         HStack(spacing: 2) {
                             Image(systemName: "person.2.fill")
                                 .font(.system(size: 8))
-                            Text("\(event.totalAttendingHeadcount)")
+                            Text("\(event.displayAttendingCount)")
                                 .fontWeight(.semibold)
                         }
                         .font(.caption2)
@@ -111,7 +111,7 @@ struct HappeningSoonCard: View {
         .categoryAccentBar(Color.forCategory(event.category))
         .drawingGroup()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(event.title), \(relativeDay). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending")
+        .accessibilityLabel("\(event.title), \(relativeDay). \(event.location?.name ?? ""). \(event.displayAttendingCount) attending")
     }
 
     private var dayOfMonth: String {
@@ -229,8 +229,8 @@ struct ExploreGridCard: View {
                             maxDisplay: 3,
                             size: 20
                         )
-                        if event.totalAttendingHeadcount > 3 {
-                            Text("+\(event.totalAttendingHeadcount - 3)")
+                        if event.displayAttendingCount > 3 {
+                            Text("+\(event.displayAttendingCount - 3)")
                                 .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color.gatherSecondaryText)
@@ -239,7 +239,7 @@ struct ExploreGridCard: View {
                         Image(systemName: "person.2.fill")
                             .font(.system(size: 8))
                             .foregroundStyle(Color.gatherSecondaryText)
-                        Text("\(event.totalAttendingHeadcount)")
+                        Text("\(event.displayAttendingCount)")
                             .font(.caption2)
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.gatherPrimaryText)
@@ -248,7 +248,7 @@ struct ExploreGridCard: View {
                     Spacer()
 
                     if let capacity = event.capacity, capacity > 0 {
-                        let remaining = capacity - event.totalAttendingHeadcount
+                        let remaining = capacity - event.displayAttendingCount
                         if remaining <= 10 && remaining > 0 {
                             Text("\(remaining) left!")
                                 .font(.caption2)
@@ -264,7 +264,7 @@ struct ExploreGridCard: View {
         .categoryAccentBar(Color.forCategory(event.category))
         .drawingGroup()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(event.title). \(priceLabel). \(smartDate). \(event.location?.name ?? ""). \(event.totalAttendingHeadcount) attending")
+        .accessibilityLabel("\(event.title). \(priceLabel). \(smartDate). \(event.location?.name ?? ""). \(event.displayAttendingCount) attending")
     }
 
     private var priceLabel: String {

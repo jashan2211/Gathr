@@ -16,7 +16,7 @@ struct TicketPurchaseSheet: View {
     @State private var guestName: String = ""
     @State private var guestEmail: String = ""
     @State private var isProcessing = false
-    @State private var purchasedTicket: Ticket?
+    @State private var purchasedTickets: [Ticket] = []
     @State private var showConfirmation = false
     @State private var paymentCompleted = false
 
@@ -160,8 +160,8 @@ struct TicketPurchaseSheet: View {
                 }
             }
             .fullScreenCover(isPresented: $showConfirmation) {
-                if let ticket = purchasedTicket {
-                    TicketConfirmationView(ticket: ticket, event: event)
+                if !purchasedTickets.isEmpty {
+                    TicketConfirmationView(tickets: purchasedTickets, event: event)
                 }
             }
         }
@@ -569,11 +569,15 @@ struct TicketPurchaseSheet: View {
     }
 
     private func completePurchase(paymentMethod: PaymentMethod) {
-        // Create tickets for each selected tier
-        var lastTicket: Ticket?
+        // Create tickets for each selected tier, iterating in a STABLE (sorted)
+        // order so the confirmation always opens on a deterministic ticket, and
+        // collecting EVERY ticket created so the confirmation can page through
+        // all of them (a group claim of N free tickets = N unique QR codes).
+        var created: [Ticket] = []
 
-        for (tierId, quantity) in selectedTiers {
-            guard let tier = sortedTiers.first(where: { $0.id == tierId }), quantity > 0 else { continue }
+        for tier in sortedTiers {
+            let quantity = selectedTiers[tier.id] ?? 0
+            guard quantity > 0 else { continue }
 
             if tier.isFree {
                 // Free tier: issue ONE unique ticket per admission so each guest
@@ -582,7 +586,7 @@ struct TicketPurchaseSheet: View {
                 for _ in 0..<quantity {
                     let ticket = Ticket(
                         eventId: event.id,
-                        tierId: tierId,
+                        tierId: tier.id,
                         guestName: guestName,
                         guestEmail: guestEmail,
                         quantity: 1,
@@ -604,7 +608,7 @@ struct TicketPurchaseSheet: View {
                         paymentMethod: .free
                     )
                     modelContext.insert(transaction)
-                    lastTicket = ticket
+                    created.append(ticket)
                 }
                 tier.soldCount += quantity
             } else {
@@ -612,7 +616,7 @@ struct TicketPurchaseSheet: View {
                 let discountForTier = groupDiscount + promoDiscount
                 let ticket = Ticket(
                     eventId: event.id,
-                    tierId: tierId,
+                    tierId: tier.id,
                     guestName: guestName,
                     guestEmail: guestEmail,
                     quantity: quantity,
@@ -643,7 +647,7 @@ struct TicketPurchaseSheet: View {
                 )
                 modelContext.insert(transaction)
 
-                lastTicket = ticket
+                created.append(ticket)
             }
         }
 
@@ -666,7 +670,7 @@ struct TicketPurchaseSheet: View {
 
         modelContext.safeSave()
 
-        purchasedTicket = lastTicket
+        purchasedTickets = created
         showConfirmation = true
     }
 }

@@ -106,9 +106,14 @@ struct ExploreView: View {
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showFilterSheet) {
-                let cities = Array(Set(publicEvents.compactMap { $0.location?.city })).sorted()
-                let states = Array(Set(publicEvents.compactMap { $0.location?.state })).sorted()
+                // Narrow each level to what's reachable given the levels above it,
+                // so the sheet can't offer a country/state/city combination that
+                // yields zero events.
+                let statePool = publicEvents.filter { selectedCountry == nil || $0.location?.country == selectedCountry }
+                let cityPool = statePool.filter { selectedState == nil || $0.location?.state == selectedState }
                 let countries = Array(Set(publicEvents.compactMap { $0.location?.country })).sorted()
+                let states = Array(Set(statePool.compactMap { $0.location?.state })).sorted()
+                let cities = Array(Set(cityPool.compactMap { $0.location?.city })).sorted()
                 LocationFilterSheet(
                     availableCities: cities,
                     availableStates: states,
@@ -119,6 +124,15 @@ struct ExploreView: View {
                 )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+            }
+            // Changing an upper level clears any now-inconsistent lower selection
+            // (e.g. picking a new country drops a city that isn't in it).
+            .onChange(of: selectedCountry) { _, _ in
+                selectedState = nil
+                selectedCity = nil
+            }
+            .onChange(of: selectedState) { _, _ in
+                selectedCity = nil
             }
             .onChange(of: searchText) { _, newValue in
                 searchTask?.cancel()
@@ -644,7 +658,9 @@ struct ExploreView: View {
     // MARK: - Computed Properties
 
     private var publicEvents: [Event] {
-        allEvents.filter { $0.privacy == .publicEvent && $0.isUpcoming }
+        // Keep in-progress events (not just future ones) so a public event doesn't
+        // vanish from Explore the moment it starts.
+        allEvents.filter { $0.privacy == .publicEvent && !$0.isPast }
     }
 
     /// Pre-computed category counts to avoid redundant filtering per chip

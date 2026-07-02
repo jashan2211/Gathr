@@ -709,10 +709,17 @@ struct FunctionDetailSheet: View {
         function.functionDescription = editDescription.isEmpty ? nil : editDescription
         function.date = editDate
         function.endTime = editEndTime
-        function.location = editLocationName.isEmpty ? nil : EventLocation(
-            name: editLocationName,
-            address: editLocationAddress.isEmpty ? nil : editLocationAddress
-        )
+        if editLocationName.isEmpty {
+            function.location = nil
+        } else {
+            // Preserve the existing map pin (coordinates/city/state/country) — the
+            // edit form only exposes name + address, so rebuilding from scratch
+            // would silently drop the geocoded location.
+            var loc = function.location ?? EventLocation(name: editLocationName)
+            loc.name = editLocationName
+            loc.address = editLocationAddress.isEmpty ? nil : editLocationAddress
+            function.location = loc
+        }
         function.dressCode = editDressCode
         function.customDressCode = editDressCode == .custom ? editCustomDressCode : nil
         function.updatedAt = Date()

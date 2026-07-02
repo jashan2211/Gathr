@@ -328,8 +328,8 @@ struct EventDetailView: View {
                 .gatherMetaText()
                 .foregroundStyle(.white.opacity(0.92))
 
-                if event.attendingCount > 0 {
-                    Label("\(event.attendingCount) going", systemImage: "person.2.fill")
+                if event.displayAttendingCount > 0 {
+                    Label("\(event.displayAttendingCount) going", systemImage: "person.2.fill")
                         .gatherMetaText()
                         .foregroundStyle(.white)
                 }

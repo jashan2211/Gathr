@@ -25,6 +25,9 @@ struct CreateEventView: View {
     @State private var capacity: Int?
     @State private var hasCapacity = false
     @State private var privacy: EventPrivacy = .inviteOnly
+    /// Honours the "Default Event Privacy" preference set in Profile.
+    @AppStorage("defaultPrivacy") private var defaultPrivacyRaw = "inviteOnly"
+    @State private var didSeedPrivacy = false
     @State private var guestListVisibility: GuestListVisibility = .visible
 
     // Category and features
@@ -86,6 +89,14 @@ struct CreateEventView: View {
             }
             .navigationTitle("Create Event")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                // Apply the user's default-privacy preference once, before they've
+                // touched anything (a chosen template or manual change wins after).
+                if !didSeedPrivacy {
+                    privacy = EventPrivacy(rawValue: defaultPrivacyRaw) ?? .inviteOnly
+                    didSeedPrivacy = true
+                }
+            }
             .interactiveDismissDisabled(hasInput)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -446,7 +457,10 @@ struct CreateEventView: View {
     private func applyTemplate(_ tmpl: EventTemplate) {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             selectedCategory = tmpl.category
-            enabledFeatures = tmpl.suggestedFeatures
+            // Only enable features that actually ship — otherwise a template could
+            // switch on a "coming soon" feature (e.g. seating) that the category
+            // and manual toggles both filter out, leaving a dead tab.
+            enabledFeatures = tmpl.suggestedFeatures.filter { $0.isAvailable }
             description = tmpl.suggestedDescription
             privacy = tmpl.suggestedPrivacy
             showTemplates = false
@@ -603,7 +617,10 @@ struct CreateEventView: View {
         case .features:
             return nil
         case .settings:
-            if hasCapacity, let cap = capacity, cap <= 0 { return "Capacity must be at least 1 guest" }
+            if hasCapacity {
+                guard let cap = capacity else { return "Enter a capacity, or turn off the limit" }
+                if cap <= 0 { return "Capacity must be at least 1 guest" }
+            }
             return nil
         }
     }

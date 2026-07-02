@@ -122,20 +122,39 @@ final class FirestoreService {
                 guard let guestIdStr = data["guestId"] as? String,
                       let guestId = UUID(uuidString: guestIdStr),
                       let statusStr = data["status"] as? String,
-                      let status = RSVPStatus(rawValue: statusStr),
-                      let guest = event.guests.first(where: { $0.id == guestId }) else { continue }
+                      let status = RSVPStatus(rawValue: statusStr) else { continue }
 
                 let remoteDate = (data["respondedAt"] as? Timestamp)?.dateValue() ?? Date()
-                if let localDate = guest.respondedAt, localDate >= remoteDate { continue }
+                let note = (data["note"] as? String).flatMap { $0.isEmpty ? nil : $0 }
 
-                guest.status = status
-                guest.plusOneCount = data["partySize"] as? Int ?? guest.plusOneCount
-                guest.respondedAt = remoteDate
-                if let note = data["note"] as? String, !note.isEmpty {
-                    if guest.metadata != nil { guest.metadata?.notes = note }
-                    else { guest.metadata = GuestMetadata(notes: note) }
+                if let guest = event.guests.first(where: { $0.id == guestId }) {
+                    // Existing guest — a newer remote response wins.
+                    if let localDate = guest.respondedAt, localDate >= remoteDate { continue }
+                    guest.status = status
+                    guest.plusOneCount = data["partySize"] as? Int ?? guest.plusOneCount
+                    guest.respondedAt = remoteDate
+                    if let note {
+                        if guest.metadata != nil { guest.metadata?.notes = note }
+                        else { guest.metadata = GuestMetadata(notes: note) }
+                    }
+                    changed = true
+                } else {
+                    // A response from the shareable "anyone with the link" link:
+                    // no guest was pre-created for this id, so add one (keyed to
+                    // the same guestId) — otherwise link RSVPs never reach the
+                    // host's guest list.
+                    let rawName = (data["name"] as? String)?.trimmingCharacters(in: .whitespaces)
+                    let newGuest = Guest(
+                        id: guestId,
+                        name: (rawName?.isEmpty == false) ? rawName! : "Guest",
+                        status: status,
+                        plusOneCount: data["partySize"] as? Int ?? 0,
+                        metadata: note.map { GuestMetadata(notes: $0) }
+                    )
+                    newGuest.respondedAt = remoteDate
+                    event.guests.append(newGuest)
+                    changed = true
                 }
-                changed = true
             }
             if changed {
                 modelContext.safeSave()
@@ -292,8 +311,12 @@ final class FirestoreService {
     func fetchPublicEvents(into modelContext: ModelContext) async {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         do {
+            // Include events that started up to 24h ago so an in-progress event
+            // (e.g. an all-day festival) stays discoverable and isn't pruned
+            // locally while it's still happening.
+            let since = Date().addingTimeInterval(-24 * 3600)
             let snapshot = try await discoverCollection
-                .whereField("startDate", isGreaterThanOrEqualTo: Date())
+                .whereField("startDate", isGreaterThanOrEqualTo: since)
                 .order(by: "startDate")
                 .limit(to: 60)
                 .getDocuments()
@@ -324,8 +347,8 @@ final class FirestoreService {
                 }
             }
 
-            // Prune discovered events the feed no longer lists (unpublished,
-            // deleted, or now past). Guards:
+            // Prune discovered events that are over, or that the feed no longer
+            // lists (unpublished/deleted). Guards:
             //  - `isDiscovered`: never delete a hosted or invited event.
             //  - `guests.isEmpty`: never delete one the user has RSVP'd to — an
             //    RSVP appends a local Guest (carrying plus-ones + note that live
@@ -334,7 +357,8 @@ final class FirestoreService {
             // The feed is capped at 60, so a not-yet-RSVP'd discovered event
             // ranked beyond that may be pruned and re-inserted later — harmless.
             for event in allLocal
-            where event.isDiscovered && event.guests.isEmpty && !feedIds.contains(event.id) {
+            where event.isDiscovered && event.guests.isEmpty
+                && (event.isPast || !feedIds.contains(event.id)) {
                 modelContext.delete(event)
                 changed = true
             }

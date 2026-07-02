@@ -201,7 +201,10 @@ class InviteService: ObservableObject {
         guard !phone.isEmpty else { return false }
 
         let encodedMessage = message.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "sms:\(phone)&body=\(encodedMessage)"
+        // The body must be introduced as a query ("?&body="); using "&body="
+        // directly after the number makes iOS treat the whole thing as the
+        // recipient and silently drop the prefilled message.
+        let urlString = "sms:\(phone)?&body=\(encodedMessage)"
 
         guard let url = URL(string: urlString) else { return false }
 

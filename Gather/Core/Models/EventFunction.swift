@@ -151,7 +151,10 @@ extension EventFunction {
     }
 
     var pendingCount: Int {
-        invites.filter { $0.inviteStatus != .responded }.count
+        // "Pending" = invited and awaiting a reply. A guest toggled on but not yet
+        // sent an invite (.notSent) isn't pending — counting them made the number
+        // jump the moment you added a guest, before any invite went out.
+        invites.filter { $0.inviteStatus == .sent }.count
     }
 
     var sentCount: Int {

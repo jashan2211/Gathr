@@ -455,6 +455,24 @@ struct EventDateTimeSection: View {
             }
         }
         .eventFormCard()
+        // Flipping "Ends" on must write a concrete end time, not just show the
+        // picker's placeholder — otherwise the event saves with no end time and
+        // is treated as instantaneous everywhere (Past/Future, "happening now").
+        .onChange(of: hasEndDate) { _, on in
+            if on {
+                if endDate == nil || (endDate ?? startDate) < startDate {
+                    endDate = startDate.addingTimeInterval(3600)
+                }
+            } else {
+                endDate = nil
+            }
+        }
+        // Keep the end time at/after the start if the start moves past it.
+        .onChange(of: startDate) { _, newStart in
+            if hasEndDate, let end = endDate, end < newStart {
+                endDate = newStart.addingTimeInterval(3600)
+            }
+        }
     }
 }
 

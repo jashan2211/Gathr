@@ -203,6 +203,19 @@ struct AddFunctionSheet: View {
             .eventFormInputSurface(isActive: hasEndTime)
         }
         .eventFormCard()
+        .onChange(of: date) { _, newDate in reconcileEndTimeDay(to: newDate) }
+        .onChange(of: hasEndTime) { _, on in if on { reconcileEndTimeDay(to: date) } }
+    }
+
+    /// Keeps the end time on the same calendar day as the start `date` (preserving
+    /// its hour/minute) so a function's end can't accidentally precede its start —
+    /// the end picker only edits time, so a start-date change would otherwise
+    /// leave the end stranded on the old day.
+    private func reconcileEndTimeDay(to day: Date) {
+        let cal = Calendar.current
+        let t = cal.dateComponents([.hour, .minute], from: endTime)
+        guard let snapped = cal.date(bySettingHour: t.hour ?? 0, minute: t.minute ?? 0, second: 0, of: day) else { return }
+        endTime = snapped < day ? day.addingTimeInterval(3600) : snapped
     }
 
     // MARK: - Where Card

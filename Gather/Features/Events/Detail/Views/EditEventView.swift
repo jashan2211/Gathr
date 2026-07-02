@@ -68,12 +68,20 @@ struct EditEventView: View {
         description != (event.eventDescription ?? "") ||
         startDate != event.startDate ||
         endDate != event.endDate ||
+        hasEndDate != (event.endDate != nil) ||
         selectedCategory != event.category ||
         privacy != event.privacy ||
         guestListVisibility != event.guestListVisibility ||
         enabledFeatures != event.enabledFeatures ||
         locationName != (event.location?.name ?? "") ||
+        locationAddress != (event.location?.address ?? "") ||
+        locationCity != (event.location?.city ?? "") ||
+        locationState != (event.location?.state ?? "") ||
+        locationCountry != (event.location?.country ?? "") ||
         isVirtual != (event.location?.isVirtual ?? false) ||
+        virtualURL != (event.location?.virtualURL?.absoluteString ?? "") ||
+        capacity != event.capacity ||
+        hasCapacity != (event.capacity != nil) ||
         heroImage != nil
     }
 

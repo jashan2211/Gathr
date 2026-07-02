@@ -289,15 +289,17 @@ struct GoingView: View {
 
         switch filter {
         case .upcoming:
-            return attendingEvents.filter { $0.startDate > now }
+            // Classify by end, not start, so a live event stays under Upcoming
+            // (with a "Now" badge) instead of dropping into Past the moment it begins.
+            return attendingEvents.filter { !$0.isPast }
         case .thisWeek:
             let weekEnd = calendar.date(byAdding: .day, value: 7, to: now) ?? now
-            return attendingEvents.filter { $0.startDate > now && $0.startDate <= weekEnd }
+            return attendingEvents.filter { !$0.isPast && $0.startDate <= weekEnd }
         case .thisMonth:
             let monthEnd = calendar.date(byAdding: .month, value: 1, to: now) ?? now
-            return attendingEvents.filter { $0.startDate > now && $0.startDate <= monthEnd }
+            return attendingEvents.filter { !$0.isPast && $0.startDate <= monthEnd }
         case .past:
-            return attendingEvents.filter { $0.startDate < now }.reversed()
+            return attendingEvents.filter { $0.isPast }.reversed()
         }
     }
 
@@ -306,15 +308,15 @@ struct GoingView: View {
         let calendar = Calendar.current
         switch f {
         case .upcoming:
-            return attendingEvents.filter { $0.startDate > now }.count
+            return attendingEvents.filter { !$0.isPast }.count
         case .thisWeek:
             let weekEnd = calendar.date(byAdding: .day, value: 7, to: now) ?? now
-            return attendingEvents.filter { $0.startDate > now && $0.startDate <= weekEnd }.count
+            return attendingEvents.filter { !$0.isPast && $0.startDate <= weekEnd }.count
         case .thisMonth:
             let monthEnd = calendar.date(byAdding: .month, value: 1, to: now) ?? now
-            return attendingEvents.filter { $0.startDate > now && $0.startDate <= monthEnd }.count
+            return attendingEvents.filter { !$0.isPast && $0.startDate <= monthEnd }.count
         case .past:
-            return attendingEvents.filter { $0.startDate < now }.count
+            return attendingEvents.filter { $0.isPast }.count
         }
     }
 
@@ -514,14 +516,22 @@ struct HomeView: View {
         return e.guests.contains { $0.userId == myId && $0.status == .pending }
     }
 
+    /// "Still relevant" = hasn't ended yet, keeping the original 1h grace for
+    /// events with no end time. Gating on end (not start) means a multi-hour or
+    /// all-day event that's underway stays on Home instead of vanishing an hour
+    /// after it began.
+    private func stillRelevant(_ e: Event) -> Bool {
+        (e.endDate ?? e.startDate) >= horizon
+    }
+
     private var upcoming: [Event] {
-        allEvents.filter { !$0.isDraft && $0.startDate >= horizon && mine($0) && !isPendingInvite($0) }
+        allEvents.filter { !$0.isDraft && stillRelevant($0) && mine($0) && !isPendingInvite($0) }
     }
     private var nextEvent: Event? { upcoming.first }
     private var laterEvents: [Event] { Array(upcoming.dropFirst()) }
 
     private var invitesWaiting: [Event] {
-        allEvents.filter { !$0.isDraft && $0.startDate >= horizon && isPendingInvite($0) }
+        allEvents.filter { !$0.isDraft && stillRelevant($0) && isPendingInvite($0) }
     }
 
     private var drafts: [Event] {

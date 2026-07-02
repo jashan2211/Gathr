@@ -4,9 +4,15 @@ import EventKit
 import PassKit
 
 struct TicketConfirmationView: View {
-    let ticket: Ticket
+    let tickets: [Ticket]
     let event: Event
+    @State private var ticketIndex = 0
     @Environment(\.dismiss) private var dismiss
+
+    /// The ticket currently shown. All the card/QR/share/wallet code reads this,
+    /// so paging the index swaps which unique ticket (and QR) is displayed. The
+    /// view is only ever presented with a non-empty array.
+    private var ticket: Ticket { tickets[min(ticketIndex, max(0, tickets.count - 1))] }
     @State private var showingShareSheet = false
     @State private var showingCalendarAlert = false
     @State private var calendarMessage = ""
@@ -24,7 +30,9 @@ struct TicketConfirmationView: View {
             ScrollView {
                 VStack(spacing: Spacing.xl) {
                     successHeader
+                    if tickets.count > 1 { ticketPager }
                     ticketCard
+                        .id(ticket.id)
                         .scaleEffect(cardAppeared ? 1 : 0.8)
                         .opacity(cardAppeared ? 1 : 0)
                     actionButtons
@@ -67,6 +75,45 @@ struct TicketConfirmationView: View {
         }
     }
 
+    // MARK: - Ticket Pager (multi-ticket claims)
+
+    /// Lets a group claim of N tickets step through each unique ticket + QR.
+    private var ticketPager: some View {
+        HStack(spacing: Spacing.lg) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    ticketIndex = max(0, ticketIndex - 1)
+                }
+                HapticService.selection()
+            } label: {
+                Image(systemName: "chevron.left.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(ticketIndex > 0 ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.3))
+            }
+            .disabled(ticketIndex == 0)
+
+            Text("Ticket \(ticketIndex + 1) of \(tickets.count)")
+                .font(GatherFont.callout)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.gatherPrimaryText)
+                .frame(minWidth: 130)
+
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    ticketIndex = min(tickets.count - 1, ticketIndex + 1)
+                }
+                HapticService.selection()
+            } label: {
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(ticketIndex < tickets.count - 1 ? Color.accentPurpleFallback : Color.gatherSecondaryText.opacity(0.3))
+            }
+            .disabled(ticketIndex >= tickets.count - 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Ticket \(ticketIndex + 1) of \(tickets.count). Each has its own QR code.")
+    }
+
     // MARK: - Success Header
 
     private var successHeader: some View {
@@ -95,9 +142,12 @@ struct TicketConfirmationView: View {
             Text("You're Going!")
                 .gatherTitle()
 
-            Text("Confirmation #\(ticket.ticketNumber)")
+            Text(tickets.count > 1
+                 ? "\(tickets.count) tickets confirmed — each has its own QR"
+                 : "Confirmation #\(ticket.ticketNumber)")
                 .font(GatherFont.callout)
                 .foregroundStyle(Color.gatherSecondaryText)
+                .multilineTextAlignment(.center)
         }
         .padding(.top, Spacing.lg)
         .accessibilityElement(children: .combine)
@@ -727,5 +777,5 @@ struct TicketShareSheet: UIViewControllerRepresentable {
     ticket.paymentStatus = .completed
     ticket.paymentMethod = .applePay
 
-    return TicketConfirmationView(ticket: ticket, event: event)
+    return TicketConfirmationView(tickets: [ticket], event: event)
 }

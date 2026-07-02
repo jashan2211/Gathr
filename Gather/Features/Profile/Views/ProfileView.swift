@@ -1127,7 +1127,7 @@ struct CalendarSettingsView: View {
 }
 
 struct AppearanceSettingsView: View {
-    @AppStorage("colorScheme") private var colorScheme = "system"
+    @AppStorage("colorScheme") private var colorScheme = "dark"
 
     var body: some View {
         List {

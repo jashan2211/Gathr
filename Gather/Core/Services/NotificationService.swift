@@ -57,6 +57,8 @@ class NotificationService: ObservableObject {
         response: RSVPResponse
     ) {
         guard isAuthorized else { return }
+        // Honour the "RSVP Updates" preference (Profile › Notifications).
+        guard UserDefaults.standard.object(forKey: "rsvpUpdates") as? Bool ?? true else { return }
 
         let content = UNMutableNotificationContent()
 
@@ -107,6 +109,8 @@ class NotificationService: ObservableObject {
         daysBefore: Int
     ) {
         guard isAuthorized else { return }
+        // Honour the "Event Reminders" preference (Profile › Notifications).
+        guard UserDefaults.standard.object(forKey: "eventReminders") as? Bool ?? true else { return }
 
         let content = UNMutableNotificationContent()
 

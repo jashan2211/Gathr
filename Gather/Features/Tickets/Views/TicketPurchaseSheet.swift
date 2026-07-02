@@ -844,9 +844,17 @@ struct TicketManagementSheet: View {
     @State private var showAddTier = false
     @State private var tierToDelete: TicketTier?
     @State private var showCheckIn = false
+    @Query private var allWaitlist: [WaitlistEntry]
 
     private var sortedTiers: [TicketTier] {
         event.ticketTiers.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    /// People waiting on this event who haven't been converted to a ticket yet.
+    private var waitlist: [WaitlistEntry] {
+        allWaitlist
+            .filter { $0.eventId == event.id && !$0.convertedToTicket }
+            .sorted { $0.position < $1.position }
     }
 
     /// Any tickets claimed yet? Gates the "Check In" action.
@@ -874,6 +882,10 @@ struct TicketManagementSheet: View {
                                 tierRow(tier)
                             }
                         }
+                    }
+
+                    if !waitlist.isEmpty {
+                        waitlistSection
                     }
 
                     Color.clear.frame(height: 90)
@@ -938,6 +950,41 @@ struct TicketManagementSheet: View {
                 .foregroundStyle(Color.gatherPrimaryText)
                 .accessibilityAddTraits(.isHeader)
         }
+    }
+
+    private var waitlistSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("WAITLIST · \(waitlist.count)")
+                .gatherEyebrow()
+                .foregroundStyle(Color.accentPurpleFallback)
+            Text("People waiting if a spot opens. Add a tier or capacity, then they can claim a ticket.")
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
+            ForEach(waitlist) { entry in
+                HStack(spacing: Spacing.sm) {
+                    Text("#\(entry.position)")
+                        .font(GatherFont.caption.weight(.bold))
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .frame(minWidth: 32, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text((entry.name?.isEmpty == false ? entry.name! : entry.email))
+                            .gatherRowTitle()
+                            .foregroundStyle(Color.gatherPrimaryText)
+                            .lineLimit(1)
+                        if entry.name?.isEmpty == false {
+                            Text(entry.email)
+                                .font(GatherFont.caption)
+                                .foregroundStyle(Color.gatherSecondaryText)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(Spacing.sm)
+                .background(Color.gatherElevated.opacity(0.5), in: RoundedRectangle(cornerRadius: CornerRadius.md))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func tierRow(_ tier: TicketTier) -> some View {

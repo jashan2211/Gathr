@@ -162,7 +162,7 @@ struct WaitlistSheet: View {
                 Text("You're on the list!")
                     .font(GatherFont.title2)
 
-                Text("We'll notify you at \(email) when tickets become available.")
+                Text("The host can see you're waiting and will add tickets for you if a spot opens up.")
                     .font(GatherFont.body)
                     .foregroundStyle(Color.gatherSecondaryText)
                     .multilineTextAlignment(.center)
@@ -255,7 +255,7 @@ struct WaitlistSheet: View {
             HStack {
                 Image(systemName: "bell.fill")
                     .foregroundStyle(Color.accentPurpleFallback)
-                Text("We'll email you when tickets are available")
+                Text("The host will see you on the waitlist")
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
             }

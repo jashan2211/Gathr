@@ -327,10 +327,9 @@ struct InviteLinkSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedRole: EventRole = .manager
     @State private var copied = false
-
-    private var inviteLink: String {
-        "gather.app/join/\(UUID().uuidString.prefix(8).lowercased())"
-    }
+    // Generated once (not per render) so the displayed, copied, and shared link
+    // all match.
+    @State private var inviteLink = ""
 
     var body: some View {
         NavigationStack {
@@ -392,12 +391,19 @@ struct InviteLinkSheet: View {
                 .background(Color.gatherSecondaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
 
-                // Share buttons
-                HStack(spacing: Spacing.md) {
-                    shareButton(title: "WhatsApp", icon: "message.fill", color: .green)
-                    shareButton(title: "SMS", icon: "bubble.left.fill", color: .blue)
-                    shareButton(title: "Email", icon: "envelope.fill", color: .orange)
-                    shareButton(title: "More", icon: "square.and.arrow.up", color: .gray)
+                // Native share — lets the host send the link through Messages,
+                // WhatsApp, Mail, or anything else installed.
+                ShareLink(item: inviteLink) {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("Share Link")
+                    }
+                    .font(GatherFont.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(LinearGradient.gatherAccentGradient)
+                    .clipShape(Capsule())
                 }
 
                 Spacer()
@@ -411,21 +417,11 @@ struct InviteLinkSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-        }
-    }
-
-    private func shareButton(title: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(color)
-                .clipShape(Circle())
-
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(Color.gatherSecondaryText)
+            .onAppear {
+                if inviteLink.isEmpty {
+                    inviteLink = "gather.app/join/\(UUID().uuidString.prefix(8).lowercased())"
+                }
+            }
         }
     }
 }

@@ -479,6 +479,13 @@ final class FirestoreService {
         do {
             let snapshot = try await financeDoc(eventId).getDocument()
             guard snapshot.exists, let doc = try? snapshot.data(as: BudgetDoc.self) else { return }
+            // Re-check after the await: the user may have tapped "Set a Budget"
+            // (or a second fetch may have landed) while the network round-trip
+            // was in flight — inserting now would duplicate the budget and the
+            // arbitrary duplicate could later clobber the cloud copy.
+            let current = (try? modelContext.fetch(
+                FetchDescriptor<Budget>(predicate: #Predicate { $0.eventId == eventId }))) ?? []
+            guard !Task.isCancelled, current.isEmpty else { return }
             modelContext.insert(doc.makeBudget())
             modelContext.safeSave()
             logger.info("Created budget from the cloud.")

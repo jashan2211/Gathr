@@ -125,6 +125,10 @@ struct EventTeamSheet: View {
             .sheet(isPresented: $showInviteLink) {
                 InviteLinkSheet(eventTitle: event.title)
             }
+            .task {
+                // Sync the roster across the host's devices.
+                await FirestoreService.shared.fetchMembers(for: event, into: modelContext)
+            }
         }
     }
 
@@ -186,6 +190,8 @@ struct EventTeamSheet: View {
                     ForEach([EventRole.admin, .manager, .viewer], id: \.self) { role in
                         Button {
                             member.role = role
+                            modelContext.safeSave()
+                            FirestoreService.shared.pushMember(member)
                         } label: {
                             HStack {
                                 Text(role.rawValue)
@@ -197,7 +203,9 @@ struct EventTeamSheet: View {
                     }
                     Divider()
                     Button("Remove", role: .destructive) {
+                        FirestoreService.shared.deleteMember(eventId: member.eventId, memberId: member.id)
                         modelContext.delete(member)
+                        modelContext.safeSave()
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -306,8 +314,10 @@ struct AddMemberSheet: View {
             role: selectedRole
         )
         modelContext.insert(member)
+        modelContext.safeSave()
+        FirestoreService.shared.pushMember(member)
 
-        // Create notification for demo
+        // Notify the host their invite was recorded.
         let notification = AppNotification(
             type: .memberInvite,
             title: "Invite Sent",

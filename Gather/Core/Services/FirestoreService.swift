@@ -449,6 +449,97 @@ final class FirestoreService {
         }
     }
 
+    // MARK: - Team Members (owner-only, cross-device)
+
+    private func membersCollection(_ eventId: UUID) -> CollectionReference {
+        eventsCollection.document(eventId.uuidString).collection("members")
+    }
+
+    /// Pushes an event team member so the host's roster follows their account
+    /// across devices. Owner-only (enforced by rules).
+    func pushMember(_ member: EventMember) {
+        guard Auth.auth().currentUser != nil else { return }
+        var data: [String: Any] = [
+            "id": member.id.uuidString,
+            "eventId": member.eventId.uuidString,
+            "name": member.name,
+            "role": member.roleRaw,
+            "inviteStatus": member.inviteStatusRaw,
+            "invitedAt": Timestamp(date: member.invitedAt),
+            "updatedAt": FieldValue.serverTimestamp()
+        ]
+        if let userId = member.userId { data["userId"] = userId.uuidString }
+        if let email = member.email, !email.isEmpty { data["email"] = email }
+        if let phone = member.phone, !phone.isEmpty { data["phone"] = phone }
+        membersCollection(member.eventId).document(member.id.uuidString).setData(data, merge: true) { error in
+            if let error { logger.error("Member push failed: \(error.localizedDescription)") }
+        }
+    }
+
+    func deleteMember(eventId: UUID, memberId: UUID) {
+        membersCollection(eventId).document(memberId.uuidString).delete { error in
+            if let error { logger.error("Member delete failed: \(error.localizedDescription)") }
+        }
+    }
+
+    /// Pulls the team roster and merges it into local `EventMember`s (insert new,
+    /// update existing, prune ones removed on another of the owner's devices).
+    func fetchMembers(for event: Event, into modelContext: ModelContext) async {
+        guard Auth.auth().currentUser != nil else { return }
+        let eventId = event.id
+        do {
+            let snapshot = try await membersCollection(eventId).getDocuments()
+            let localMembers = (try? modelContext.fetch(
+                FetchDescriptor<EventMember>(predicate: #Predicate { $0.eventId == eventId }))) ?? []
+            var localById = [UUID: EventMember]()
+            for member in localMembers where localById[member.id] == nil { localById[member.id] = member }
+
+            var remoteIds = Set<UUID>()
+            var changed = false
+
+            for doc in snapshot.documents {
+                let data = doc.data()
+                guard let idStr = data["id"] as? String, let memberId = UUID(uuidString: idStr) else { continue }
+                remoteIds.insert(memberId)
+                let name = data["name"] as? String ?? "Member"
+                let role = data["role"] as? String ?? EventRole.viewer.rawValue
+                let inviteStatus = data["inviteStatus"] as? String ?? MemberInviteStatus.pending.rawValue
+                let email = (data["email"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                let phone = (data["phone"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                let userId = (data["userId"] as? String).flatMap { UUID(uuidString: $0) }
+
+                if let local = localById[memberId] {
+                    local.name = name
+                    local.roleRaw = role
+                    local.inviteStatusRaw = inviteStatus
+                    local.email = email
+                    local.phone = phone
+                    local.userId = userId
+                    changed = true
+                } else {
+                    let member = EventMember(id: memberId, eventId: eventId, userId: userId,
+                                             name: name, email: email, phone: phone)
+                    member.roleRaw = role
+                    member.inviteStatusRaw = inviteStatus
+                    modelContext.insert(member)
+                    changed = true
+                }
+            }
+
+            // Prune members removed on another device. Guard against racing a
+            // just-added local member whose push hasn't round-tripped yet.
+            for member in localMembers where !remoteIds.contains(member.id)
+                && member.invitedAt < Date().addingTimeInterval(-60) {
+                modelContext.delete(member)
+                changed = true
+            }
+
+            if changed { modelContext.safeSave() }
+        } catch {
+            logger.error("Member fetch failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Invited Events (a guest's personal index)
 
     /// Records, under `users/{uid}/invitedEvents/{eventId}`, that the signed-in

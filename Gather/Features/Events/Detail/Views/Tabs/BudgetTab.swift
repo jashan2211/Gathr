@@ -183,6 +183,17 @@ struct BudgetTab: View {
         } message: { split in
             Text("\(split.name) still owes \(split.owedAmount.asCurrency).")
         }
+        .task {
+            // First open on a new device: pull the budget the host built elsewhere.
+            await FirestoreService.shared.fetchBudget(for: event, into: modelContext)
+        }
+        .onDisappear {
+            // Leaving the tab snapshots the whole budget tree to the cloud so
+            // finance edits follow the host across devices.
+            if isHost, let budget = eventBudget {
+                FirestoreService.shared.pushBudget(budget, eventId: event.id)
+            }
+        }
     }
 
     private var eventBudget: Budget? {
@@ -1776,6 +1787,7 @@ struct BudgetTab: View {
         }
         modelContext.insert(newBudget)
         modelContext.safeSave()
+        FirestoreService.shared.pushBudget(newBudget, eventId: event.id)
 
         HapticService.success()
     }

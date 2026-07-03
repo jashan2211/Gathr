@@ -449,6 +449,44 @@ final class FirestoreService {
         }
     }
 
+    // MARK: - Finance / Budget (owner-only, cross-device)
+
+    private func financeDoc(_ eventId: UUID) -> DocumentReference {
+        eventsCollection.document(eventId.uuidString).collection("finance").document("data")
+    }
+
+    /// Snapshots the whole budget (categories → expenses → installment payments)
+    /// to `events/{id}/finance/data` so it follows the host across devices.
+    /// Owner-only. Splits are intentionally not synced (secondary co-host tool).
+    func pushBudget(_ budget: Budget, eventId: UUID) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        do {
+            try financeDoc(eventId).setData(from: BudgetDoc(budget: budget, eventId: eventId, ownerUid: uid), merge: true)
+        } catch {
+            logger.error("Budget push failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Creates a local Budget from the cloud when this device doesn't have one
+    /// yet (the host built it on another device). Non-destructive: an existing
+    /// local Budget is left untouched so unpushed local edits are never lost.
+    func fetchBudget(for event: Event, into modelContext: ModelContext) async {
+        guard Auth.auth().currentUser != nil else { return }
+        let eventId = event.id
+        let existing = (try? modelContext.fetch(
+            FetchDescriptor<Budget>(predicate: #Predicate { $0.eventId == eventId }))) ?? []
+        guard existing.isEmpty else { return }
+        do {
+            let snapshot = try await financeDoc(eventId).getDocument()
+            guard snapshot.exists, let doc = try? snapshot.data(as: BudgetDoc.self) else { return }
+            modelContext.insert(doc.makeBudget())
+            modelContext.safeSave()
+            logger.info("Created budget from the cloud.")
+        } catch {
+            logger.error("Budget fetch failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Team Members (owner-only, cross-device)
 
     private func membersCollection(_ eventId: UUID) -> CollectionReference {
@@ -1208,5 +1246,127 @@ struct InviteDocument: Codable {
         )
         invite.createdAt = createdAt
         return invite
+    }
+}
+
+// MARK: - Finance Firestore Documents
+
+/// Codable snapshot of the host's whole budget tree (categories → expenses →
+/// installment payments) for `events/{id}/finance/data`. Owner-only; splits
+/// are not synced.
+struct BudgetDoc: Codable {
+    var id: String
+    var eventId: String
+    var ownerUid: String
+    var totalBudget: Double
+    var updatedAt: Date
+    var categories: [BudgetCategoryDoc]
+
+    init(budget: Budget, eventId: UUID, ownerUid: String) {
+        self.id = budget.id.uuidString
+        self.eventId = eventId.uuidString
+        self.ownerUid = ownerUid
+        self.totalBudget = budget.totalBudget
+        self.updatedAt = Date()
+        self.categories = budget.categories
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map { BudgetCategoryDoc(category: $0) }
+    }
+
+    func makeBudget() -> Budget {
+        let budget = Budget(
+            id: UUID(uuidString: id) ?? UUID(),
+            eventId: UUID(uuidString: eventId) ?? UUID(),
+            totalBudget: totalBudget
+        )
+        budget.categories = categories.map { $0.makeCategory() }
+        return budget
+    }
+}
+
+struct BudgetCategoryDoc: Codable {
+    var id: String
+    var name: String
+    var icon: String
+    var allocated: Double
+    var spent: Double
+    var color: String
+    var sortOrder: Int
+    var functionId: String?
+    var expenses: [ExpenseDoc]
+
+    init(category: BudgetCategory) {
+        self.id = category.id.uuidString
+        self.name = category.name
+        self.icon = category.icon
+        self.allocated = category.allocated
+        self.spent = category.spent
+        self.color = category.color
+        self.sortOrder = category.sortOrder
+        self.functionId = category.functionId?.uuidString
+        self.expenses = category.expenses.map { ExpenseDoc(expense: $0) }
+    }
+
+    func makeCategory() -> BudgetCategory {
+        let category = BudgetCategory(
+            id: UUID(uuidString: id) ?? UUID(),
+            name: name,
+            icon: icon,
+            allocated: allocated,
+            color: color,
+            sortOrder: sortOrder,
+            functionId: functionId.flatMap { UUID(uuidString: $0) }
+        )
+        category.spent = spent
+        category.expenses = expenses.map { $0.makeExpense() }
+        return category
+    }
+}
+
+struct ExpenseDoc: Codable {
+    var id: String
+    var name: String
+    var amount: Double
+    var isPaid: Bool
+    var paidDate: Date?
+    var dueDate: Date?
+    var notes: String?
+    var vendorName: String?
+    var paidByName: String?
+    var functionId: String?
+    var createdAt: Date
+    var payments: [ExpensePayment]?
+
+    init(expense: Expense) {
+        self.id = expense.id.uuidString
+        self.name = expense.name
+        self.amount = expense.amount
+        self.isPaid = expense.isPaid
+        self.paidDate = expense.paidDate
+        self.dueDate = expense.dueDate
+        self.notes = expense.notes
+        self.vendorName = expense.vendorName
+        self.paidByName = expense.paidByName
+        self.functionId = expense.functionId?.uuidString
+        self.createdAt = expense.createdAt
+        self.payments = expense.payments
+    }
+
+    func makeExpense() -> Expense {
+        let expense = Expense(
+            id: UUID(uuidString: id) ?? UUID(),
+            name: name,
+            amount: amount,
+            isPaid: isPaid,
+            paidDate: paidDate,
+            dueDate: dueDate,
+            notes: notes,
+            vendorName: vendorName,
+            paidByName: paidByName,
+            functionId: functionId.flatMap { UUID(uuidString: $0) }
+        )
+        expense.createdAt = createdAt
+        expense.payments = payments
+        return expense
     }
 }

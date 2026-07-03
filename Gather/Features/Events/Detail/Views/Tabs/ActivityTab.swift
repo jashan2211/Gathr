@@ -76,10 +76,16 @@ struct ActivityTab: View {
                 onPost: { post in
                     modelContext.insert(post)
                     modelContext.safeSave()
+                    FirestoreService.shared.pushActivityPost(post)
                 }
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        .task {
+            // Pull the shared activity feed so posts, likes, and poll votes from
+            // other attendees show up.
+            await FirestoreService.shared.fetchActivity(for: event, into: modelContext)
         }
     }
 
@@ -185,21 +191,28 @@ struct ActivityTab: View {
 
     private func toggleLike(_ post: ActivityPost) {
         guard let userId = authManager.currentUser?.id else { return }
+        let nowLiked: Bool
         if post.likedByUserIds.contains(userId) {
             post.likedByUserIds.removeAll { $0 == userId }
             post.likes = max(0, post.likes - 1)
+            nowLiked = false
         } else {
             post.likedByUserIds.append(userId)
             post.likes += 1
+            nowLiked = true
         }
         modelContext.safeSave()
         HapticService.buttonTap()
+        if let eventId = post.eventId {
+            FirestoreService.shared.setActivityLike(eventId: eventId, postId: post.id, userId: userId, liked: nowLiked)
+        }
     }
 
     private func togglePin(_ post: ActivityPost) {
         post.isPinned.toggle()
         modelContext.safeSave()
         HapticService.buttonTap()
+        FirestoreService.shared.pushActivityPost(post)
     }
 
     private func canDelete(_ post: ActivityPost) -> Bool {
@@ -207,11 +220,14 @@ struct ActivityTab: View {
     }
 
     private func deletePost(_ post: ActivityPost) {
-        // Delete replies first
+        // Delete replies first (tombstone remotely so the removal propagates).
         let replies = repliesFor(post)
+        let eventId = post.eventId
         for reply in replies {
+            if let eventId { FirestoreService.shared.deleteActivityPost(eventId: eventId, postId: reply.id) }
             modelContext.delete(reply)
         }
+        if let eventId { FirestoreService.shared.deleteActivityPost(eventId: eventId, postId: post.id) }
         modelContext.delete(post)
         modelContext.safeSave()
     }
@@ -220,16 +236,21 @@ struct ActivityTab: View {
         guard let userId = authManager.currentUser?.id,
               var options = post.pollOptions else { return }
 
+        var addTo: UUID?
+        var removeFrom: [UUID] = []
+
         // Check if already voted on this option
         if let idx = options.firstIndex(where: { $0.id == optionId }) {
             if options[idx].voterIds.contains(userId) {
                 // Remove vote
                 options[idx].voterIds.removeAll { $0 == userId }
                 options[idx].voteCount = max(0, options[idx].voteCount - 1)
+                removeFrom = [optionId]
             } else {
-                // If single vote, remove from other options first
+                // If single vote, remove from the options the user already picked
                 if !post.allowsMultipleVotes {
-                    for i in options.indices {
+                    for i in options.indices where options[i].voterIds.contains(userId) {
+                        removeFrom.append(options[i].id)
                         options[i].voterIds.removeAll { $0 == userId }
                         options[i].voteCount = options[i].voterIds.count
                     }
@@ -237,10 +258,16 @@ struct ActivityTab: View {
                 // Add vote
                 options[idx].voterIds.append(userId)
                 options[idx].voteCount = options[idx].voterIds.count
+                addTo = optionId
             }
             post.pollOptions = options
         }
         modelContext.safeSave()
         HapticService.buttonTap()
+
+        if let eventId = post.eventId, addTo != nil || !removeFrom.isEmpty {
+            FirestoreService.shared.updateActivityVote(
+                eventId: eventId, postId: post.id, addTo: addTo, removeFrom: removeFrom, userId: userId)
+        }
     }
 }

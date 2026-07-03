@@ -283,6 +283,172 @@ final class FirestoreService {
         }
     }
 
+    // MARK: - Activity Feed (cross-user)
+
+    private func activityCollection(_ eventId: UUID) -> CollectionReference {
+        eventsCollection.document(eventId.uuidString).collection("activity")
+    }
+
+    /// Pushes a post's CONTENT (not its reactions) to `events/{id}/activity/{postId}`
+    /// so every attendee sees it. `likedBy` and `pollVotes` are written only via
+    /// arrayUnion elsewhere, so concurrent reactions from different users can't
+    /// clobber each other. The local hero image is not synced (kept on-device).
+    func pushActivityPost(_ post: ActivityPost) {
+        guard let uid = Auth.auth().currentUser?.uid, let eventId = post.eventId else { return }
+        var data: [String: Any] = [
+            "id": post.id.uuidString,
+            "eventId": eventId.uuidString,
+            "authorUid": uid,
+            "authorName": post.authorName,
+            "text": post.text,
+            "postType": post.postType.rawValue,
+            "isPinned": post.isPinned,
+            "isHostPost": post.isHostPost,
+            "allowsMultipleVotes": post.allowsMultipleVotes,
+            "createdAt": Timestamp(date: post.createdAt),
+            "deleted": false
+        ]
+        if let authorId = post.authorId { data["authorId"] = authorId.uuidString }
+        if let parent = post.parentPostId { data["parentPostId"] = parent.uuidString }
+        if let options = post.pollOptions {
+            data["pollOptions"] = options.map { ["id": $0.id.uuidString, "text": $0.text] }
+        }
+        activityCollection(eventId).document(post.id.uuidString).setData(data, merge: true) { error in
+            if let error { logger.error("Activity push failed: \(error.localizedDescription)") }
+        }
+    }
+
+    /// Atomically adds/removes the user from a post's likedBy set.
+    func setActivityLike(eventId: UUID, postId: UUID, userId: UUID, liked: Bool) {
+        let op = liked ? FieldValue.arrayUnion([userId.uuidString]) : FieldValue.arrayRemove([userId.uuidString])
+        activityCollection(eventId).document(postId.uuidString).setData(["likedBy": op], merge: true) { error in
+            if let error { logger.error("Activity like failed: \(error.localizedDescription)") }
+        }
+    }
+
+    /// Atomically moves the user's poll vote: removes from `removeFrom` options and
+    /// adds to `addTo` (nil when the user is un-voting).
+    func updateActivityVote(eventId: UUID, postId: UUID, addTo: UUID?, removeFrom: [UUID], userId: UUID) {
+        var updates: [String: Any] = [:]
+        let uidStr = userId.uuidString
+        for oid in removeFrom {
+            updates["pollVotes.\(oid.uuidString)"] = FieldValue.arrayRemove([uidStr])
+        }
+        if let addTo {
+            updates["pollVotes.\(addTo.uuidString)"] = FieldValue.arrayUnion([uidStr])
+        }
+        guard !updates.isEmpty else { return }
+        // Nested map keys require updateData (setData treats dots as literal names);
+        // the doc already exists because the poll post was pushed on creation.
+        activityCollection(eventId).document(postId.uuidString).updateData(updates) { error in
+            if let error { logger.error("Activity vote failed: \(error.localizedDescription)") }
+        }
+    }
+
+    /// Soft-deletes a post (tombstone) so the removal propagates to other devices
+    /// without a locally-created post being resurrected on the next backfill.
+    func deleteActivityPost(eventId: UUID, postId: UUID) {
+        activityCollection(eventId).document(postId.uuidString).setData(["deleted": true], merge: true) { error in
+            if let error { logger.error("Activity delete failed: \(error.localizedDescription)") }
+        }
+    }
+
+    /// Pulls the activity feed and merges it into local `ActivityPost`s: inserts
+    /// new posts, refreshes content + reactions on existing ones, removes ones
+    /// tombstoned remotely, and backfills the user's own local posts that aren't
+    /// in the cloud yet (e.g. created before sync existed).
+    func fetchActivity(for event: Event, into modelContext: ModelContext) async {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let myUserId = AuthManager.deterministicUUID(from: uid)
+        let eventId = event.id
+        do {
+            let snapshot = try await activityCollection(eventId).getDocuments()
+            let localPosts = (try? modelContext.fetch(
+                FetchDescriptor<ActivityPost>(predicate: #Predicate { $0.eventId == eventId }))) ?? []
+            var localById = [UUID: ActivityPost]()
+            for post in localPosts where localById[post.id] == nil { localById[post.id] = post }
+
+            var remoteIds = Set<UUID>()
+            var changed = false
+
+            for doc in snapshot.documents {
+                let data = doc.data()
+                guard let idStr = data["id"] as? String, let postId = UUID(uuidString: idStr) else { continue }
+                remoteIds.insert(postId)
+
+                if (data["deleted"] as? Bool) == true {
+                    if let local = localById[postId] { modelContext.delete(local); changed = true }
+                    continue
+                }
+
+                let text = data["text"] as? String ?? ""
+                let postType = ActivityPostType(rawValue: data["postType"] as? String ?? "update") ?? .update
+                let isPinned = data["isPinned"] as? Bool ?? false
+                let isHostPost = data["isHostPost"] as? Bool ?? false
+                let allowsMultiple = data["allowsMultipleVotes"] as? Bool ?? false
+                let authorName = data["authorName"] as? String ?? ""
+                let authorId = (data["authorId"] as? String).flatMap { UUID(uuidString: $0) }
+                let parentPostId = (data["parentPostId"] as? String).flatMap { UUID(uuidString: $0) }
+                let createdAt = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+                let likedBy = (data["likedBy"] as? [String] ?? []).compactMap { UUID(uuidString: $0) }
+                let pollVotes = data["pollVotes"] as? [String: [String]] ?? [:]
+
+                var options: [PollOption]?
+                if let rawOptions = data["pollOptions"] as? [[String: Any]] {
+                    options = rawOptions.compactMap { opt in
+                        guard let oidStr = opt["id"] as? String, let oid = UUID(uuidString: oidStr),
+                              let otext = opt["text"] as? String else { return nil }
+                        let voters = (pollVotes[oidStr] ?? []).compactMap { UUID(uuidString: $0) }
+                        return PollOption(id: oid, text: otext, voteCount: voters.count, voterIds: voters)
+                    }
+                }
+
+                if let local = localById[postId] {
+                    local.text = text
+                    local.postType = postType
+                    local.isPinned = isPinned
+                    local.isHostPost = isHostPost
+                    local.allowsMultipleVotes = allowsMultiple
+                    local.authorName = authorName
+                    local.likedByUserIds = likedBy
+                    local.likes = likedBy.count
+                    local.pollOptions = options
+                    changed = true
+                } else {
+                    let post = ActivityPost(
+                        id: postId,
+                        text: text,
+                        postType: postType,
+                        isPinned: isPinned,
+                        pollOptions: options,
+                        allowsMultipleVotes: allowsMultiple,
+                        parentPostId: parentPostId,
+                        authorId: authorId,
+                        authorName: authorName,
+                        isHostPost: isHostPost,
+                        eventId: eventId
+                    )
+                    post.createdAt = createdAt
+                    post.likedByUserIds = likedBy
+                    post.likes = likedBy.count
+                    modelContext.insert(post)
+                    changed = true
+                }
+            }
+
+            // Backfill the user's OWN local posts that never made it to the cloud
+            // (created before sync). Only own-authored, so a post someone else
+            // deleted isn't resurrected.
+            for post in localPosts where !remoteIds.contains(post.id) && post.authorId == myUserId {
+                pushActivityPost(post)
+            }
+
+            if changed { modelContext.safeSave() }
+        } catch {
+            logger.error("Activity fetch failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Invited Events (a guest's personal index)
 
     /// Records, under `users/{uid}/invitedEvents/{eventId}`, that the signed-in

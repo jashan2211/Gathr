@@ -118,6 +118,26 @@ service cloud.firestore {
         allow delete: if request.auth != null
                       && get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid == request.auth.uid;
       }
+
+      // Activity feed: posts, questions, polls, announcements. Any signed-in user
+      // can read the feed and create their own post (authorUid must be them).
+      // Content edits (text/pin/soft-delete) are limited to the author or the
+      // event owner; ANY signed-in user may react, but only by changing the
+      // likedBy / pollVotes fields (enforced via diff().affectedKeys()).
+      match /activity/{postId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+                      && request.resource.data.authorUid == request.auth.uid;
+        allow update: if request.auth != null && (
+                        resource.data.authorUid == request.auth.uid
+                        || get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid == request.auth.uid
+                        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy', 'pollVotes'])
+                      );
+        allow delete: if request.auth != null && (
+                        resource.data.authorUid == request.auth.uid
+                        || get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid == request.auth.uid
+                      );
+      }
     }
   }
 }

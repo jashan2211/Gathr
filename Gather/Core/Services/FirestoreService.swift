@@ -609,6 +609,19 @@ final class FirestoreService {
             }
     }
 
+    /// Removes an event from the user's invited-events index so a "Remove from
+    /// list" action sticks and it isn't re-added on the next sync.
+    func removeInvitedEvent(id: UUID) {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        usersCollection.document(uid).collection("invitedEvents")
+            .document(id.uuidString)
+            .delete { error in
+                if let error {
+                    logger.error("Invited-event index delete failed: \(error.localizedDescription)")
+                }
+            }
+    }
+
     /// Pulls the user's invited-events index and makes sure each event exists
     /// locally with a guest entry tied to this account, so invitations show up
     /// in Home and Calendar on any device they sign in to.
@@ -684,6 +697,14 @@ final class FirestoreService {
                 logger.error("Event delete failed: \(error.localizedDescription)")
             }
         }
+        // Remove the sanitized public projection too, so a shared invite link
+        // stops resolving to the event after it's deleted.
+        eventsCollection.document(id.uuidString)
+            .collection("public").document("info").delete { error in
+                if let error {
+                    logger.error("Public projection delete failed: \(error.localizedDescription)")
+                }
+            }
         discoverCollection.document(id.uuidString).delete { error in
             if let error {
                 logger.error("Discover card delete failed: \(error.localizedDescription)")
@@ -728,6 +749,23 @@ final class FirestoreService {
     /// unpublished/deleted them or they've passed). It ONLY ever touches events
     /// flagged `isDiscovered` — a hosted or invited event is never modified or
     /// deleted. The user's own cards are skipped (already local as hosted events).
+    // MARK: Dismissed discovered events
+
+    private let dismissedDiscoverKey = "dismissedDiscoverIds"
+
+    /// Ids of discovered (other-people's public) events the user removed from
+    /// their lists, so reconciliation never re-inserts them.
+    private var dismissedDiscoverIds: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: dismissedDiscoverKey) ?? [])
+    }
+
+    /// Records that the user removed a discovered event so it stays gone.
+    func dismissDiscoveredEvent(_ id: UUID) {
+        var ids = dismissedDiscoverIds
+        ids.insert(id.uuidString)
+        UserDefaults.standard.set(Array(ids), forKey: dismissedDiscoverKey)
+    }
+
     func fetchPublicEvents(into modelContext: ModelContext) async {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         do {
@@ -740,9 +778,10 @@ final class FirestoreService {
                 .order(by: "startDate")
                 .limit(to: 60)
                 .getDocuments()
+            let dismissed = dismissedDiscoverIds
             let cards = snapshot.documents
                 .compactMap { try? $0.data(as: DiscoverCard.self) }
-                .filter { $0.ownerUid != uid }
+                .filter { $0.ownerUid != uid && !dismissed.contains($0.id) }
 
             let allLocal = (try? modelContext.fetch(FetchDescriptor<Event>())) ?? []
             var localById = [UUID: Event]()

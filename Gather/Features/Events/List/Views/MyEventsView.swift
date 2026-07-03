@@ -487,6 +487,7 @@ struct CalendarView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @State private var selectedEvent: Event?
+    @State private var pendingDelete: Event?
     @State private var scope: EventsScope = .future
     @Namespace private var scopeNS
 
@@ -564,6 +565,14 @@ struct CalendarView: View {
                                                             attending: attending(event))
                                         }
                                         .buttonStyle(.plain)
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                pendingDelete = event
+                                            } label: {
+                                                Label(hosting(event) ? "Delete Event" : "Remove from List",
+                                                      systemImage: "trash")
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -584,7 +593,41 @@ struct CalendarView: View {
             .refreshable { await loadPublicEvents() }
             .task { await loadPublicEvents() }
             .navigationDestination(item: $selectedEvent) { EventDetailView(event: $0) }
+            .confirmationDialog(
+                pendingDelete.map { hosting($0) ? "Delete event?" : "Remove event?" } ?? "",
+                isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                titleVisibility: .visible,
+                presenting: pendingDelete
+            ) { event in
+                Button(hosting(event) ? "Delete" : "Remove", role: .destructive) {
+                    performDelete(event)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { event in
+                Text(hosting(event)
+                     ? "This permanently deletes \u{201C}\(event.title)\u{201D} and its guest list for everyone."
+                     : "This removes \u{201C}\(event.title)\u{201D} from your lists.")
+            }
         }
+    }
+
+    /// Deletes an event the viewer hosts (locally + from the cloud), or removes a
+    /// discovered/invited event from just this device. A discovered event is also
+    /// marked dismissed so reconciliation doesn't re-add it.
+    private func performDelete(_ event: Event) {
+        if hosting(event) {
+            FirestoreService.shared.deleteEvent(id: event.id)
+        } else if event.isDiscovered {
+            FirestoreService.shared.dismissDiscoveredEvent(event.id)
+        } else {
+            // An invited event — drop it from the cloud invited index so it
+            // doesn't reappear on the next sync.
+            FirestoreService.shared.removeInvitedEvent(id: event.id)
+        }
+        modelContext.delete(event)
+        modelContext.safeSave()
+        HapticService.success()
+        pendingDelete = nil
     }
 
     /// Keeps the Discover-fed public events fresh so the Future tab shows events

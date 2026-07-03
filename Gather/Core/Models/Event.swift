@@ -270,17 +270,24 @@ struct EventLocation: Codable, Equatable, Hashable {
 // MARK: - Event Helpers
 
 extension Event {
+    /// The moment the event is fully over. Uses the LATER of start and end, so a
+    /// corrupt endDate earlier than startDate (from old data or a bad edit) can't
+    /// wrongly mark a still-upcoming event as past.
+    var effectiveEnd: Date {
+        max(startDate, endDate ?? startDate)
+    }
+
     var isUpcoming: Bool {
         startDate > Date()
     }
 
     var isPast: Bool {
-        (endDate ?? startDate) < Date()
+        effectiveEnd < Date()
     }
 
     var isOngoing: Bool {
         let now = Date()
-        return startDate <= now && (endDate ?? startDate) >= now
+        return startDate <= now && effectiveEnd >= now
     }
 
     var attendingCount: Int {

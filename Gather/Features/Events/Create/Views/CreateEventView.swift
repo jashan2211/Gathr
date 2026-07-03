@@ -10,7 +10,7 @@ struct CreateEventView: View {
     // Form state
     @State private var title = ""
     @State private var description = ""
-    @State private var startDate = Date().addingTimeInterval(3600)
+    @State private var startDate = CreateEventView.defaultStartDate()
     @State private var endDate: Date?
     @State private var hasEndDate = false
     @State private var locationName = ""
@@ -452,6 +452,14 @@ struct CreateEventView: View {
             }
         }
         .eventFormCard()
+    }
+
+    /// A clearly-future default so a quickly-created event isn't a near-now time
+    /// that becomes "past" within the hour: tomorrow at 7 PM.
+    static func defaultStartDate() -> Date {
+        let cal = Calendar.current
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
+        return cal.date(bySettingHour: 19, minute: 0, second: 0, of: tomorrow) ?? tomorrow
     }
 
     private func applyTemplate(_ tmpl: EventTemplate) {

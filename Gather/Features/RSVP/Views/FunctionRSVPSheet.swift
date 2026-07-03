@@ -398,6 +398,21 @@ struct FunctionRSVPSheet: View {
 
         modelContext.safeSave()
 
+        // Push the per-function response to the cloud so the host receives it
+        // across devices, and keep the event in the guest's invited index.
+        FirestoreService.shared.submitFunctionRSVP(
+            eventId: event.id,
+            functionId: function.id,
+            guestId: guest.id,
+            response: selectedResponse,
+            partySize: partySize,
+            name: currentUser.name,
+            note: notes.isEmpty ? nil : notes
+        )
+        if event.hostId != currentUser.id {
+            FirestoreService.shared.recordInvitedEvent(event, guestId: guest.id, status: guest.status)
+        }
+
         // Send notification to host
         NotificationService.shared.scheduleRSVPNotification(
             guestName: currentUser.name,

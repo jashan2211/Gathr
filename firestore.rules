@@ -95,6 +95,29 @@ service cloud.firestore {
         allow delete: if request.auth != null
                       && get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid == request.auth.uid;
       }
+
+      // Per-function RSVPs: a guest writes their response to a specific function
+      // (doc id "<functionId>_<guestId>"), validated. The event owner reads them
+      // all to merge into the guest list. Same trust model as rsvps: guest ids
+      // are unguessable, so only someone with the invite link can respond.
+      match /functionRsvps/{docId} {
+        allow read: if request.auth != null
+                    && get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid == request.auth.uid;
+        allow create, update: if request.auth != null
+                    && request.resource.data.functionId is string
+                    && request.resource.data.guestId is string
+                    && request.resource.data.response in ['yes', 'maybe', 'no']
+                    && request.resource.data.partySize is int
+                    && request.resource.data.partySize >= 0
+                    && request.resource.data.partySize <= 20
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() <= 120
+                    && request.resource.data.keys().hasOnly(
+                         ['functionId', 'guestId', 'response', 'partySize', 'name', 'note', 'respondedAt', 'source']
+                       );
+        allow delete: if request.auth != null
+                      && get(/databases/$(database)/documents/events/$(eventId)).data.ownerUid == request.auth.uid;
+      }
     }
   }
 }

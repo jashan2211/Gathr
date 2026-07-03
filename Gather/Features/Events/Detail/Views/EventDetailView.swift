@@ -109,9 +109,10 @@ struct EventDetailView: View {
         .scrollDismissesKeyboard(.interactively)
         .background(Color.gatherCanvas.ignoresSafeArea())
         .refreshable {
-            // Pull-to-refresh: hosts re-sync guest RSVPs from the cloud.
+            // Pull-to-refresh: hosts re-sync guest RSVPs (event + per-function).
             if isHost {
                 await FirestoreService.shared.fetchRSVPs(for: event, into: modelContext)
+                await FirestoreService.shared.fetchFunctionRSVPs(for: event, into: modelContext)
             }
         }
         .task {
@@ -120,6 +121,7 @@ struct EventDetailView: View {
             if isHost {
                 isLoadingRSVPs = true
                 await FirestoreService.shared.fetchRSVPs(for: event, into: modelContext)
+                await FirestoreService.shared.fetchFunctionRSVPs(for: event, into: modelContext)
                 isLoadingRSVPs = false
             }
         }

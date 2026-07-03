@@ -202,6 +202,87 @@ final class FirestoreService {
             }
     }
 
+    // MARK: - Function RSVPs (cross-user, per sub-event)
+
+    /// Pushes a guest's response to a specific function to
+    /// `events/{id}/functionRsvps/{functionId}_{guestId}` so the host receives
+    /// per-function RSVPs across devices (mirrors the event-level rsvps flow).
+    func submitFunctionRSVP(eventId: UUID, functionId: UUID, guestId: UUID, response: RSVPResponse, partySize: Int, name: String, note: String?) {
+        let data: [String: Any] = [
+            "functionId": functionId.uuidString,
+            "guestId": guestId.uuidString,
+            "response": response.rawValue,
+            "partySize": max(0, partySize),
+            "name": name,
+            "note": note ?? "",
+            "respondedAt": FieldValue.serverTimestamp(),
+            "source": "app"
+        ]
+        eventsCollection.document(eventId.uuidString)
+            .collection("functionRsvps").document("\(functionId.uuidString)_\(guestId.uuidString)")
+            .setData(data, merge: true) { error in
+                if let error {
+                    logger.error("Function RSVP submit failed: \(error.localizedDescription)")
+                }
+            }
+    }
+
+    /// Pulls per-function responses for a hosted event and merges them into the
+    /// local `FunctionInvite`s (newer-wins). Ensures a `Guest` exists for each
+    /// responder so a function invite from a shared link still shows up.
+    func fetchFunctionRSVPs(for event: Event, into modelContext: ModelContext) async {
+        guard Auth.auth().currentUser != nil else { return }
+        do {
+            let snapshot = try await eventsCollection.document(event.id.uuidString)
+                .collection("functionRsvps").getDocuments()
+            var changed = false
+            for doc in snapshot.documents {
+                let data = doc.data()
+                guard let fidStr = data["functionId"] as? String, let functionId = UUID(uuidString: fidStr),
+                      let gidStr = data["guestId"] as? String, let guestId = UUID(uuidString: gidStr),
+                      let respStr = data["response"] as? String, let response = RSVPResponse(rawValue: respStr),
+                      let function = event.functions.first(where: { $0.id == functionId }) else { continue }
+
+                let remoteDate = (data["respondedAt"] as? Timestamp)?.dateValue() ?? Date()
+                let partySize = data["partySize"] as? Int ?? 1
+                let note = (data["note"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                let rawName = (data["name"] as? String)?.trimmingCharacters(in: .whitespaces)
+
+                // A FunctionInvite references a Guest.id — make sure one exists.
+                if !event.guests.contains(where: { $0.id == guestId }) {
+                    event.guests.append(Guest(id: guestId,
+                                              name: (rawName?.isEmpty == false) ? rawName! : "Guest",
+                                              status: .pending))
+                }
+
+                if let invite = function.invites.first(where: { $0.guestId == guestId }) {
+                    if let localDate = invite.respondedAt, localDate >= remoteDate { continue }
+                    invite.response = response
+                    invite.partySize = partySize
+                    invite.notes = note
+                    invite.respondedAt = remoteDate
+                    invite.inviteStatus = .responded
+                    changed = true
+                } else {
+                    let invite = FunctionInvite(guestId: guestId, functionId: functionId)
+                    invite.response = response
+                    invite.partySize = partySize
+                    invite.notes = note
+                    invite.respondedAt = remoteDate
+                    invite.inviteStatus = .responded
+                    function.invites.append(invite)
+                    changed = true
+                }
+            }
+            if changed {
+                modelContext.safeSave()
+                logger.info("Merged function RSVPs from the cloud.")
+            }
+        } catch {
+            logger.error("Function RSVP fetch failed: \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Invited Events (a guest's personal index)
 
     /// Records, under `users/{uid}/invitedEvents/{eventId}`, that the signed-in

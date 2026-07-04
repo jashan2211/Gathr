@@ -23,8 +23,10 @@ enum EventDetailTab: String, CaseIterable {
         }
     }
 
-    // Check if tab should be visible for a given event
-    func isVisible(for event: Event) -> Bool {
+    // Check if tab should be visible for a given event. `isHost` gates the
+    // management-only tabs so an invited guest sees the event's functions,
+    // schedule and photos but never the host's finances or guest management.
+    func isVisible(for event: Event, isHost: Bool) -> Bool {
         switch self {
         case .overview:
             return true
@@ -33,11 +35,13 @@ enum EventDetailTab: String, CaseIterable {
         case .functions:
             return event.hasFunctions
         case .guests:
-            return event.hasGuestManagement
+            // Guest management (add/remove/invite) is host-only.
+            return event.hasGuestManagement && isHost
         case .photos:
             return event.hasPhotos && EventFeature.photos.isAvailable
         case .budget:
-            return event.hasBudget
+            // Finances are private to the host — never shown to invitees.
+            return event.hasBudget && isHost
         }
     }
 }
@@ -74,6 +78,7 @@ struct EventDetailView: View {
     @State private var showDuplicateConfirmation = false
     @Namespace private var tabNamespace
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var eventTickets: [Ticket]
@@ -133,6 +138,11 @@ struct EventDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        // Collapse the main tab bar to a single Home button while this event is
+        // open, and close back to Home when that button is tapped.
+        .onAppear { appState.isInEvent = true }
+        .onDisappear { appState.isInEvent = false }
+        .onChange(of: appState.exitEventToken) { _, _ in dismiss() }
         // Solid canvas behind the nav controls so scrolled content (the serif
         // hero title) slides cleanly under the status bar instead of colliding
         // with the clock and back/edit chips.
@@ -421,7 +431,7 @@ struct EventDetailView: View {
     // MARK: - Floating Tab Bar
 
     private var visibleTabs: [EventDetailTab] {
-        EventDetailTab.allCases.filter { $0.isVisible(for: event) }
+        EventDetailTab.allCases.filter { $0.isVisible(for: event, isHost: isHost) }
     }
 
     /// The event's category accent, threaded through the tab bar and CTAs so
@@ -950,5 +960,6 @@ struct GuestCountPill: View {
     NavigationStack {
         EventDetailView(event: previewEvent)
             .environmentObject(AuthManager())
+            .environmentObject(AppState())
     }
 }

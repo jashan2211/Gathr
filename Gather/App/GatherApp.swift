@@ -252,6 +252,12 @@ struct RootView: View {
 class AppState: ObservableObject {
     @Published var selectedTab: Tab = .home
     @Published var isShowingCreateEvent: Bool = false
+    /// True while an event's detail screen is open, so the main tab bar collapses
+    /// to a single compact Home button and stops covering the event's content.
+    @Published var isInEvent: Bool = false
+    /// Bumped when the in-event Home button is tapped, so the open event dismisses
+    /// itself back to Home regardless of which tab it was pushed from.
+    @Published var exitEventToken: Int = 0
     @Published var deepLinkEventId: UUID?
     @Published var deepLinkGuestId: UUID?
     /// When an invite link is scoped to a specific function (`&f=`), the RSVP

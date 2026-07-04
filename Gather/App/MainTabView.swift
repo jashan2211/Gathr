@@ -150,8 +150,38 @@ struct MainTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.gatherCanvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            floatingTabBar
+            // Inside an event the full dock collapses to a single Home button in
+            // the corner so it stops covering the event's content / RSVP bar.
+            if appState.isInEvent {
+                collapsedHomeBar
+            } else {
+                floatingTabBar
+            }
         }
+    }
+
+    /// A single compact Home button, bottom-right, shown while viewing an event.
+    private var collapsedHomeBar: some View {
+        HStack {
+            Spacer()
+            Button {
+                HapticService.buttonTap()
+                appState.exitEventToken += 1   // ask the open event to close
+                appState.selectedTab = .home
+            } label: {
+                Image(systemName: "house.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(LinearGradient.gatherAccentGradient, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+                    .shadow(color: Color.accentPurpleFallback.opacity(0.5), radius: 12, y: 5)
+            }
+            .accessibilityLabel("Home")
+            .accessibilityHint("Closes this event and returns to Home")
+        }
+        .padding(.trailing, Spacing.lg)
+        .padding(.bottom, Spacing.xs)
     }
 
     @ViewBuilder

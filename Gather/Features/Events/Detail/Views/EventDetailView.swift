@@ -83,8 +83,15 @@ struct EventDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var eventTickets: [Ticket]
 
-    init(event: Event) {
+    /// True when shown in the deep-link fullScreenCover (which already covers the
+    /// tab bar). Such an instance must NOT drive `appState.isInEvent`, or
+    /// dismissing it would flip the flag off while a different, still-pushed event
+    /// is on screen.
+    let isPresentedInCover: Bool
+
+    init(event: Event, isPresentedInCover: Bool = false) {
         self.event = event
+        self.isPresentedInCover = isPresentedInCover
         let eventId = event.id
         _eventTickets = Query(
             filter: #Predicate<Ticket> { $0.eventId == eventId }
@@ -139,10 +146,14 @@ struct EventDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         // Collapse the main tab bar to a single Home button while this event is
-        // open, and close back to Home when that button is tapped.
-        .onAppear { appState.isInEvent = true }
-        .onDisappear { appState.isInEvent = false }
-        .onChange(of: appState.exitEventToken) { _, _ in dismiss() }
+        // open, and close back to Home when that button is tapped. The cover
+        // instance skips this — it already sits over the tab bar, and letting it
+        // toggle the shared flag would desync a different pushed event underneath.
+        .onAppear { if !isPresentedInCover { appState.isInEvent = true } }
+        .onDisappear { if !isPresentedInCover { appState.isInEvent = false } }
+        .onChange(of: appState.exitEventToken) { _, _ in
+            if !isPresentedInCover { dismiss() }
+        }
         // Solid canvas behind the nav controls so scrolled content (the serif
         // hero title) slides cleanly under the status bar instead of colliding
         // with the clock and back/edit chips.

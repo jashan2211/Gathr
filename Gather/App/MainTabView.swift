@@ -52,7 +52,7 @@ struct MainTabView: View {
             deepLinkFunction = nil
         }) { event in
             NavigationStack {
-                EventDetailView(event: event)
+                EventDetailView(event: event, isPresentedInCover: true)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Done") {

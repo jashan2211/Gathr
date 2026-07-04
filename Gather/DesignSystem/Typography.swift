@@ -107,27 +107,70 @@ extension View {
     }
 }
 
+// MARK: - Dynamic-Type-Scaling Font Modifier
+
+/// Applies a font at an exact default point size that scales with the user's
+/// Dynamic Type setting (via `@ScaledMetric(relativeTo:)`). This keeps the
+/// editorial scale pixel-identical at the default content size while making
+/// every style respond to accessibility text sizes.
+private struct GatherScaledFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    private let weight: Font.Weight
+    private let design: Font.Design
+
+    init(size: CGFloat,
+         relativeTo textStyle: Font.TextStyle,
+         weight: Font.Weight,
+         design: Font.Design = .default) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: textStyle)
+        self.weight = weight
+        self.design = design
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight, design: design))
+    }
+}
+
 // MARK: - Editorial Scale (2026 poster identity)
 
 /// A small, coherent set of font styles for the redesign. Use these instead of
 /// scattering ad-hoc `.font(.system(size:))` calls so the type scale stays
 /// consistent. They set font + tracking only (not color), so callers keep
-/// control of `foregroundStyle`.
+/// control of `foregroundStyle`. All styles scale with Dynamic Type.
 extension View {
-    /// 34pt heavy — top-level screen titles (Home, Explore, You).
-    func gatherScreenTitle() -> some View { self.font(.system(size: 34, weight: .heavy)).kerning(-1) }
-    /// 26pt heavy — poster / hero titles over imagery.
-    func gatherPosterTitle() -> some View { self.font(.system(size: 26, weight: .heavy)).kerning(-0.5) }
-    /// 20pt bold — prominent card titles.
-    func gatherCardTitle() -> some View { self.font(.system(size: 20, weight: .bold)) }
-    /// 17pt bold — section headers within a screen.
-    func gatherSectionHeader() -> some View { self.font(.system(size: 17, weight: .bold)) }
-    /// 15pt semibold — list-row titles.
-    func gatherRowTitle() -> some View { self.font(.system(size: 15, weight: .semibold)) }
-    /// 13pt medium — meta lines, subtitles, timestamps.
-    func gatherMetaText() -> some View { self.font(.system(size: 13, weight: .medium)) }
-    /// 11pt heavy, tracked — eyebrows and ALL-CAPS labels.
-    func gatherEyebrow() -> some View { self.font(.system(size: 11, weight: .heavy)).tracking(0.5) }
+    /// 34pt heavy — top-level screen titles (Home, Explore, You). Scales with Dynamic Type.
+    func gatherScreenTitle() -> some View {
+        self.modifier(GatherScaledFont(size: 34, relativeTo: .largeTitle, weight: .heavy))
+            .kerning(-1)
+    }
+    /// 26pt heavy — poster / hero titles over imagery. Scales with Dynamic Type.
+    func gatherPosterTitle() -> some View {
+        self.modifier(GatherScaledFont(size: 26, relativeTo: .title, weight: .heavy))
+            .kerning(-0.5)
+            .minimumScaleFactor(0.7)
+    }
+    /// 20pt bold — prominent card titles. Scales with Dynamic Type.
+    func gatherCardTitle() -> some View {
+        self.modifier(GatherScaledFont(size: 20, relativeTo: .title3, weight: .bold))
+    }
+    /// 17pt bold — section headers within a screen. Scales with Dynamic Type.
+    func gatherSectionHeader() -> some View {
+        self.modifier(GatherScaledFont(size: 17, relativeTo: .headline, weight: .bold))
+    }
+    /// 15pt semibold — list-row titles. Scales with Dynamic Type.
+    func gatherRowTitle() -> some View {
+        self.modifier(GatherScaledFont(size: 15, relativeTo: .subheadline, weight: .semibold))
+    }
+    /// 13pt medium — meta lines, subtitles, timestamps. Scales with Dynamic Type.
+    func gatherMetaText() -> some View {
+        self.modifier(GatherScaledFont(size: 13, relativeTo: .footnote, weight: .medium))
+    }
+    /// 11pt heavy, tracked — eyebrows and ALL-CAPS labels. Scales with Dynamic Type.
+    func gatherEyebrow() -> some View {
+        self.modifier(GatherScaledFont(size: 11, relativeTo: .caption2, weight: .heavy))
+            .tracking(0.5)
+    }
 }
 
 // MARK: - Serif Display (the Gathr Editorial signature)
@@ -135,16 +178,32 @@ extension View {
 /// The signature voice of the app: Apple's New York serif at heavy weights for
 /// event titles and screen headers — an editorial, invitation-like look that
 /// no system-font app has. Body/meta text stays SF for readability; serif is
-/// reserved for display moments so it stays special.
+/// reserved for display moments so it stays special. All styles scale with
+/// Dynamic Type; hero/poster sizes gain a minimum scale factor so long titles
+/// shrink gracefully instead of clipping at accessibility sizes.
 extension View {
-    /// 40pt heavy serif — hero display (event detail hero, auth wordmark).
-    func gatherSerifHero() -> some View { self.font(.system(size: 40, weight: .heavy, design: .serif)).kerning(-0.5) }
-    /// 32pt heavy serif — screen titles (Home, Explore, Calendar, You).
-    func gatherSerifScreenTitle() -> some View { self.font(.system(size: 32, weight: .heavy, design: .serif)).kerning(-0.5) }
-    /// 26pt heavy serif — poster/card titles over imagery.
-    func gatherSerifPosterTitle() -> some View { self.font(.system(size: 26, weight: .heavy, design: .serif)).kerning(-0.3) }
-    /// 20pt bold serif — prominent inline titles (row/section display moments).
-    func gatherSerifHeadline() -> some View { self.font(.system(size: 20, weight: .bold, design: .serif)) }
+    /// 40pt heavy serif — hero display (event detail hero, auth wordmark). Scales with Dynamic Type.
+    func gatherSerifHero() -> some View {
+        self.modifier(GatherScaledFont(size: 40, relativeTo: .largeTitle, weight: .heavy, design: .serif))
+            .kerning(-0.5)
+            .minimumScaleFactor(0.6)
+    }
+    /// 32pt heavy serif — screen titles (Home, Explore, Calendar, You). Scales with Dynamic Type.
+    func gatherSerifScreenTitle() -> some View {
+        self.modifier(GatherScaledFont(size: 32, relativeTo: .largeTitle, weight: .heavy, design: .serif))
+            .kerning(-0.5)
+            .minimumScaleFactor(0.7)
+    }
+    /// 26pt heavy serif — poster/card titles over imagery. Scales with Dynamic Type.
+    func gatherSerifPosterTitle() -> some View {
+        self.modifier(GatherScaledFont(size: 26, relativeTo: .title, weight: .heavy, design: .serif))
+            .kerning(-0.3)
+            .minimumScaleFactor(0.7)
+    }
+    /// 20pt bold serif — prominent inline titles (row/section display moments). Scales with Dynamic Type.
+    func gatherSerifHeadline() -> some View {
+        self.modifier(GatherScaledFont(size: 20, relativeTo: .title3, weight: .bold, design: .serif))
+    }
 }
 
 // MARK: - Accessibility Helpers

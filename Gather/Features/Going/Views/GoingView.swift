@@ -494,6 +494,7 @@ struct HomeView: View {
     @State private var selectedEvent: Event?
     @State private var showCreate = false
     @State private var selectedTemplate: EventTemplate?
+    @State private var pendingDelete: Event?
 
     /// On the wide iPad canvas, keep content at a comfortable reading width and
     /// let the next-event poster sit beside the lists.
@@ -516,6 +517,19 @@ struct HomeView: View {
         return e.guests.contains { $0.userId == myId && $0.status == .pending }
     }
 
+    /// The viewer's own RSVP status for an event, if they have a guest record.
+    private func myStatus(_ e: Event) -> RSVPStatus? {
+        guard let myId else { return nil }
+        return e.guests.first { $0.userId == myId }?.status
+    }
+
+    /// An event the viewer declined doesn't belong under "Upcoming" — unless
+    /// they host it, in which case it's still their event to run.
+    private func declinedByMe(_ e: Event) -> Bool {
+        guard !isHost(e) else { return false }
+        return myStatus(e) == .declined
+    }
+
     /// "Still relevant" = hasn't ended yet, keeping the original 1h grace for
     /// events with no end time. Gating on end (not start) means a multi-hour or
     /// all-day event that's underway stays on Home instead of vanishing an hour
@@ -525,7 +539,7 @@ struct HomeView: View {
     }
 
     private var upcoming: [Event] {
-        allEvents.filter { !$0.isDraft && stillRelevant($0) && mine($0) && !isPendingInvite($0) }
+        allEvents.filter { !$0.isDraft && stillRelevant($0) && mine($0) && !isPendingInvite($0) && !declinedByMe($0) }
     }
     private var nextEvent: Event? { upcoming.first }
     private var laterEvents: [Event] { Array(upcoming.dropFirst()) }
@@ -573,7 +587,41 @@ struct HomeView: View {
             .sheet(item: $selectedTemplate) { tmpl in
                 CreateEventView(template: tmpl).presentationDragIndicator(.visible)
             }
+            .confirmationDialog(
+                pendingDelete.map { isHost($0) ? "Delete event?" : "Remove event?" } ?? "",
+                isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                titleVisibility: .visible,
+                presenting: pendingDelete
+            ) { event in
+                Button(isHost(event) ? "Delete" : "Remove", role: .destructive) {
+                    performDelete(event)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { event in
+                Text(isHost(event)
+                     ? "This permanently deletes \u{201C}\(event.title)\u{201D} and its guest list for everyone."
+                     : "This removes \u{201C}\(event.title)\u{201D} from your lists.")
+            }
         }
+    }
+
+    /// Deletes an event the viewer hosts (locally + from the cloud), or removes
+    /// an invited/discovered event from just this device — mirrors CalendarView
+    /// so long-press delete behaves identically on both screens.
+    private func performDelete(_ event: Event) {
+        if isHost(event) {
+            FirestoreService.shared.deleteEvent(id: event.id)
+        } else if event.isDiscovered {
+            FirestoreService.shared.dismissDiscoveredEvent(event.id)
+        } else {
+            // An invited event — drop it from the cloud invited index so it
+            // doesn't reappear on the next sync.
+            FirestoreService.shared.removeInvitedEvent(id: event.id)
+        }
+        modelContext.delete(event)
+        modelContext.safeSave()
+        HapticService.success()
+        pendingDelete = nil
     }
 
     // MARK: - Layouts (compact vs. regular width)
@@ -654,9 +702,22 @@ struct HomeView: View {
                 VStack(spacing: Spacing.xs) {
                     ForEach(laterEvents, id: \.id) { event in
                         Button { selectedEvent = event } label: {
-                            HomeUpcomingRow(event: event, hosting: isHost(event))
+                            HomeUpcomingRow(event: event, hosting: isHost(event), rsvpStatus: myStatus(event))
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                selectedEvent = event
+                            } label: {
+                                Label("View Details", systemImage: "arrow.up.right")
+                            }
+                            Button(role: .destructive) {
+                                pendingDelete = event
+                            } label: {
+                                Label(isHost(event) ? "Delete Event" : "Remove from List",
+                                      systemImage: "trash")
+                            }
+                        }
                     }
                 }
             }
@@ -674,6 +735,18 @@ struct HomeView: View {
                             HomeUpcomingRow(event: event, hosting: true, isDraft: true)
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                selectedEvent = event
+                            } label: {
+                                Label("View Details", systemImage: "arrow.up.right")
+                            }
+                            Button(role: .destructive) {
+                                pendingDelete = event
+                            } label: {
+                                Label("Delete Draft", systemImage: "trash")
+                            }
+                        }
                     }
                 }
             }
@@ -719,7 +792,7 @@ struct HomeView: View {
             Spacer()
             // A hairline that trails the label to anchor the section band.
             Rectangle()
-                .fill(Color.white.opacity(0.06))
+                .fill(Color.gatherSeparator.opacity(0.5))
                 .frame(height: 1)
                 .frame(maxWidth: 120)
         }
@@ -866,7 +939,12 @@ struct HomeView: View {
             partySize: guest.plusOneCount, name: guest.name, note: nil
         )
         FirestoreService.shared.recordInvitedEvent(event, guestId: guest.id, status: status)
-        HapticService.success()
+        // Declining isn't a celebration — give it a softer cue than accepting.
+        if status == .declined {
+            HapticService.warning()
+        } else {
+            HapticService.success()
+        }
     }
 }
 
@@ -992,33 +1070,58 @@ struct HomeUpcomingRow: View {
     /// (which only list the viewer's own events) keep the "Going" tag; set false
     /// for a public event the viewer has discovered but not joined → "Public".
     var attending: Bool = true
+    /// The viewer's own RSVP status, when known. Takes precedence over
+    /// `attending` so a "Maybe" or "Can't go" reply isn't mislabeled "Going".
+    var rsvpStatus: RSVPStatus? = nil
+    /// When the row sits under a month header (CalendarView), the stub's month
+    /// is redundant — show the decision-relevant weekday there instead.
+    var stubShowsWeekday: Bool = false
 
     /// Where the stub's perforation sits, as a fraction of the ticket width.
     private let stubFraction: CGFloat = 0.26
-    private let ticketHeight: CGFloat = 76
+    @ScaledMetric(relativeTo: .body) private var ticketHeight: CGFloat = 76
 
     private var tagText: String {
         if isDraft { return "Draft" }
         if hosting { return "Hosting" }
-        return attending ? "Going" : "Public"
+        switch rsvpStatus {
+        case .attending: return "Going"
+        case .maybe: return "Maybe"
+        case .declined: return "Declined"
+        case .pending: return "Invited"
+        case .waitlisted: return "Waitlisted"
+        case nil: return attending ? "Going" : "Public"
+        }
     }
 
     private var tagColor: Color {
         if isDraft { return Color.gatherSecondaryText }
         if hosting { return Color.accentPurpleFallback }
-        return attending ? Color.rsvpYesFallback : Color.neonBlue
+        switch rsvpStatus {
+        case .attending: return Color.rsvpYesFallback
+        case .maybe: return Color.rsvpMaybeFallback
+        case .declined: return Color.gatherSecondaryText
+        case .pending: return Color.accentPinkFallback
+        case .waitlisted: return Color.rsvpMaybeFallback
+        case nil: return attending ? Color.rsvpYesFallback : Color.neonBlue
+        }
     }
 
     var body: some View {
         GeometryReader { geo in
             HStack(spacing: 0) {
-                // Date stub — centered in the tear-off portion.
+                // Date stub — centered in the tear-off portion. Under a month
+                // header the month is redundant, so show the weekday instead.
                 VStack(spacing: 1) {
-                    Text(event.startDate.formatted(.dateTime.month(.abbreviated)).uppercased())
+                    Text(event.startDate.formatted(
+                        stubShowsWeekday
+                            ? Date.FormatStyle.dateTime.weekday(.abbreviated)
+                            : Date.FormatStyle.dateTime.month(.abbreviated)
+                    ).uppercased())
                         .gatherEyebrow()
                         .foregroundStyle(Color.forCategory(event.category))
                     Text(event.startDate.formatted(.dateTime.day()))
-                        .font(.system(size: 24, weight: .heavy))
+                        .font(.system(.title2, weight: .heavy))
                         .foregroundStyle(Color.gatherPrimaryText)
                 }
                 .frame(width: geo.size.width * stubFraction)
@@ -1028,11 +1131,18 @@ struct HomeUpcomingRow: View {
                 HStack(spacing: Spacing.sm) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(event.title)
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(.subheadline, weight: .semibold))
                             .foregroundStyle(Color.gatherPrimaryText)
                             .lineLimit(1)
                         HStack(spacing: 4) {
-                            Text(event.startDate.formatted(.dateTime.hour().minute()))
+                            // Weekday is the most decision-relevant datum for
+                            // plans ("is that a Friday?") — unless the stub
+                            // already shows it.
+                            Text(event.startDate.formatted(
+                                stubShowsWeekday
+                                    ? Date.FormatStyle.dateTime.hour().minute()
+                                    : Date.FormatStyle.dateTime.weekday(.abbreviated).hour().minute()
+                            ))
                             if let loc = event.location?.name {
                                 Text("· \(loc)").lineLimit(1)
                             }
@@ -1065,6 +1175,7 @@ struct HomeInviteCard: View {
     let event: Event
     let onRespond: (RSVPStatus) -> Void
     let onOpen: () -> Void
+    @State private var showDeclineConfirm = false
 
     private var subtitle: String {
         var s = event.startDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
@@ -1113,12 +1224,29 @@ struct HomeInviteCard: View {
         // lift so a waiting invite feels like the room's warmest object.
         .categoryAccentBar(Color.forCategory(event.category))
         .accentGlow(Color.accentPinkFallback, radius: 12)
+        .confirmationDialog(
+            "Decline \u{201C}\(event.title)\u{201D}?",
+            isPresented: $showDeclineConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Decline", role: .destructive) {
+                onRespond(.declined)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The host will see that you can't make it.")
+        }
     }
 
     private func respondButton(_ label: String, _ status: RSVPStatus, _ color: Color) -> some View {
         Button {
             HapticService.selection()
-            onRespond(status)
+            if status == .declined {
+                // Declining is destructive-ish (the card vanishes) — confirm first.
+                showDeclineConfirm = true
+            } else {
+                onRespond(status)
+            }
         } label: {
             Text(label)
                 .gatherMetaText()
@@ -1127,6 +1255,8 @@ struct HomeInviteCard: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
                 .background(color.opacity(0.15), in: Capsule())
+                .frame(minHeight: Layout.minTouchTarget)
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("RSVP \(label) to \(event.title)")

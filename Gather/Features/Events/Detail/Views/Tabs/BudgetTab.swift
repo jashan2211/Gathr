@@ -36,6 +36,15 @@ struct BudgetTab: View {
     @State private var splitPaymentText = ""
     @State private var visibleSection: BudgetSection = .all
     @State private var showAllTransactions = false
+    @State private var selectedPayer: PayerTotal?
+    @State private var payingExpense: Expense?
+    @State private var showPayConfirm = false
+    @State private var openExpenseInPayment = false
+    @State private var editingSplit: PaymentSplit?
+    @State private var showEditSplitAlert = false
+    @State private var editSplitShareText = ""
+    @State private var deletingSplit: PaymentSplit?
+    @State private var showDeleteSplitAlert = false
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var authManager: AuthManager
 
@@ -54,8 +63,11 @@ struct BudgetTab: View {
         Group {
             VStack(spacing: Spacing.lg) {
                 if let budget = eventBudget {
-                    // PERF-004: Compute expenses once and build category lookup
-                    let expenses = allExpenses(budget)
+                    // PERF-004: Compute expenses once and build category lookup.
+                    // The function filter is applied HERE, once, so every money
+                    // section on the page (summary, breakdown, who-paid-what,
+                    // settle up, upcoming, transactions) agrees with the filter.
+                    let expenses = filteredExpenses(budget)
                     let categoryLookup = buildCategoryLookup(budget)
 
                     // Overdue / Over-budget alerts (always visible)
@@ -63,6 +75,15 @@ struct BudgetTab: View {
 
                     // Quick-nav: filter the long page down to one section.
                     sectionNav(budget, expenses: expenses)
+
+                    // Primary actions live right under the nav so Add Expense
+                    // is always one glance from the top of the page.
+                    quickActions(budget)
+
+                    // Function Filter — drives every money figure on the page.
+                    if !event.functions.isEmpty {
+                        functionFilterPicker
+                    }
 
                     if isVisible(.overview) {
                         // Budget Summary
@@ -79,17 +100,7 @@ struct BudgetTab: View {
 
                         // Settle Up (even split among payers)
                         settleUp(budget, expenses: expenses)
-                    }
 
-                    // Quick Actions (always visible)
-                    quickActions(budget)
-
-                    // Function Filter — drives the overview figures and categories
-                    if !event.functions.isEmpty, isVisible(.overview) || isVisible(.categories) {
-                        functionFilterPicker
-                    }
-
-                    if isVisible(.overview) {
                         // Upcoming Payments
                         upcomingPayments(budget, expenses: expenses, categoryLookup: categoryLookup)
                     }
@@ -228,44 +239,72 @@ struct BudgetTab: View {
         }
 
         if !overdueExpenses.isEmpty {
-            HStack(spacing: Spacing.sm) {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.white)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(overdueExpenses.count) overdue \(overdueExpenses.count == 1 ? "payment" : "payments")")
-                        .font(GatherFont.callout)
-                        .fontWeight(.semibold)
+            // Tapping lands on the Overview slice where Upcoming Payments lives.
+            Button {
+                jumpToSection(.overview)
+            } label: {
+                HStack(spacing: Spacing.sm) {
+                    Image(systemName: "exclamationmark.circle.fill")
                         .foregroundStyle(.white)
-                    Text(overdueExpenses.reduce(0) { $0 + $1.amountRemaining }.asCurrency + " needs attention")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(overdueExpenses.count) overdue \(overdueExpenses.count == 1 ? "payment" : "payments")")
+                            .font(GatherFont.callout)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                        Text(overdueExpenses.reduce(0) { $0 + $1.amountRemaining }.asCurrency + " needs attention")
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.85))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.85))
                 }
-                Spacer()
+                .padding(Spacing.sm)
+                .background(Color.gatherError.gradient)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             }
-            .padding(Spacing.sm)
-            .background(Color.gatherError.gradient)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            .buttonStyle(CardPressStyle())
             // A11Y-019: Alert banner accessibility
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(overdueExpenses.count) overdue \(overdueExpenses.count == 1 ? "payment" : "payments"). \(overdueExpenses.reduce(0) { $0 + $1.amountRemaining }.asCurrency) needs attention")
+            .accessibilityHint("Double tap to view upcoming payments")
+            .accessibilityAddTraits(.isButton)
         }
 
         if !overBudgetCategories.isEmpty {
-            HStack(spacing: Spacing.sm) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.white)
-                Text("\(overBudgetCategories.count) \(overBudgetCategories.count == 1 ? "category" : "categories") over budget")
-                    .font(GatherFont.callout)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                Spacer()
+            // Tapping opens Categories with the first offender expanded.
+            // Tinted-pill styling (amber text on soft amber) keeps WCAG
+            // contrast where white-on-amber failed.
+            Button {
+                HapticService.buttonTap()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    visibleSection = .categories
+                    expandedCategoryId = overBudgetCategories.first?.id
+                }
+            } label: {
+                HStack(spacing: Spacing.sm) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                    Text("\(overBudgetCategories.count) \(overBudgetCategories.count == 1 ? "category" : "categories") over budget")
+                        .font(GatherFont.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
+                }
+                .padding(Spacing.sm)
+                .background(Color.rsvpMaybeFallback.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
             }
-            .padding(Spacing.sm)
-            .background(Color.rsvpMaybeFallback.gradient)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md))
+            .buttonStyle(CardPressStyle())
             // A11Y-019: Alert banner accessibility
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(overBudgetCategories.count) \(overBudgetCategories.count == 1 ? "category" : "categories") over budget")
+            .accessibilityHint("Double tap to view the over-budget categories")
+            .accessibilityAddTraits(.isButton)
         }
     }
 
@@ -426,9 +465,10 @@ struct BudgetTab: View {
     private func paymentBreakdown(_ budget: Budget, expenses: [Expense]) -> some View {
         let totalAmount = expenses.reduce(0) { $0 + $1.amount }
         // Installment-aware: counts partial payments toward Paid and only
-        // outstanding balances toward Owed/Overdue.
-        let paidAmount = budget.totalPaid
-        let pendingAmount = budget.totalPending
+        // outstanding balances toward Owed/Overdue. Derived from the
+        // function-filtered expenses so these cards agree with the summary.
+        let paidAmount = expenses.reduce(0) { $0 + min($1.amountPaid, $1.amount) }
+        let pendingAmount = expenses.reduce(0) { $0 + $1.amountRemaining }
         let overdueAmount = expenses.filter { $0.paymentState != .paid && ($0.dueDate.map { $0 < Date() } ?? false) }.reduce(0) { $0 + $1.amountRemaining }
 
         return HStack(spacing: Spacing.sm) {
@@ -438,14 +478,18 @@ struct BudgetTab: View {
                 total: totalAmount,
                 icon: "checkmark.circle.fill",
                 color: Color.rsvpYesFallback
-            )
+            ) {
+                jumpToSection(.transactions)
+            }
             paymentStatCard(
                 label: "Owed",
                 amount: pendingAmount,
                 total: totalAmount,
                 icon: "clock.fill",
                 color: overdueAmount > 0 ? Color.rsvpMaybeFallback : Color.accentPurpleFallback
-            )
+            ) {
+                jumpToSection(.overview)
+            }
             if overdueAmount > 0 {
                 paymentStatCard(
                     label: "Overdue",
@@ -453,50 +497,60 @@ struct BudgetTab: View {
                     total: totalAmount,
                     icon: "exclamationmark.circle.fill",
                     color: Color.rsvpNoFallback
-                )
+                ) {
+                    jumpToSection(.overview)
+                }
             }
         }
     }
 
-    private func paymentStatCard(label: String, amount: Double, total: Double, icon: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.footnote)
-                    .foregroundStyle(color)
-                Text(label.uppercased())
-                    .font(.system(size: 10, weight: .heavy))
-                    .tracking(0.5)
-                    .foregroundStyle(Color.gatherTertiaryText)
-                Spacer(minLength: 0)
-            }
-
-            Text(amount.asCurrency)
-                .font(.system(size: 18, weight: .heavy))
-                .foregroundStyle(Color.gatherPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-
-            // Mini progress
-            if total > 0 {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.gatherElevated)
-                        Capsule()
-                            .fill(color)
-                            .frame(width: max(0, min(geometry.size.width, geometry.size.width * (amount / total))))
-                    }
+    private func paymentStatCard(label: String, amount: Double, total: Double, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                HStack(spacing: 5) {
+                    Image(systemName: icon)
+                        .font(.footnote)
+                        .foregroundStyle(color)
+                    Text(label.uppercased())
+                        .gatherEyebrow()
+                        .foregroundStyle(Color.gatherTertiaryText)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .imageScale(.small)
+                        .foregroundStyle(Color.gatherTertiaryText)
                 }
-                .frame(height: 4)
+
+                Text(amount.asCurrency)
+                    .font(GatherFont.headline)
+                    .fontWeight(.heavy)
+                    .foregroundStyle(Color.gatherPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+
+                // Mini progress
+                if total > 0 {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.gatherElevated)
+                            Capsule()
+                                .fill(color)
+                                .frame(width: max(0, min(geometry.size.width, geometry.size.width * (amount / total))))
+                        }
+                    }
+                    .frame(height: 4)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.sm)
+            .surfaceCard(cornerRadius: CornerRadius.lg)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Spacing.sm)
-        .surfaceCard(cornerRadius: CornerRadius.lg)
+        .buttonStyle(CardPressStyle())
         // A11Y-009: Financial data grouping for payment stat cards
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label). \(amount.asCurrency)")
+        .accessibilityHint("Double tap to view matching payments")
     }
 
     // MARK: - Spending by Category
@@ -542,8 +596,29 @@ struct BudgetTab: View {
                 .accessibilityHidden(true)
 
                 VStack(spacing: Spacing.sm) {
-                    ForEach(spending) { category in
+                    // Cap the list — the stacked bar above already shows the
+                    // full distribution; "Show all" jumps to Categories.
+                    ForEach(spending.prefix(4)) { category in
                         categoryShareRow(category, totalSpent: totalSpent)
+                    }
+
+                    if spending.count > 4 {
+                        Button {
+                            jumpToSection(.categories)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("Show all categories")
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(GatherFont.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Spacing.xs)
+                        }
+                        .frame(minHeight: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel("Show all \(spending.count) categories")
                     }
                 }
             }
@@ -557,7 +632,24 @@ struct BudgetTab: View {
         let share = totalSpent > 0 ? (category.spent / totalSpent) * 100 : 0
         let color = categoryColor(category.color)
 
-        return HStack(spacing: Spacing.sm) {
+        // Tap lands on the Categories slice with this category expanded.
+        return Button {
+            HapticService.selection()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                visibleSection = .categories
+                expandedCategoryId = category.id
+            }
+        } label: {
+            categoryShareRowContent(category, share: share, color: color)
+        }
+        .buttonStyle(CardPressStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(category.name). \(category.spent.asCurrency), \(Int(share.rounded())) percent of spending.")
+        .accessibilityHint("Double tap to open this category")
+    }
+
+    private func categoryShareRowContent(_ category: BudgetCategory, share: Double, color: Color) -> some View {
+        HStack(spacing: Spacing.sm) {
             Image(systemName: category.icon)
                 .font(.caption)
                 .foregroundStyle(.white)
@@ -595,9 +687,12 @@ struct BudgetTab: View {
                 .fontWeight(.bold)
                 .foregroundStyle(Color.gatherSecondaryText)
                 .frame(width: 34, alignment: .trailing)
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .imageScale(.small)
+                .foregroundStyle(Color.gatherTertiaryText)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(category.name). \(category.spent.asCurrency), \(Int(share.rounded())) percent of spending.")
     }
 
     // MARK: - Payer Aggregation
@@ -652,9 +747,32 @@ struct BudgetTab: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
 
+                // In .all mode cap the list to keep the page short; the
+                // expander jumps to the Overview slice with the full list.
+                let displayPayers = visibleSection == .all ? Array(payers.prefix(3)) : payers
+
                 VStack(spacing: Spacing.sm) {
-                    ForEach(payers) { payer in
+                    ForEach(displayPayers) { payer in
                         whoPaidRow(payer, totalPaid: totalPaid)
+                    }
+
+                    if visibleSection == .all, payers.count > 3 {
+                        Button {
+                            jumpToSection(.overview)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("See all (\(payers.count))")
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(GatherFont.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Spacing.xs)
+                        }
+                        .frame(minHeight: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel("See all \(payers.count) payers")
                     }
                 }
             }
@@ -668,7 +786,22 @@ struct BudgetTab: View {
         let share = totalPaid > 0 ? (payer.paid / totalPaid) * 100 : 0
         let name = payer.name.isEmpty ? "Unknown" : payer.name
 
-        return HStack(spacing: Spacing.sm) {
+        // Tap opens the payer's payment history sheet.
+        return Button {
+            HapticService.buttonTap()
+            selectedPayer = payer
+        } label: {
+            whoPaidRowContent(payer, share: share)
+        }
+        .buttonStyle(CardPressStyle())
+        // A11Y: Who-paid-what row grouping
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name) paid \(payer.paid.asCurrency), \(Int(share.rounded())) percent of the total.")
+        .accessibilityHint("Double tap to see this person's payments")
+    }
+
+    private func whoPaidRowContent(_ payer: PayerTotal, share: Double) -> some View {
+        HStack(spacing: Spacing.sm) {
             Circle()
                 .fill(avatarColor(for: payer.name))
                 .frame(width: 38, height: 38)
@@ -681,7 +814,7 @@ struct BudgetTab: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(name)
+                    Text(payer.name.isEmpty ? "Unknown" : payer.name)
                         .gatherRowTitle()
                         .foregroundStyle(Color.gatherPrimaryText)
                         .lineLimit(1)
@@ -702,10 +835,12 @@ struct BudgetTab: View {
                 }
                 .frame(height: 5)
             }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2)
+                .imageScale(.small)
+                .foregroundStyle(Color.gatherTertiaryText)
         }
-        // A11Y: Who-paid-what row grouping
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(name) paid \(payer.paid.asCurrency), \(Int(share.rounded())) percent of the total.")
     }
 
     // MARK: - Settle Up
@@ -769,9 +904,32 @@ struct BudgetTab: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Total paid \(totalPaid.asCurrency). Even split \(fairShare.asCurrency) each across \(payers.count) people.")
 
+                // In .all mode cap the list to keep the page short; the
+                // expander jumps to the Overview slice with the full list.
+                let displayBalances = visibleSection == .all ? Array(sortedByBalance.prefix(3)) : sortedByBalance
+
                 VStack(spacing: Spacing.sm) {
-                    ForEach(sortedByBalance, id: \.name) { entry in
+                    ForEach(displayBalances, id: \.name) { entry in
                         settleUpRow(name: entry.name, balance: entry.balance)
+                    }
+
+                    if visibleSection == .all, sortedByBalance.count > 3 {
+                        Button {
+                            jumpToSection(.overview)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("See all (\(sortedByBalance.count))")
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(GatherFont.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Spacing.xs)
+                        }
+                        .frame(minHeight: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel("See all \(sortedByBalance.count) balances")
                     }
                 }
             }
@@ -807,45 +965,56 @@ struct BudgetTab: View {
             statusIcon = "checkmark"
         }
 
-        return HStack(spacing: Spacing.sm) {
-            Circle()
-                .fill(avatarColor(for: name))
-                .frame(width: 34, height: 34)
-                .overlay {
-                    Text(name.isEmpty ? "?" : name.prefix(1).uppercased())
-                        .font(GatherFont.caption)
+        // Tap opens the payer's payment history so an "owes" state is
+        // explainable — the user can see exactly what made up the balance.
+        return Button {
+            HapticService.buttonTap()
+            selectedPayer = PayerTotal(name: name, paid: max(0, balance))
+        } label: {
+            HStack(spacing: Spacing.sm) {
+                Circle()
+                    .fill(avatarColor(for: name))
+                    .frame(width: 34, height: 34)
+                    .overlay {
+                        Text(name.isEmpty ? "?" : name.prefix(1).uppercased())
+                            .font(GatherFont.caption)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                    }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(displayName)
+                        .gatherRowTitle()
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .lineLimit(1)
+                    Text(statusText)
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherTertiaryText)
+                }
+
+                Spacer()
+
+                HStack(spacing: 5) {
+                    Image(systemName: statusIcon)
+                        .font(.caption2)
                         .fontWeight(.bold)
-                        .foregroundStyle(.white)
+                    if !statusValue.isEmpty {
+                        Text(statusValue)
+                            .font(GatherFont.caption)
+                            .fontWeight(.bold)
+                    }
                 }
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(displayName)
-                    .gatherRowTitle()
-                    .foregroundStyle(Color.gatherPrimaryText)
-                    .lineLimit(1)
-                Text(statusText)
-                    .font(.caption2)
-                    .foregroundStyle(Color.gatherTertiaryText)
+                .foregroundStyle(statusColor)
+                .padding(.horizontal, Spacing.sm)
+                .padding(.vertical, 6)
+                .background(statusColor.opacity(0.12))
+                .clipShape(Capsule())
             }
-
-            Spacer()
-
-            HStack(spacing: 5) {
-                Image(systemName: statusIcon)
-                    .font(.system(size: 10, weight: .bold))
-                if !statusValue.isEmpty {
-                    Text(statusValue)
-                        .font(.system(size: 14, weight: .bold))
-                }
-            }
-            .foregroundStyle(statusColor)
-            .padding(.horizontal, Spacing.sm)
-            .padding(.vertical, 6)
-            .background(statusColor.opacity(0.12))
-            .clipShape(Capsule())
         }
+        .buttonStyle(CardPressStyle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(displayName) \(statusText) \(statusValue)")
+        .accessibilityHint("Double tap to see this person's payments")
     }
 
     // MARK: - Quick Actions
@@ -962,14 +1131,22 @@ struct BudgetTab: View {
     // MARK: - Function Filter
 
     private var functionFilterPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Spacing.xs) {
-                BudgetFilterChip(title: "All", isSelected: filterFunction == nil) {
-                    filterFunction = nil
-                }
-                ForEach(event.functions.sorted { $0.date < $1.date }) { function in
-                    BudgetFilterChip(title: function.name, isSelected: filterFunction?.id == function.id) {
-                        filterFunction = function
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text("Filter by Function")
+                .textCase(.uppercase)
+                .gatherEyebrow()
+                .foregroundStyle(Color.gatherTertiaryText)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Spacing.xs) {
+                    BudgetFilterChip(title: "All", isSelected: filterFunction == nil) {
+                        HapticService.selection()
+                        filterFunction = nil
+                    }
+                    ForEach(event.functions.sorted { $0.date < $1.date }) { function in
+                        BudgetFilterChip(title: function.name, isSelected: filterFunction?.id == function.id) {
+                            HapticService.selection()
+                            filterFunction = function
+                        }
                     }
                 }
             }
@@ -1794,6 +1971,24 @@ struct BudgetTab: View {
 
     private func allExpenses(_ budget: Budget) -> [Expense] {
         budget.categories.flatMap { $0.expenses }.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    /// Every expense, narrowed to the selected function (general expenses
+    /// with no function always stay visible). Computed once per render and
+    /// fed to every money section so the whole page agrees with the filter.
+    private func filteredExpenses(_ budget: Budget) -> [Expense] {
+        let all = allExpenses(budget)
+        guard let function = filterFunction else { return all }
+        return all.filter { $0.functionId == function.id || $0.functionId == nil }
+    }
+
+    /// Animated jump between quick-nav slices, used by tappable summary
+    /// cards and banners so they land on the section they describe.
+    private func jumpToSection(_ section: BudgetSection) {
+        HapticService.buttonTap()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            visibleSection = section
+        }
     }
 
     // PERF-004: O(1) category name lookup replacing O(n*m) findCategoryName

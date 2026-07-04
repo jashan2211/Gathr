@@ -6,11 +6,15 @@ struct OverviewTab: View {
     @Bindable var event: Event
     @Binding var showGuestList: Bool
     @Binding var showRSVPSheet: Bool
+    /// Jumps the parent detail view to the Functions tab (EventDetailView
+    /// owns the tab selection). Defaults to a no-op for previews.
+    var onShowFunctions: () -> Void = {}
     @EnvironmentObject var authManager: AuthManager
     @State private var showSendInvites = false
     @State private var showAddGuest = false
     @State private var showCalendarAlert = false
     @State private var calendarAlertMessage = ""
+    @State private var isAddingToCalendar = false
     @State private var showShareSheet = false
 
     var body: some View {
@@ -23,20 +27,35 @@ struct OverviewTab: View {
                     quickActionsSection
                 }
 
-                // RSVP Summary Card
-                rsvpSummaryCard
+                // RSVP Summary Card — host analytics; guests get Who's Going below.
+                if isHost {
+                    rsvpSummaryCard
+                }
 
                 // Function RSVP guidance banner (for non-host users on function-based events)
                 if !event.functions.isEmpty && !isHost {
-                    HStack(spacing: Spacing.xs) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundStyle(Color.accentPurpleFallback)
-                        Text("RSVP to individual functions on the Functions tab")
-                            .font(GatherFont.caption)
-                            .foregroundStyle(Color.gatherSecondaryText)
+                    Button {
+                        HapticService.buttonTap()
+                        onShowFunctions()
+                    } label: {
+                        HStack(spacing: Spacing.xs) {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundStyle(Color.accentPurpleFallback)
+                            Text("RSVP to individual functions on the Functions tab")
+                                .font(GatherFont.caption)
+                                .foregroundStyle(Color.gatherSecondaryText)
+                            Spacer(minLength: Spacing.xs)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                                .foregroundStyle(Color.accentPurpleFallback)
+                        }
+                        .padding(Spacing.sm)
+                        .frame(minHeight: Layout.minTouchTarget)
+                        .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+                        .surfaceCard()
                     }
-                    .padding(Spacing.sm)
-                    .surfaceCard()
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens the Functions tab")
                 }
 
                 // Date & Time
@@ -81,17 +100,15 @@ struct OverviewTab: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
-        .alert("Calendar", isPresented: $showCalendarAlert) {
+        .alert("Add to Calendar", isPresented: $showCalendarAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(calendarAlertMessage)
         }
         .sheet(isPresented: $showShareSheet) {
-            // Share the universal link — clickable in any chat, opens the app
-            // when installed and the web RSVP page when not.
-            let link = InviteService.shared.generateShareableLink(event: event)?.absoluteString ?? ""
-            let shareText = "\(event.title)\n\(event.startDate.formatted(date: .abbreviated, time: .shortened))"
-            ShareActivitySheet(items: [shareText, link])
+            // Same rich share sheet as the toolbar action — one share path
+            // everywhere (event preview, Message/Email/More, copy link).
+            ShareSheet(event: event)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
@@ -106,10 +123,12 @@ struct OverviewTab: View {
     // MARK: - Quick Actions
 
     private var quickActionsSection: some View {
-        // Tiles share the event's category accent so the whole screen carries
-        // one color story instead of a rainbow of unrelated tints.
+        // One compact 44pt row of capsule chips — all three host actions stay
+        // one tap away without eating the top band of the Overview. Chips
+        // share the event's category accent so the screen keeps one color
+        // story instead of a rainbow of unrelated tints.
         HStack(spacing: Spacing.sm) {
-            QuickActionCard(
+            QuickActionChip(
                 icon: "person.badge.plus",
                 title: "Add Guest",
                 color: Color.forCategory(event.category)
@@ -118,16 +137,16 @@ struct OverviewTab: View {
             }
             .bouncyAppear(delay: 0)
 
-            QuickActionCard(
+            QuickActionChip(
                 icon: "paperplane.fill",
-                title: "Send Invites",
+                title: "Invites",
                 color: Color.forCategory(event.category)
             ) {
                 showSendInvites = true
             }
             .bouncyAppear(delay: 0.05)
 
-            QuickActionCard(
+            QuickActionChip(
                 icon: "square.and.arrow.up",
                 title: "Share",
                 color: Color.forCategory(event.category)
@@ -153,7 +172,33 @@ struct OverviewTab: View {
 
     // MARK: - RSVP Summary Card
 
+    @ViewBuilder
     private var rsvpSummaryCard: some View {
+        if event.guests.isEmpty {
+            // Brand-new event: a nudge beats four all-zero progress bars.
+            GatherEmptyState(
+                icon: "envelope.open",
+                title: "No guests yet",
+                message: "Add guests to start collecting RSVPs.",
+                accent: Color.forCategory(event.category),
+                actionTitle: "Add Guest",
+                action: { showAddGuest = true }
+            )
+            .frame(maxWidth: .infinity)
+        } else {
+            // Whole card opens the full, filterable guest roster.
+            Button {
+                HapticService.buttonTap()
+                showGuestList = true
+            } label: {
+                rsvpSummaryContent
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Shows the full guest list")
+        }
+    }
+
+    private var rsvpSummaryContent: some View {
         VStack(spacing: Spacing.md) {
             // Header
             HStack {
@@ -167,6 +212,14 @@ struct OverviewTab: View {
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
                     .contentTransition(.numericText())
+
+                HStack(spacing: 2) {
+                    Text("View all")
+                        .font(GatherFont.caption)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                }
+                .foregroundStyle(Color.accentPurpleFallback)
             }
 
             // Progress Bars
@@ -226,6 +279,7 @@ struct OverviewTab: View {
             .padding(.top, Spacing.xs)
         }
         .padding()
+        .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
         .surfaceCard()
         .bouncyAppear()
     }
@@ -264,10 +318,14 @@ struct OverviewTab: View {
                     .foregroundStyle(Color.gatherSecondaryText)
 
                 // Compact countdown so "when" is answerable without math.
-                Text(countdownText)
-                    .font(GatherFont.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.forCategory(event.category))
+                // TimelineView re-renders each minute while visible so
+                // "Happening now" actually appears without a manual Timer.
+                TimelineView(.periodic(from: .now, by: 60)) { _ in
+                    Text(countdownText)
+                        .font(GatherFont.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.forCategory(event.category))
+                }
 
                 if let endDate = event.endDate, !Calendar.current.isDate(event.startDate, inSameDayAs: endDate) {
                     Text("Multi-day event")
@@ -279,18 +337,32 @@ struct OverviewTab: View {
             Spacer()
 
             Button {
+                guard !isAddingToCalendar else { return }
+                isAddingToCalendar = true
                 Task {
                     calendarAlertMessage = await CalendarService.shared.addEventToCalendar(event: event)
+                    HapticService.success()
                     showCalendarAlert = true
+                    isAddingToCalendar = false
                 }
             } label: {
-                Image(systemName: "calendar.badge.plus")
-                    .font(.title2)
-                    .foregroundStyle(Color.accentPurpleFallback)
-                    .frame(width: 44, height: 44)
-                    .background(Color.gatherElevated)
-                    .clipShape(Circle())
+                Group {
+                    if isAddingToCalendar {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(Color.accentPurpleFallback)
+                    } else {
+                        Image(systemName: "calendar.badge.plus")
+                            .font(.title2)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .background(Color.gatherElevated)
+                .clipShape(Circle())
             }
+            .disabled(isAddingToCalendar)
+            .accessibilityLabel("Add to calendar")
         }
         .padding()
         .surfaceCard()
@@ -301,7 +373,20 @@ struct OverviewTab: View {
     @ViewBuilder
     private func locationSection(_ location: EventLocation) -> some View {
         if location.isVirtual {
-            locationCardContent(location)
+            // Virtual events get the same one-tap card — straight into the
+            // meeting link, with the "Join" capsule as the visual affordance.
+            if let url = location.virtualURL {
+                Button {
+                    HapticService.buttonTap()
+                    UIApplication.shared.open(url)
+                } label: {
+                    locationCardContent(location)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens the meeting link")
+            } else {
+                locationCardContent(location)
+            }
         } else {
             // Whole card is one tap target — a big, thumb-friendly hit area
             // that jumps straight to Apple Maps. The "Directions" capsule
@@ -353,6 +438,18 @@ struct OverviewTab: View {
                     .padding(.vertical, Spacing.xs)
                     .background(Color.accentPinkFallback)
                     .clipShape(Capsule())
+                } else if location.virtualURL != nil {
+                    HStack(spacing: Spacing.xxs) {
+                        Image(systemName: "video.fill")
+                            .font(.caption2)
+                        Text("Join")
+                            .font(GatherFont.caption)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xs)
+                    .background(Color.accentPurpleFallback)
+                    .clipShape(Capsule())
                 }
             }
 
@@ -383,9 +480,13 @@ struct OverviewTab: View {
                 .gatherSectionHeader()
                 .foregroundStyle(Color.gatherPrimaryText)
 
+            // Primary-content brightness + open leading — the description is
+            // the event's actual story, not dim metadata.
             Text(description)
                 .font(GatherFont.body)
-                .foregroundStyle(Color.gatherSecondaryText)
+                .foregroundStyle(Color.gatherPrimaryText.opacity(0.9))
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -400,7 +501,7 @@ struct OverviewTab: View {
 
                 Spacer()
 
-                Text("\(event.functions.count) events")
+                Text("\(event.functions.count) function\(event.functions.count == 1 ? "" : "s")")
                     .font(GatherFont.caption)
                     .foregroundStyle(Color.gatherSecondaryText)
             }
@@ -411,10 +512,22 @@ struct OverviewTab: View {
                 }
 
                 if event.functions.count > 3 {
-                    Text("+ \(event.functions.count - 3) more")
-                        .font(GatherFont.caption)
+                    Button {
+                        HapticService.buttonTap()
+                        onShowFunctions()
+                    } label: {
+                        HStack(spacing: Spacing.xxs) {
+                            Text("+ \(event.functions.count - 3) more")
+                                .font(GatherFont.caption)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                        }
                         .foregroundStyle(Color.accentPurpleFallback)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(maxWidth: .infinity, minHeight: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens the Functions tab")
                 }
             }
         }
@@ -438,22 +551,40 @@ struct OverviewTab: View {
                 }
             }
 
-            HStack(spacing: Spacing.sm) {
-                AvatarStack(
-                    names: attendingGuests.map { $0.name },
-                    maxDisplay: 5,
-                    size: AvatarSize.md
-                )
+            // The card opens the full roster — the avatar stack is a preview,
+            // not the whole story.
+            Button {
+                HapticService.buttonTap()
+                showGuestList = true
+            } label: {
+                HStack(spacing: Spacing.sm) {
+                    AvatarStack(
+                        names: attendingGuests.map { $0.name },
+                        maxDisplay: 5,
+                        size: AvatarSize.md
+                    )
 
-                AttendeePreviewText(
-                    names: guestNames,
-                    totalCount: attendingGuests.count
-                )
+                    AttendeePreviewText(
+                        names: guestNames,
+                        totalCount: attendingGuests.count
+                    )
 
-                Spacer()
+                    Spacer()
+
+                    HStack(spacing: 2) {
+                        Text("View all")
+                            .font(GatherFont.caption)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(Color.accentPurpleFallback)
+                }
+                .padding(Spacing.md)
+                .contentShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
+                .surfaceCard()
             }
-            .padding(Spacing.md)
-            .surfaceCard()
+            .buttonStyle(.plain)
+            .accessibilityHint("Shows the full guest list")
         }
     }
 
@@ -579,9 +710,12 @@ struct OverviewTab: View {
     }
 }
 
-// MARK: - Quick Action Card
+// MARK: - Quick Action Chip
 
-struct QuickActionCard: View {
+/// A compact 44pt capsule chip (icon + label) for the host quick-action row —
+/// replaces the old ~100pt QuickActionCard tiles so the Overview's top band
+/// stays light while keeping every action one tap away.
+struct QuickActionChip: View {
     let icon: String
     let title: String
     let color: Color
@@ -589,23 +723,26 @@ struct QuickActionCard: View {
     @State private var isPressed = false
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: Spacing.xs) {
+        Button {
+            HapticService.buttonTap()
+            action()
+        } label: {
+            HStack(spacing: Spacing.xxs) {
                 Image(systemName: icon)
-                    .font(.title2)
+                    .font(.system(size: IconSize.sm, weight: .semibold))
                     .foregroundStyle(color)
-                    .frame(width: 40, height: 40)
-                    .background(color.opacity(0.15))
-                    .clipShape(Circle())
 
                 Text(title)
-                    .font(GatherFont.caption)
+                    .gatherRowTitle()
                     .foregroundStyle(Color.gatherPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.md)
-            .surfaceCard()
+            .frame(maxWidth: .infinity, minHeight: Layout.minTouchTarget)
+            .contentShape(Capsule())
+            .surfaceCard(cornerRadius: CornerRadius.full)
         }
+        .buttonStyle(.plain)
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .pressEvents(
             onPress: { withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { isPressed = true } },
@@ -623,7 +760,6 @@ struct RSVPProgressRow: View {
     let total: Int
     let color: Color
     let icon: String
-    @State private var animatedProgress: Double = 0
 
     private var percentage: Double {
         guard total > 0 else { return 0 }
@@ -637,10 +773,13 @@ struct RSVPProgressRow: View {
                 .foregroundStyle(color)
                 .frame(width: 20)
 
+            // minWidth (not fixed width) so labels/counts survive Dynamic
+            // Type and 4-digit guest counts without truncating.
             Text(label)
                 .font(GatherFont.caption)
                 .foregroundStyle(Color.gatherSecondaryText)
-                .frame(width: 70, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(minWidth: 70, alignment: .leading)
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
@@ -648,9 +787,13 @@ struct RSVPProgressRow: View {
                         .fill(Color.gatherElevated)
                         .frame(height: 6)
 
+                    // Fill is driven directly by the value: first render is
+                    // instant (no replayed zero-to-full sweep on every tab
+                    // switch); only real RSVP changes animate.
                     RoundedRectangle(cornerRadius: 2)
                         .fill(color)
-                        .frame(width: geometry.size.width * animatedProgress, height: 6)
+                        .frame(width: geometry.size.width * percentage, height: 6)
+                        .animation(.easeOut(duration: 0.5), value: percentage)
                 }
             }
             .frame(height: 6)
@@ -659,26 +802,12 @@ struct RSVPProgressRow: View {
                 .font(GatherFont.caption)
                 .fontWeight(.semibold)
                 .foregroundStyle(Color.gatherPrimaryText)
-                .frame(width: 30, alignment: .trailing)
+                .frame(minWidth: 30, alignment: .trailing)
+                .layoutPriority(1)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(count) of \(total)")
         .accessibilityValue("\(Int(percentage * 100)) percent")
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
-                animatedProgress = percentage
-            }
-        }
-        .onChange(of: count) { _, _ in
-            withAnimation(.easeOut(duration: 0.5)) {
-                animatedProgress = percentage
-            }
-        }
-        .onChange(of: total) { _, _ in
-            withAnimation(.easeOut(duration: 0.5)) {
-                animatedProgress = percentage
-            }
-        }
     }
 }
 

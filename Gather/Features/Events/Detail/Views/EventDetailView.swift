@@ -205,17 +205,15 @@ struct EventDetailView: View {
                     }
                 }
             } else {
+                // Guests get exactly one action — surface it directly instead
+                // of hiding a single-item menu behind an unlabeled "…".
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            showShareSheet = true
-                        } label: {
-                            Label("Share Event", systemImage: "square.and.arrow.up")
-                        }
+                    Button {
+                        showShareSheet = true
                     } label: {
-                        heroControlIcon("ellipsis")
+                        heroControlIcon("square.and.arrow.up")
                     }
-                    .accessibilityLabel("More options")
+                    .accessibilityLabel("Share Event")
                 }
             }
         }
@@ -289,6 +287,10 @@ struct EventDetailView: View {
             .frame(width: 34, height: 34)
             .background(Color.black.opacity(0.38), in: Circle())
             .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+            // Keep the 34pt visual disc, but give the button a full 44pt
+            // hit area so the two side-by-side chips meet the HIG minimum.
+            .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+            .contentShape(Rectangle())
     }
 
     private var heroSection: some View {
@@ -351,7 +353,14 @@ struct EventDetailView: View {
                 .gatherMetaText()
                 .foregroundStyle(.white.opacity(0.92))
 
-                if event.displayAttendingCount > 0 {
+                // One attendance line: when a capacity is set, fold it in
+                // ("12/50 going") instead of a second competing badge in the
+                // top corner — one number, one place.
+                if let capacity = event.capacity {
+                    Label("\(event.totalAttendingHeadcount)/\(capacity) going", systemImage: "person.2.fill")
+                        .gatherMetaText()
+                        .foregroundStyle(.white)
+                } else if event.displayAttendingCount > 0 {
                     Label("\(event.displayAttendingCount) going", systemImage: "person.2.fill")
                         .gatherMetaText()
                         .foregroundStyle(.white)
@@ -359,36 +368,6 @@ struct EventDetailView: View {
             }
             .padding(Spacing.lg)
             .padding(.bottom, Spacing.lg)
-
-            // Category emoji badge - top left
-            VStack {
-                HStack {
-                    Text(event.category.emoji)
-                        .font(.title2)
-                        .padding(Spacing.xs)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
-                        .padding(.leading)
-                        .padding(.top, Spacing.md)
-                    Spacer()
-                }
-                Spacer()
-            }
-
-            // Capacity badge - top right
-            if let capacity = event.capacity {
-                VStack {
-                    HStack {
-                        Spacer()
-                        CapacityBadge(
-                            attending: event.totalAttendingHeadcount,
-                            capacity: capacity
-                        )
-                        .padding()
-                    }
-                    Spacer()
-                }
-            }
 
             // Subtle RSVP sync indicator — top center while the host's list
             // pulls fresh responses from the cloud.
@@ -429,7 +408,7 @@ struct EventDetailView: View {
                 Color.gatherCanvas
                     .overlay(alignment: .bottom) {
                         Rectangle()
-                            .fill(Color.white.opacity(0.05))
+                            .fill(Color.gatherSeparator.opacity(0.5))
                             .frame(height: 1)
                     }
             )
@@ -519,7 +498,12 @@ struct EventDetailView: View {
             OverviewTab(
                 event: event,
                 showGuestList: $showGuestList,
-                showRSVPSheet: $showRSVPSheet
+                showRSVPSheet: $showRSVPSheet,
+                onShowFunctions: {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        selectedTab = .functions
+                    }
+                }
             )
         case .activity:
             ActivityTab(event: event)
@@ -682,8 +666,11 @@ struct EventDetailView: View {
             .padding(.vertical, Spacing.xs)
             .background(Color.forRSVPStatus(guest.status).opacity(0.12))
             .clipShape(Capsule())
+            // Expansion lives INSIDE the label so the whole bar row is the
+            // hit area — the pill visual stays compact.
+            .frame(maxWidth: .infinity, minHeight: Layout.minTouchTarget)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.xs)
         .floatingBottomBar()
     }
@@ -809,7 +796,9 @@ struct EventDetailView: View {
                 } label: {
                     HStack(spacing: Spacing.xs) {
                         Image(systemName: "ticket.fill")
-                        Text("Get Free Ticket")
+                        // Price-aware label — promising a FREE ticket next to
+                        // "From $25" reads as bait when the sheet shows a price.
+                        Text(minTicketPrice == 0 ? "Get Free Ticket" : "Get Tickets")
                     }
                     .font(GatherFont.headline)
                     .foregroundStyle(.white)

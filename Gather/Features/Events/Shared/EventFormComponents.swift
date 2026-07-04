@@ -40,6 +40,14 @@ struct EventFormInputSurface: ViewModifier {
     var isActive: Bool
     var cornerRadius: CGFloat = CornerRadius.md
     var minHeight: CGFloat = Layout.minTouchTarget
+    /// When true the border renders in the error color so invalid input is
+    /// flagged at the field itself, not just in a distant footer hint.
+    var isError: Bool = false
+
+    private var borderColor: Color {
+        if isError { return Color.warmCoral.opacity(0.7) }
+        return isActive ? Color.accentPurpleFallback.opacity(0.6) : Color.gatherSeparator.opacity(0.6)
+    }
 
     func body(content: Content) -> some View {
         content
@@ -48,23 +56,39 @@ struct EventFormInputSurface: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(
-                        isActive ? Color.accentPurpleFallback.opacity(0.6) : Color.gatherSeparator.opacity(0.6),
-                        lineWidth: 1
-                    )
+                    .strokeBorder(borderColor, lineWidth: 1)
             )
     }
 }
 
 extension View {
     /// Style a row/field as a nested input on `gatherElevated` with a border
-    /// that turns accent when `isActive` (focused or filled). Tap target >= 44pt.
+    /// that turns accent when `isActive` (focused or filled) and error-colored
+    /// when `isError`. Tap target >= 44pt.
     func eventFormInputSurface(
         isActive: Bool,
         cornerRadius: CGFloat = CornerRadius.md,
-        minHeight: CGFloat = Layout.minTouchTarget
+        minHeight: CGFloat = Layout.minTouchTarget,
+        isError: Bool = false
     ) -> some View {
-        modifier(EventFormInputSurface(isActive: isActive, cornerRadius: cornerRadius, minHeight: minHeight))
+        modifier(EventFormInputSurface(
+            isActive: isActive,
+            cornerRadius: cornerRadius,
+            minHeight: minHeight,
+            isError: isError
+        ))
+    }
+}
+
+// MARK: - Shared Form Validation
+
+/// Small shared validation helpers used by both the Create and Edit forms.
+enum EventFormValidation {
+    /// True when the string parses as an http(s) URL — the only kind of
+    /// meeting link the app can actually open from Event Detail.
+    static func isValidMeetingLink(_ string: String) -> Bool {
+        guard let url = URL(string: string), let scheme = url.scheme?.lowercased() else { return false }
+        return scheme == "https" || scheme == "http"
     }
 }
 
@@ -82,10 +106,10 @@ struct EventFormSectionHeader: View {
     var body: some View {
         HStack(spacing: Spacing.xs) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(.subheadline, weight: .semibold))
                 .foregroundStyle(accent)
             Text(title)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(.headline, weight: .bold))
                 .foregroundStyle(Color.gatherPrimaryText)
         }
     }
@@ -214,6 +238,9 @@ struct EventCategorySelector: View {
     @Binding var selectedCategory: EventCategory
     @Binding var enabledFeatures: Set<EventFeature>
     var headerTitle: String = "What kind of event?"
+    /// Seeding category defaults makes sense in Create; pass `false` from Edit
+    /// so recategorizing an existing event never wipes a curated feature set.
+    var resetsFeaturesOnChange: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
@@ -229,7 +256,9 @@ struct EventCategorySelector: View {
                         ) {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                 selectedCategory = category
-                                enabledFeatures = category.defaultFeatures
+                                if resetsFeaturesOnChange {
+                                    enabledFeatures = category.defaultFeatures
+                                }
                             }
                             HapticService.buttonTap()
                         }
@@ -254,16 +283,23 @@ struct EventBasicsSection: View {
             // Title field with accent-on-fill border
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("EVENT NAME")
-                    .font(.system(size: 11, weight: .bold))
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
-                    .tracking(0.5)
 
-                TextField("Give your event a vibe...", text: $title, axis: .vertical)
-                    .font(.system(size: 18, weight: .semibold))
+                TextField("Give your event a vibe...", text: $title)
+                    .font(.system(.body, weight: .semibold))
                     .foregroundStyle(Color.gatherPrimaryText)
-                    .lineLimit(1...2)
+                    .submitLabel(.done)
                     .padding(Spacing.md)
                     .eventFormInputSurface(isActive: !title.isEmpty)
+                    // Event names are single-line everywhere they render, so
+                    // strip pasted newlines and enforce the 100-char limit.
+                    .onChange(of: title) { _, newValue in
+                        let cleaned = String(
+                            newValue.replacingOccurrences(of: "\n", with: " ").prefix(100)
+                        )
+                        if cleaned != newValue { title = cleaned }
+                    }
 
                 HStack {
                     Spacer()
@@ -277,16 +313,15 @@ struct EventBasicsSection: View {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 HStack {
                     Text("DESCRIPTION")
-                        .font(.system(size: 11, weight: .bold))
+                        .gatherEyebrow()
                         .foregroundStyle(Color.gatherSecondaryText)
-                        .tracking(0.5)
                     Text("optional")
                         .font(.caption2)
                         .foregroundStyle(Color.gatherTertiaryText)
                 }
 
                 TextField("Tell people what to expect...", text: $description, axis: .vertical)
-                    .font(.system(size: 16))
+                    .font(.system(.callout))
                     .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(3...6)
                     .padding(Spacing.md)
@@ -393,7 +428,7 @@ struct EventDateTimeSection: View {
                             .font(.caption)
                             .foregroundStyle(Color.rsvpYesFallback)
                         Text("Starts")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(.callout, weight: .medium))
                             .foregroundStyle(Color.gatherPrimaryText)
                     }
                     Spacer()
@@ -427,7 +462,7 @@ struct EventDateTimeSection: View {
                             .font(.caption)
                             .foregroundStyle(Color.rsvpNoFallback.opacity(0.7))
                         Text("Ends")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(.callout, weight: .medium))
                             .foregroundStyle(Color.gatherPrimaryText)
                     }
                     Spacer()
@@ -598,14 +633,14 @@ struct EventLocationSection: View {
         } label: {
             HStack(spacing: Spacing.xs) {
                 Image(systemName: "square.and.pencil")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, weight: .semibold))
                     .foregroundStyle(Color.accentPurpleFallback)
                 Text("Enter address manually")
                     .gatherMetaText()
                     .foregroundStyle(Color.gatherSecondaryText)
                 Spacer()
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(.caption, weight: .semibold))
                     .foregroundStyle(Color.gatherSecondaryText)
                     .rotationEffect(.degrees(showManualEntry ? 180 : 0))
             }
@@ -654,7 +689,7 @@ struct EventLocationSection: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(locationName.isEmpty ? "Selected location" : locationName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(.callout, weight: .semibold))
                     .foregroundStyle(Color.gatherPrimaryText)
                     .lineLimit(1)
                 if !addressSummary.isEmpty {
@@ -714,6 +749,8 @@ struct EventSettingsSection: View {
     @Binding var capacity: Int?
     @Binding var hasCapacity: Bool
 
+    @FocusState private var capacityFocused: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             EventFormSectionHeader(title: "Settings", icon: "gearshape.fill")
@@ -721,9 +758,8 @@ struct EventSettingsSection: View {
             // Privacy cards
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("WHO CAN SEE THIS EVENT?")
-                    .font(.system(size: 11, weight: .bold))
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
-                    .tracking(0.5)
 
                 HStack(spacing: Spacing.xs) {
                     EventFormPrivacyCard(
@@ -749,9 +785,8 @@ struct EventSettingsSection: View {
             // Guest list visibility
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("GUEST LIST")
-                    .font(.system(size: 11, weight: .bold))
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
-                    .tracking(0.5)
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.xs) {
                     ForEach(GuestListVisibility.allCases, id: \.self) { option in
@@ -759,7 +794,7 @@ struct EventSettingsSection: View {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { guestListVisibility = option }
                         } label: {
                             Text(option.displayName)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(.subheadline, weight: .semibold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                                 .foregroundStyle(guestListVisibility == option ? .white : Color.gatherPrimaryText)
@@ -792,7 +827,7 @@ struct EventSettingsSection: View {
                         .font(.caption)
                         .foregroundStyle(Color.accentPurpleFallback)
                     Text("Limit capacity")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(.callout, weight: .medium))
                         .foregroundStyle(Color.gatherPrimaryText)
                 }
                 Spacer()
@@ -807,23 +842,29 @@ struct EventSettingsSection: View {
             if hasCapacity {
                 HStack(spacing: Spacing.sm) {
                     Text("Max guests")
-                        .font(.system(size: 16))
+                        .font(.system(.callout))
                         .foregroundStyle(Color.gatherSecondaryText)
                     Spacer()
                     HStack(spacing: Spacing.xs) {
                         Button {
                             let current = capacity ?? 50
-                            if current > 10 { capacity = current - 10 }
+                            // Fine steps near the bottom so small gatherings
+                            // (e.g. a dinner for 6) are reachable without typing.
+                            capacity = max(1, current - (current <= 10 ? 1 : 10))
                         } label: {
                             Image(systemName: "minus.circle.fill")
                                 .font(.title3)
                                 .foregroundStyle(Color.accentPinkFallback)
+                                .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                                .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("Decrease capacity")
 
                         TextField("50", value: $capacity, format: .number)
                             .keyboardType(.numberPad)
+                            .focused($capacityFocused)
                             .multilineTextAlignment(.center)
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.system(.body, weight: .bold))
                             .foregroundStyle(Color.gatherPrimaryText)
                             .frame(width: 64)
                             .padding(.vertical, Spacing.xs)
@@ -833,6 +874,7 @@ struct EventSettingsSection: View {
                                 RoundedRectangle(cornerRadius: CornerRadius.sm)
                                     .strokeBorder(Color.accentPurpleFallback.opacity(0.6), lineWidth: 1)
                             )
+                            .accessibilityLabel("Maximum guests")
 
                         Button {
                             capacity = (capacity ?? 50) + 10
@@ -840,7 +882,10 @@ struct EventSettingsSection: View {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title3)
                                 .foregroundStyle(Color.accentPurpleFallback)
+                                .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                                .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("Increase capacity")
                     }
                 }
                 .padding(.horizontal, Spacing.md)
@@ -849,6 +894,21 @@ struct EventSettingsSection: View {
             }
         }
         .eventFormCard()
+        // The numberPad has no return key — give it an explicit Done button.
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                if capacityFocused {
+                    Spacer()
+                    Button("Done") { capacityFocused = false }
+                }
+            }
+        }
+        // Flipping "Limit capacity" on must seed a concrete number — otherwise
+        // the field shows a placeholder "50" that looks filled while capacity
+        // is still nil and the Create/Save button stays disabled (dead end).
+        .onChange(of: hasCapacity) { _, isOn in
+            if isOn && capacity == nil { capacity = 50 }
+        }
     }
 }
 
@@ -867,7 +927,7 @@ struct EventFormCategoryChip: View {
                 Text(category.emoji)
                     .font(.callout)
                 Text(category.displayName)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(.subheadline, weight: .bold))
             }
             .foregroundStyle(
                 isSelected
@@ -917,7 +977,7 @@ struct EventFeatureCard: View {
         Button(action: onToggle) {
             HStack(spacing: Spacing.sm) {
                 Image(systemName: feature.icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(.body, weight: .semibold))
                     .foregroundStyle(active ? .white : Color.gatherSecondaryText)
                     .frame(width: 46, height: 46)
                     .background(
@@ -930,7 +990,7 @@ struct EventFeatureCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(feature.displayName)
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(.callout, weight: .semibold))
                             .foregroundStyle(available ? Color.gatherPrimaryText : Color.gatherSecondaryText)
                         if !available {
                             Text("SOON")
@@ -943,7 +1003,7 @@ struct EventFeatureCard: View {
                         }
                     }
                     Text(feature.description)
-                        .font(.system(size: 13))
+                        .font(.system(.footnote))
                         .foregroundStyle(Color.gatherSecondaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1002,7 +1062,7 @@ struct EventFeatureGridCard: View {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 HStack(spacing: Spacing.xs) {
                     Image(systemName: feature.icon)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(active ? .white : Color.gatherSecondaryText)
                         .frame(width: 34, height: 34)
                         .background(
@@ -1036,7 +1096,7 @@ struct EventFeatureGridCard: View {
                     .minimumScaleFactor(0.85)
 
                 Text(feature.description)
-                    .font(.system(size: 12))
+                    .font(.system(.caption))
                     .foregroundStyle(Color.gatherSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1082,12 +1142,12 @@ struct EventFormStyledTextField: View {
         HStack(spacing: Spacing.xs) {
             if let icon = icon {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(Color.accentPurpleFallback.opacity(0.8))
                     .frame(width: 20)
             }
             TextField(placeholder, text: $text)
-                .font(.system(size: 16))
+                .font(.system(.callout))
                 .foregroundStyle(Color.gatherPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -1113,9 +1173,9 @@ struct EventFormQuickDateChip: View {
         }) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(.caption2, weight: .semibold))
                 Text(label)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(.footnote, weight: .semibold))
             }
             .foregroundStyle(Color.accentPurpleFallback)
             .padding(.horizontal, Spacing.md)
@@ -1140,9 +1200,9 @@ struct EventFormLocationTypeButton: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(.subheadline, weight: .semibold))
                 Text(label)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(.callout, weight: .semibold))
             }
             .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
             .frame(maxWidth: .infinity)
@@ -1191,7 +1251,7 @@ struct EventFormPrivacyCard: View {
                     .clipShape(Circle())
 
                 Text(option.displayName)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(.caption, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .foregroundStyle(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryText)

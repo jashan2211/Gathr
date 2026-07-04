@@ -13,7 +13,10 @@ struct GuestsTab: View {
     /// Parallel to `filterStatus` — GuestFilter can't gain a case without
     /// breaking GuestFilterBar's exhaustive switch, so waitlist is a side filter.
     @State private var showWaitlistedOnly = false
+    /// Side filter for Maybe, same pattern as `showWaitlistedOnly`.
+    @State private var showMaybeOnly = false
     @State private var guestPendingRemoval: Guest?
+    @State private var showBulkRemoveConfirmation = false
     @State private var guestPendingPromotion: Guest?
     @State private var dietaryExpanded = false
     // Bulk-invite action row (host)
@@ -32,14 +35,12 @@ struct GuestsTab: View {
         event.guests.contains { $0.status == .waitlisted }
     }
 
-    private var isHost: Bool {
-        event.hostId == authManager.currentUser?.id
+    private var hasMaybeGuests: Bool {
+        event.guests.contains { $0.status == .maybe }
     }
 
-    /// Guest IDs that have been sent an invite. Tracked on the Guest itself so
-    /// this works for events with or without functions.
-    private var sentGuestIds: Set<UUID> {
-        Set(event.guests.filter { $0.inviteWasSent }.map { $0.id })
+    private var isHost: Bool {
+        event.hostId == authManager.currentUser?.id
     }
 
     /// Guests who haven't been sent an invite yet — the natural target for
@@ -111,7 +112,7 @@ struct GuestsTab: View {
     enum GuestFilter: String, CaseIterable {
         case all = "All"
         case pending = "Pending"
-        case sent = "Sent"
+        case sent = "Awaiting reply"
         case confirmed = "Confirmed"
         case declined = "Declined"
 
@@ -186,7 +187,9 @@ struct GuestsTab: View {
         }
         .sheet(isPresented: $showAddGuest) {
             AddGuestSheet(event: event)
-                .presentationDetents([.medium, .large])
+                // Tall enough that the Add Guest CTA stays visible above the
+                // keyboard during rapid batch entry.
+                .presentationDetents([.fraction(0.75), .large])
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showSendInvites, onDismiss: {
@@ -204,7 +207,7 @@ struct GuestsTab: View {
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $selectedGuest) { guest in
-            GuestDetailSheet(guest: guest, event: event)
+            GuestDetailSheet(guest: guest, event: event, isHost: isHost)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -231,6 +234,15 @@ struct GuestsTab: View {
         } message: {
             Text("Are you sure you want to remove \(guestPendingRemoval?.name ?? "this guest") from this event? This action cannot be undone.")
         }
+        .alert(
+            "Remove \(selectedGuests.count) Guest\(selectedGuests.count == 1 ? "" : "s")",
+            isPresented: $showBulkRemoveConfirmation
+        ) {
+            Button("Remove", role: .destructive) { bulkRemoveSelected() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to remove \(selectedGuests.count) guest\(selectedGuests.count == 1 ? "" : "s") from this event? This action cannot be undone.")
+        }
         .confirmationDialog(
             "Event is at capacity — promote anyway?",
             isPresented: Binding(
@@ -254,6 +266,13 @@ struct GuestsTab: View {
                 filterStatus = .all
             }
         }
+        .onChange(of: hasMaybeGuests) { _, stillHasMaybe in
+            // If the last maybe guest responded/was removed, fall back to All.
+            if !stillHasMaybe && showMaybeOnly {
+                showMaybeOnly = false
+                filterStatus = .all
+            }
+        }
     }
 
     // MARK: - Status Summary Bar
@@ -265,8 +284,16 @@ struct GuestsTab: View {
                     StatusPill(
                         filter: filter,
                         count: countForFilter(filter),
-                        isSelected: filterStatus == filter && !showWaitlistedOnly,
+                        isSelected: filterStatus == filter && !showWaitlistedOnly && !showMaybeOnly,
                         onTap: { selectFilter(filter) }
+                    )
+                }
+
+                if hasMaybeGuests {
+                    MaybePill(
+                        count: event.guests.filter { $0.status == .maybe }.count,
+                        isSelected: showMaybeOnly,
+                        onTap: { toggleMaybeFilter() }
                     )
                 }
 
@@ -286,12 +313,13 @@ struct GuestsTab: View {
     /// Tap a status pill to filter; tap the active pill again to clear back to All.
     private func selectFilter(_ filter: GuestFilter) {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            if filterStatus == filter && !showWaitlistedOnly {
+            if filterStatus == filter && !showWaitlistedOnly && !showMaybeOnly {
                 filterStatus = .all
             } else {
                 filterStatus = filter
             }
             showWaitlistedOnly = false
+            showMaybeOnly = false
         }
         HapticService.selection()
     }
@@ -301,6 +329,17 @@ struct GuestsTab: View {
     private func toggleWaitlistFilter() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             showWaitlistedOnly.toggle()
+            showMaybeOnly = false
+            filterStatus = .all
+        }
+        HapticService.selection()
+    }
+
+    /// Maybe pill toggles on/off, mirroring the waitlist side filter.
+    private func toggleMaybeFilter() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            showMaybeOnly.toggle()
+            showWaitlistedOnly = false
             filterStatus = .all
         }
         HapticService.selection()
@@ -690,10 +729,58 @@ struct GuestsTab: View {
                     .clipShape(Capsule())
                 }
                 .disabled(selectedGuests.isEmpty)
+
+                // Bulk status changes + bulk remove
+                Menu {
+                    Button {
+                        bulkApplyStatus(.attending)
+                    } label: {
+                        Label("Mark Going", systemImage: "checkmark.circle")
+                    }
+                    Button {
+                        bulkApplyStatus(.maybe)
+                    } label: {
+                        Label("Mark Maybe", systemImage: "questionmark.circle")
+                    }
+                    Button {
+                        bulkApplyStatus(.declined)
+                    } label: {
+                        Label("Mark Can't Go", systemImage: "xmark.circle")
+                    }
+                    Button {
+                        bulkApplyStatus(.pending)
+                    } label: {
+                        Label("Mark Pending", systemImage: "clock")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        HapticService.warning()
+                        showBulkRemoveConfirmation = true
+                    } label: {
+                        Label(
+                            "Remove \(selectedGuests.count) Guest\(selectedGuests.count == 1 ? "" : "s")",
+                            systemImage: "trash"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(
+                            selectedGuests.isEmpty
+                                ? Color.gatherSecondaryText.opacity(0.4)
+                                : Color.gatherSecondaryText
+                        )
+                        .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
+                }
+                .disabled(selectedGuests.isEmpty)
+                .accessibilityLabel("More bulk actions")
+                .accessibilityHint("Change RSVP status or remove the selected guests")
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(event.guests.count) Guests")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(GatherFont.headline)
+                        .fontWeight(.bold)
                         .foregroundStyle(Color.gatherPrimaryText)
                         .accessibilityAddTraits(.isHeader)
                     if event.attendingCount > 0 {
@@ -716,7 +803,7 @@ struct GuestsTab: View {
 
     /// Sort / select / send / add affordances — host only.
     private var hostActionButtons: some View {
-        HStack(spacing: Spacing.sm) {
+        HStack(spacing: Spacing.xs) {
             if !event.guests.isEmpty {
                 // Sort menu
                 Menu {
@@ -730,6 +817,8 @@ struct GuestsTab: View {
                     Image(systemName: "arrow.up.arrow.down")
                         .font(.title3)
                         .foregroundStyle(Color.gatherSecondaryText)
+                        .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Sort guests")
                 .accessibilityValue("Sorted by \(sortOrder.displayName)")
@@ -741,6 +830,8 @@ struct GuestsTab: View {
                     Image(systemName: "checklist")
                         .font(.title3)
                         .foregroundStyle(Color.gatherSecondaryText)
+                        .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Select guests")
 
@@ -752,6 +843,8 @@ struct GuestsTab: View {
                     Image(systemName: "paperplane")
                         .font(.title3)
                         .foregroundStyle(Color.accentPurpleFallback)
+                        .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Send invites")
 
@@ -767,17 +860,31 @@ struct GuestsTab: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.title3)
                         .foregroundStyle(Color.gatherSecondaryText)
+                        .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("More guest actions")
             }
 
-            // Add button
+            // Add button — the primary action, so it gets a labeled pill
+            // instead of a fifth bare icon.
             Button {
+                HapticService.buttonTap()
                 showAddGuest = true
             } label: {
-                Image(systemName: "person.badge.plus")
-                    .font(.title3)
-                    .foregroundStyle(Color.accentPurpleFallback)
+                HStack(spacing: 6) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                    Text("Add")
+                        .gatherRowTitle()
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, Spacing.md)
+                .frame(minHeight: Layout.minTouchTarget)
+                .background(LinearGradient.gatherAccentGradient)
+                .clipShape(Capsule())
+                .contentShape(Capsule())
             }
             .accessibilityLabel("Add guest")
         }
@@ -825,9 +932,11 @@ struct GuestsTab: View {
                 GatherEmptyState(
                     icon: "person.2",
                     title: "No Guests Yet",
-                    message: "Add your first guest to start building the list.",
-                    actionTitle: "Add Guest",
-                    action: { showAddGuest = true }
+                    message: isHost
+                        ? "Add your first guest to start building the list."
+                        : "The host hasn't added any guests yet.",
+                    actionTitle: isHost ? "Add Guest" : nil,
+                    action: isHost ? { showAddGuest = true } : nil
                 )
             } else {
                 GatherEmptyState(
@@ -840,6 +949,7 @@ struct GuestsTab: View {
                             searchText = ""
                             filterStatus = .all
                             showWaitlistedOnly = false
+                            showMaybeOnly = false
                         }
                         HapticService.buttonTap()
                     }
@@ -897,9 +1007,9 @@ struct GuestsTab: View {
         case .pending:
             return event.guests.filter { $0.status == .pending }.count
         case .sent:
-            // Guests who have been sent invites but not responded
-            let ids = sentGuestIds
-            return event.guests.filter { ids.contains($0.id) }.count
+            // Guests who have been sent invites but not responded — same
+            // predicate as pendingInvitedGuests, so responders don't count twice.
+            return pendingInvitedGuests.count
         case .confirmed:
             return event.guests.filter { $0.status == .attending }.count
         case .declined:
@@ -922,6 +1032,8 @@ struct GuestsTab: View {
         // Status filter
         if showWaitlistedOnly {
             guests = guests.filter { $0.status == .waitlisted }
+        } else if showMaybeOnly {
+            guests = guests.filter { $0.status == .maybe }
         } else {
             switch filterStatus {
             case .all:
@@ -929,8 +1041,8 @@ struct GuestsTab: View {
             case .pending:
                 guests = guests.filter { $0.status == .pending }
             case .sent:
-                let ids = sentGuestIds
-                guests = guests.filter { ids.contains($0.id) }
+                // Invited but not yet responded (mirrors countForFilter)
+                guests = guests.filter { $0.status == .pending && $0.inviteSentAt != nil }
             case .confirmed:
                 guests = guests.filter { $0.status == .attending }
             case .declined:
@@ -1023,6 +1135,53 @@ struct GuestsTab: View {
     private func sendInvite(to guest: Guest) {
         selectedGuests = [guest.id]
         showSendInvites = true
+    }
+
+    // MARK: - Bulk Actions
+
+    /// Apply an RSVP status to every selected guest in one pass. Mirrors
+    /// applyStatus (non-pending statuses stamp respondedAt) with a single
+    /// save and haptic for the whole batch. Selection stays active so the
+    /// host can follow up (e.g. send invites to the same group).
+    private func bulkApplyStatus(_ status: RSVPStatus) {
+        let targets = event.guests.filter { selectedGuests.contains($0.id) }
+        guard !targets.isEmpty else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            for guest in targets where guest.status != status {
+                guest.status = status
+                if status != .pending {
+                    guest.respondedAt = Date()
+                }
+            }
+        }
+        modelContext.safeSave()
+        HapticService.success()
+    }
+
+    /// Remove every selected guest (after the confirmation alert). Mirrors
+    /// removeGuest — deletes function invites and cloud RSVPs too — with a
+    /// single save, then exits selection mode.
+    private func bulkRemoveSelected() {
+        let targets = event.guests.filter { selectedGuests.contains($0.id) }
+        guard !targets.isEmpty else { return }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            for guest in targets {
+                event.guests.removeAll { $0.id == guest.id }
+                for function in event.functions {
+                    let orphanedInvites = function.invites.filter { $0.guestId == guest.id }
+                    for invite in orphanedInvites {
+                        modelContext.delete(invite)
+                    }
+                    function.invites.removeAll { $0.guestId == guest.id }
+                }
+                FirestoreService.shared.deleteRSVP(eventId: event.id, guestId: guest.id)
+                modelContext.delete(guest)
+            }
+            isSelectionMode = false
+            selectedGuests.removeAll()
+        }
+        modelContext.safeSave()
+        HapticService.success()
     }
 
     private func removeGuest(_ guest: Guest) {
@@ -1128,7 +1287,8 @@ struct GuestsTab: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(event.attendingCount) Going")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(GatherFont.headline)
+                        .fontWeight(.bold)
                         .foregroundStyle(Color.gatherPrimaryText)
                         .accessibilityAddTraits(.isHeader)
                     if event.maybeCount > 0 {
@@ -1329,6 +1489,57 @@ struct WaitlistPill: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
         .accessibilityLabel("Waitlist filter, \(count) guests")
         .accessibilityHint(isSelected ? "Double tap to clear filter" : "Double tap to show waitlisted guests")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+}
+
+// MARK: - Maybe Pill
+
+/// Maybe filter pill. Same side-filter pattern as WaitlistPill — the
+/// GuestFilter enum is switched exhaustively in GuestFilterBar and can't
+/// gain a case here.
+struct MaybePill: View {
+    let count: Int
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: "questionmark.circle")
+                    .font(.caption)
+                Text("Maybe")
+                    .font(GatherFont.caption)
+                    .fontWeight(isSelected ? .semibold : .regular)
+                Text("\(count)")
+                    .font(GatherFont.caption)
+                    .fontWeight(.bold)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(isSelected ? .white.opacity(0.3) : Color.rsvpMaybeFallback.opacity(0.2))
+                    .clipShape(Capsule())
+                    .contentTransition(.numericText())
+            }
+            .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, Spacing.xs)
+            .background(isSelected ? Color.rsvpMaybeFallback : Color.gatherElevated)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().strokeBorder(
+                    isSelected ? Color.rsvpMaybeFallback : Color.gatherSeparator.opacity(0.5),
+                    lineWidth: isSelected ? 1.5 : 1
+                )
+            )
+            .shadow(color: isSelected ? Color.rsvpMaybeFallback.opacity(0.35) : .clear, radius: 5, y: 2)
+            // Keep the pill visually compact but give it a full 44pt tap target.
+            .frame(minHeight: Layout.minTouchTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .accessibilityLabel("Maybe filter, \(count) guests")
+        .accessibilityHint(isSelected ? "Double tap to clear filter" : "Double tap to show guests who answered maybe")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
@@ -1572,15 +1783,34 @@ struct ImprovedGuestCard: View {
                                 .font(.system(size: 8, weight: .bold))
                                 .foregroundStyle(Color.gatherSecondaryText)
                         }
+                        .frame(minHeight: Layout.minTouchTarget)
                         .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Change RSVP for \(guest.name), currently \(guest.status.displayName)")
                 } else {
                     StatusBadge(status: guest.status)
                 }
+
+                // Visible overflow menu — the same quick actions the
+                // long-press context menu offers, but discoverable.
+                if hasQuickActions {
+                    Menu {
+                        quickActionMenuItems
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.callout)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.gatherSecondaryText)
+                            .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Actions for \(guest.name)")
+                }
             }
         }
-        .padding(Spacing.sm)
+        .padding(.vertical, Spacing.sm)
+        .padding(.leading, Spacing.sm)
+        .padding(.trailing, hasQuickActions ? Spacing.xxs : Spacing.sm)
     }
 
     private var functionStatusRow: some View {

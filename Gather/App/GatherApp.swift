@@ -90,8 +90,8 @@ struct GatherApp: App {
 
     // MARK: - Body
 
-    // Dark is the signature look of the 2026 redesign; new installs start dark.
-    @AppStorage("colorScheme") private var colorSchemeSetting = "dark"
+    // New installs start in light mode; dark remains available in Settings.
+    @AppStorage("colorScheme") private var colorSchemeSetting = "light"
 
     private var preferredColorScheme: ColorScheme? {
         switch colorSchemeSetting {

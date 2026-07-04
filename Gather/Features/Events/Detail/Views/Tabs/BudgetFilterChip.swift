@@ -17,6 +17,9 @@ struct BudgetFilterChip: View {
                 .padding(.vertical, Spacing.xs)
                 .background(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryBackground)
                 .clipShape(Capsule())
+                // A11Y: keep the capsule compact but give the chip a 44pt hit area.
+                .frame(minHeight: Layout.minTouchTarget)
+                .contentShape(Rectangle())
         }
     }
 }

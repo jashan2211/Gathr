@@ -9,6 +9,9 @@ struct ExpenseDetailSheet: View {
     @Bindable var expense: Expense
     let functions: [EventFunction]
     var category: BudgetCategory?
+    /// When true the sheet opens straight into the record-payment form,
+    /// so a "Partial" entry point lands on the flow it promises.
+    var startInRecordPayment: Bool
     var onDelete: () -> Void
 
     @State private var showDeleteConfirm = false
@@ -32,11 +35,13 @@ struct ExpenseDetailSheet: View {
         expense: Expense,
         functions: [EventFunction],
         category: BudgetCategory? = nil,
+        startInRecordPayment: Bool = false,
         onDelete: @escaping () -> Void
     ) {
         self.expense = expense
         self.functions = functions
         self.category = category
+        self.startInRecordPayment = startInRecordPayment
         self.onDelete = onDelete
     }
 
@@ -238,6 +243,11 @@ struct ExpenseDetailSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.gatherBackground)
+            .onAppear {
+                if startInRecordPayment, expense.amountRemaining > 0 {
+                    startRecordPayment()
+                }
+            }
             .onChange(of: expense.amount) { _, _ in
                 // Keep legacy isPaid/paidDate flags consistent when the amount
                 // is edited (e.g. lowered below what's already been paid).

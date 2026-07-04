@@ -1,17 +1,9 @@
 import SwiftUI
 
-// MARK: - Deep Link Limitation
-// NOTE: The `gather://` custom URL scheme only works for users who have the Gather app installed.
-// Recipients without the app will see a non-functional link. The share text includes event details
-// (title, date, location) so it remains useful even without the app.
-//
-// TODO: Implement Universal Links (Apple App Site Association) with a web fallback page
-// hosted at e.g. https://gather.app/event/<id>. This requires:
-//   1. A web server hosting an `apple-app-site-association` file
-//   2. Associated Domains entitlement configured in Xcode
-//   3. A fallback web page that displays event info for non-app users
-// Once Universal Links are in place, replace the `gather://` scheme with `https://gather.app/event/`
-// URLs so links work for everyone.
+// Sharing uses the universal invite link from InviteService — it opens the
+// app when installed and the hosted web RSVP page otherwise, so the link is
+// useful for every recipient. The share text also includes event details
+// (title, date, location) so the message stands on its own.
 
 struct ShareSheet: View {
     let event: Event
@@ -203,7 +195,12 @@ struct ShareSheet: View {
     }
 
     private func shareViaSystem() {
-        let items: [Any] = [shareText]
+        // Pass the URL as a first-class item so link-preferring targets
+        // (Messages previews, Notes, Reminders) pick it up directly.
+        var items: [Any] = [shareText]
+        if let url = URL(string: shareURL) {
+            items.append(url)
+        }
         let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
 
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,

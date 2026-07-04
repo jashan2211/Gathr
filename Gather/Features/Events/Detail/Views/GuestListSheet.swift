@@ -110,9 +110,9 @@ struct GuestListSheet: View {
         if !searchText.isEmpty {
             return "No guests match your search"
         } else if let filter = selectedFilter {
-            return "No guests with status: \(filter.displayName)"
+            return "No guests marked '\(filter.displayName)' yet"
         } else {
-            return "Invite some friends!"
+            return "Guests you add will appear here"
         }
     }
 
@@ -147,6 +147,16 @@ struct FilterChip: View {
     var color: Color = .accentPurpleFallback
     let action: () -> Void
 
+    /// White fails WCAG contrast (~2.2:1) on the amber "Maybe" chip — use
+    /// dark text on light status colors instead.
+    private var selectedForeground: Color {
+        color == .gatherWarning ? Color.black.opacity(0.85) : .white
+    }
+
+    private var selectedBadgeBackground: Color {
+        color == .gatherWarning ? Color.black.opacity(0.12) : Color.white.opacity(0.25)
+    }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.xs) {
@@ -159,18 +169,22 @@ struct FilterChip: View {
                     .padding(.horizontal, Spacing.xs)
                     .padding(.vertical, 2)
                     .background(
-                        isSelected ? .white.opacity(0.25) : Color.gatherTertiaryBackground
+                        isSelected ? selectedBadgeBackground : Color.gatherTertiaryBackground
                     )
                     .clipShape(Capsule())
             }
-            .foregroundStyle(isSelected ? .white : Color.gatherSecondaryText)
+            .foregroundStyle(isSelected ? selectedForeground : Color.gatherSecondaryText)
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, Spacing.sm)
             .background(
                 isSelected ? color : Color.gatherSecondaryBackground
             )
             .clipShape(Capsule())
+            // Compact capsule visual, full 44pt hit area.
+            .frame(minHeight: Layout.minTouchTarget)
+            .contentShape(Rectangle())
         }
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 
@@ -223,12 +237,22 @@ struct GuestRow: View {
 
             Spacer()
 
-            // Status indicator
-            Image(systemName: guest.status.icon)
-                .font(.title3)
-                .foregroundStyle(Color.forRSVPStatus(guest.status))
+            // Status indicator — icon plus a text label so status isn't
+            // conveyed by color/shape alone.
+            VStack(spacing: 2) {
+                Image(systemName: guest.status.icon)
+                    .font(.title3)
+                    .foregroundStyle(Color.forRSVPStatus(guest.status))
+                Text(guest.status.displayName)
+                    .font(GatherFont.caption2)
+                    .foregroundStyle(Color.gatherSecondaryText)
+            }
         }
         .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(guest.name), \(guest.status.displayName)\(guest.plusOneCount > 0 ? ", plus \(guest.plusOneCount)" : "")"
+        )
     }
 }
 

@@ -44,6 +44,9 @@ struct CreateEventView: View {
     @State private var step: CreateStep = .typeAndTitle
     @State private var showDiscardAlert = false
     @State private var showCoverDetails = false
+    /// Briefly names the applied template so the tap visibly did something.
+    @State private var appliedTemplateName: String?
+    @FocusState private var titleFocused: Bool
 
     // Optional: pre-fill from template
     var template: EventTemplate? = nil
@@ -51,25 +54,33 @@ struct CreateEventView: View {
     // MARK: - Steps
 
     enum CreateStep: Int, CaseIterable {
-        case typeAndTitle, whenAndWhere, features, settings
+        // Features used to be a step of their own — one grid card the common
+        // path just tapped Continue through. It now lives at the top of the
+        // final step, so the wizard is 3 steps instead of 4.
+        case typeAndTitle, whenAndWhere, settings
 
         var title: String {
             switch self {
             case .typeAndTitle: return "Type & Title"
             case .whenAndWhere: return "When & Where"
-            case .features: return "Features"
-            case .settings: return "Privacy & Settings"
+            case .settings: return "Features & Settings"
             }
         }
     }
 
     /// Whether the user has entered anything worth confirming before discard.
     private var hasInput: Bool {
-        !title.trimmingCharacters(in: .whitespaces).isEmpty ||
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !description.isEmpty ||
         !locationName.isEmpty ||
         heroImage != nil ||
         selectedCategory != .custom
+    }
+
+    /// Drafts only need a name — everything else can be filled in later, which
+    /// is the whole point of a draft.
+    private var canSaveDraft: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -116,10 +127,17 @@ struct CreateEventView: View {
                 }
             }
             .confirmationDialog("Discard Event?", isPresented: $showDiscardAlert) {
+                if canSaveDraft {
+                    Button("Save as Draft") { createEvent(asDraft: true) }
+                }
                 Button("Discard", role: .destructive) { dismiss() }
                 Button("Keep Editing", role: .cancel) {}
             } message: {
-                Text("You've started creating an event. Your changes won't be saved.")
+                Text(
+                    canSaveDraft
+                        ? "Save your progress as a draft, or discard it."
+                        : "You've started creating an event. Your changes won't be saved."
+                )
             }
         }
     }
@@ -145,7 +163,7 @@ struct CreateEventView: View {
                     .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
                 Text(step.title)
-                    .font(.system(size: 24, weight: .bold, design: .serif))
+                    .font(.system(.title2, design: .serif, weight: .bold))
                     .foregroundStyle(Color.gatherPrimaryText)
             }
         }
@@ -167,6 +185,8 @@ struct CreateEventView: View {
             VStack(spacing: Spacing.md) {
                 if showTemplates && template == nil {
                     templateSection
+                } else if let appliedTemplateName {
+                    templateAppliedBanner(appliedTemplateName)
                 }
 
                 EventCategorySelector(
@@ -207,16 +227,10 @@ struct CreateEventView: View {
             .padding(.top, Spacing.md)
             .padding(.bottom, Spacing.xl)
 
-        case .features:
-            VStack(spacing: Spacing.lg) {
-                EventFeaturesSection(enabledFeatures: $enabledFeatures)
-            }
-            .padding(.horizontal, Layout.horizontalPadding)
-            .padding(.top, Spacing.md)
-            .padding(.bottom, Spacing.xl)
-
         case .settings:
             VStack(spacing: Spacing.lg) {
+                EventFeaturesSection(enabledFeatures: $enabledFeatures)
+
                 EventSettingsSection(
                     privacy: $privacy,
                     guestListVisibility: $guestListVisibility,
@@ -242,16 +256,25 @@ struct CreateEventView: View {
 
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("EVENT NAME")
-                    .font(.system(size: 11, weight: .bold))
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
-                    .tracking(0.5)
 
-                TextField("Give your event a vibe...", text: $title, axis: .vertical)
-                    .font(.system(size: 18, weight: .semibold))
+                TextField("Give your event a vibe...", text: $title)
+                    .font(.system(.body, weight: .semibold))
                     .foregroundStyle(Color.gatherPrimaryText)
-                    .lineLimit(1...2)
+                    .focused($titleFocused)
+                    .submitLabel(.done)
+                    .onSubmit { titleFocused = false }
                     .padding(Spacing.md)
-                    .eventFormInputSurface(isActive: !title.isEmpty)
+                    .eventFormInputSurface(isActive: !title.isEmpty, isError: titleFieldHasError)
+                    // Event names are single-line everywhere they render, so
+                    // strip pasted newlines and enforce the 100-char limit.
+                    .onChange(of: title) { _, newValue in
+                        let cleaned = String(
+                            newValue.replacingOccurrences(of: "\n", with: " ").prefix(100)
+                        )
+                        if cleaned != newValue { title = cleaned }
+                    }
 
                 HStack {
                     Spacer()
@@ -262,6 +285,12 @@ struct CreateEventView: View {
             }
         }
         .eventFormCard()
+    }
+
+    /// The name field only has content that fails validation (e.g. whitespace
+    /// only) — pristine emptiness stays neutral guidance, not an error.
+    private var titleFieldHasError: Bool {
+        !title.isEmpty && hint(for: .typeAndTitle) != nil
     }
 
     // MARK: - Optional Cover & Details
@@ -277,7 +306,7 @@ struct CreateEventView: View {
             } label: {
                 HStack(spacing: Spacing.sm) {
                     Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(.callout, weight: .semibold))
                         .foregroundStyle(Color.forCategory(selectedCategory))
                         .frame(width: 40, height: 40)
                         .background(Color.gatherElevated)
@@ -285,17 +314,17 @@ struct CreateEventView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Add a cover & details")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(.callout, weight: .semibold))
                             .foregroundStyle(Color.gatherPrimaryText)
                         Text(coverDetailsSummary)
-                            .font(.system(size: 13))
+                            .font(.system(.footnote))
                             .foregroundStyle(Color.gatherSecondaryText)
                     }
 
                     Spacer()
 
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Color.gatherSecondaryText)
                         .rotationEffect(.degrees(showCoverDetails ? 180 : 0))
                 }
@@ -350,7 +379,7 @@ struct CreateEventView: View {
                 }
 
                 Text(heroImage == nil ? "Add a cover photo" : "Change cover photo")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(.callout, weight: .medium))
                     .foregroundStyle(Color.gatherPrimaryText)
 
                 Spacer()
@@ -377,16 +406,15 @@ struct CreateEventView: View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
             HStack {
                 Text("DESCRIPTION")
-                    .font(.system(size: 11, weight: .bold))
+                    .gatherEyebrow()
                     .foregroundStyle(Color.gatherSecondaryText)
-                    .tracking(0.5)
                 Text("optional")
                     .font(.caption2)
                     .foregroundStyle(Color.gatherTertiaryText)
             }
 
             TextField("Tell people what to expect...", text: $description, axis: .vertical)
-                .font(.system(size: 16))
+                .font(.system(.callout))
                 .foregroundStyle(Color.gatherPrimaryText)
                 .lineLimit(3...6)
                 .padding(Spacing.md)
@@ -405,9 +433,12 @@ struct CreateEventView: View {
 
                 Button {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { showTemplates = false }
+                    // The user is ready to name the event — focus the only
+                    // required field so they can type immediately.
+                    titleFocused = true
                 } label: {
                     Text("Skip")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(Color.gatherSecondaryText)
                         .padding(.horizontal, Spacing.sm)
                         .padding(.vertical, Spacing.xs)
@@ -440,7 +471,7 @@ struct CreateEventView: View {
                                 }
 
                                 Text(tmpl.name)
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(.footnote, weight: .semibold))
                                     .foregroundStyle(Color.gatherPrimaryText)
                                     .lineLimit(1)
                             }
@@ -471,9 +502,34 @@ struct CreateEventView: View {
             enabledFeatures = tmpl.suggestedFeatures.filter { $0.isAvailable }
             description = tmpl.suggestedDescription
             privacy = tmpl.suggestedPrivacy
+            // Make the change visible and the step immediately completable: a
+            // starter title the user can overwrite, plus a confirmation banner.
+            if title.trimmingCharacters(in: .whitespaces).isEmpty {
+                title = tmpl.name
+            }
+            appliedTemplateName = tmpl.name
             showTemplates = false
         }
         HapticService.mediumImpact()
+        titleFocused = true
+    }
+
+    /// Small confirmation shown where the template row was, so applying one
+    /// doesn't read as "nothing happened" (description + privacy are set out
+    /// of view).
+    private func templateAppliedBanner(_ name: String) -> some View {
+        HStack(spacing: Spacing.xs) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Color.rsvpYesFallback)
+            Text("\(name) template applied — description & privacy prefilled")
+                .gatherMetaText()
+                .foregroundStyle(Color.gatherSecondaryText)
+            Spacer(minLength: 0)
+        }
+        .padding(Spacing.sm)
+        .background(Color.rsvpYesFallback.opacity(0.08), in: RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+        .transition(.opacity)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Navigation Bar
@@ -621,8 +677,6 @@ struct CreateEventView: View {
             if startDate <= Date().addingTimeInterval(-300) { return "Choose a start date in the future" }
             if hasEndDate, let end = endDate, end <= startDate { return "End time must be after the start time" }
             if isVirtual, !virtualURL.isEmpty, URL(string: virtualURL) == nil { return "Enter a valid meeting link" }
-            return nil
-        case .features:
             return nil
         case .settings:
             if hasCapacity {

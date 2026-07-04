@@ -20,6 +20,12 @@ struct QuickAddExpenseSheet: View {
     @State private var selectedCategoryId: UUID?
     @State private var selectedFunctionId: UUID?
 
+    init(budget: Budget, functions: [EventFunction], preselectedCategoryId: UUID? = nil) {
+        self.budget = budget
+        self.functions = functions
+        _selectedCategoryId = State(initialValue: preselectedCategoryId)
+    }
+
     var body: some View {
         NavigationStack {
             Form {

@@ -483,6 +483,7 @@ enum EventsScope: String, CaseIterable, Identifiable {
 
 struct CalendarView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Event.startDate) private var allEvents: [Event]
@@ -497,6 +498,13 @@ struct CalendarView: View {
         myId != nil && e.guests.contains { $0.userId == myId }
     }
     private func mine(_ e: Event) -> Bool { hosting(e) || attending(e) }
+
+    /// The viewer's own RSVP status for an event — drives the row tag so a
+    /// "Maybe" or declined reply isn't mislabeled "Going".
+    private func myStatus(_ e: Event) -> RSVPStatus? {
+        guard let myId else { return nil }
+        return e.guests.first { $0.userId == myId }?.status
+    }
 
     /// Events for the active scope.
     private var scopedEvents: [Event] {
@@ -515,6 +523,9 @@ struct CalendarView: View {
     }
 
     /// Month-grouped for display. Past reads newest-first; the others oldest-first.
+    /// In Future, each month lists the viewer's own commitments before public
+    /// events from Discover (date order preserved within each half), so real
+    /// plans aren't interleaved with discover noise.
     private var grouped: [(title: String, key: Int, events: [Event])] {
         let cal = Calendar.current
         let descending = scope == .past
@@ -524,9 +535,18 @@ struct CalendarView: View {
         }
         return groups
             .sorted { descending ? $0.key > $1.key : $0.key < $1.key }
-            .map { (title: monthTitle($0.value.first?.startDate ?? Date()),
-                    key: $0.key,
-                    events: $0.value.sorted { descending ? $0.startDate > $1.startDate : $0.startDate < $1.startDate }) }
+            .map { group in
+                (title: monthTitle(group.value.first?.startDate ?? Date()),
+                 key: group.key,
+                 events: group.value.sorted { lhs, rhs in
+                     if scope == .future {
+                         let lhsRank = mine(lhs) ? 0 : 1
+                         let rhsRank = mine(rhs) ? 0 : 1
+                         if lhsRank != rhsRank { return lhsRank < rhsRank }
+                     }
+                     return descending ? lhs.startDate > rhs.startDate : lhs.startDate < rhs.startDate
+                 })
+            }
     }
 
     private func monthTitle(_ date: Date) -> String {
@@ -554,7 +574,7 @@ struct CalendarView: View {
                                         .gatherEyebrow()
                                         .foregroundStyle(Color.accentPurpleFallback)
                                     Rectangle()
-                                        .fill(Color.white.opacity(0.06))
+                                        .fill(Color.gatherSeparator.opacity(0.5))
                                         .frame(height: 1)
                                 }
                                 VStack(spacing: Spacing.xs) {
@@ -562,10 +582,17 @@ struct CalendarView: View {
                                         Button { selectedEvent = event } label: {
                                             HomeUpcomingRow(event: event,
                                                             hosting: hosting(event),
-                                                            attending: attending(event))
+                                                            attending: attending(event),
+                                                            rsvpStatus: myStatus(event),
+                                                            stubShowsWeekday: true)
                                         }
                                         .buttonStyle(.plain)
                                         .contextMenu {
+                                            Button {
+                                                selectedEvent = event
+                                            } label: {
+                                                Label("View Details", systemImage: "arrow.up.right")
+                                            }
                                             Button(role: .destructive) {
                                                 pendingDelete = event
                                             } label: {
@@ -590,8 +617,8 @@ struct CalendarView: View {
             }
             .background(Color.gatherCanvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .refreshable { await loadPublicEvents() }
-            .task { await loadPublicEvents() }
+            .refreshable { await refreshAll() }
+            .task { await refreshAll() }
             .navigationDestination(item: $selectedEvent) { EventDetailView(event: $0) }
             .confirmationDialog(
                 pendingDelete.map { hosting($0) ? "Delete event?" : "Remove event?" } ?? "",
@@ -636,6 +663,14 @@ struct CalendarView: View {
         await FirestoreService.shared.fetchPublicEvents(into: modelContext)
     }
 
+    /// Pull-to-refresh should surface everything new — a fresh invitation or a
+    /// host's edit, not just the public Discover feed (matches HomeView).
+    private func refreshAll() async {
+        await FirestoreService.shared.mergeRemoteEvents(into: modelContext)
+        await FirestoreService.shared.fetchInvitedEvents(into: modelContext)
+        await loadPublicEvents()
+    }
+
     private var scopePicker: some View {
         HStack(spacing: 4) {
             ForEach(EventsScope.allCases) { option in
@@ -644,10 +679,10 @@ struct CalendarView: View {
                     HapticService.selection()
                 } label: {
                     Text(option.rawValue)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(.footnote, weight: .semibold))
                         .foregroundStyle(scope == option ? Color.gatherPrimaryText : Color.gatherSecondaryText)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
+                        .padding(.vertical, 11)
                         .background {
                             if scope == option {
                                 Capsule()
@@ -658,6 +693,8 @@ struct CalendarView: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(option.rawValue)
+                .accessibilityAddTraits(scope == option ? [.isSelected] : [])
             }
         }
         .padding(4)
@@ -665,8 +702,14 @@ struct CalendarView: View {
     }
 
     private var emptyState: some View {
-        GatherEmptyState(icon: emptyIcon, title: emptyTitle, message: emptyMessage)
-            .padding(.top, Spacing.xl)
+        GatherEmptyState(
+            icon: emptyIcon,
+            title: emptyTitle,
+            message: emptyMessage,
+            actionTitle: scope == .past ? nil : "Explore events",
+            action: scope == .past ? nil : { appState.selectedTab = .explore }
+        )
+        .padding(.top, Spacing.xl)
     }
 
     private var emptyIcon: String {

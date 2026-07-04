@@ -140,9 +140,13 @@ struct BudgetTab: View {
             }
         }
         .sheet(item: $addExpenseCategory) { category in
-            AddExpenseSheet(category: category, functions: event.functions)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+            // Same form as the quick-action "Add Expense", pre-seeded with the
+            // tapped category, so both entry points feel like one feature.
+            if let budget = eventBudget {
+                QuickAddExpenseSheet(budget: budget, functions: event.functions, preselectedCategoryId: category.id)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
         }
         .sheet(isPresented: $showEditBudget) {
             if let budget = eventBudget {
@@ -158,10 +162,16 @@ struct BudgetTab: View {
                     .presentationDragIndicator(.visible)
             }
         }
-        .sheet(item: $editingExpense) { expense in
-            ExpenseDetailSheet(expense: expense, functions: event.functions, category: owningCategory(of: expense), onDelete: {
-                deleteExpense(expense)
-            })
+        .sheet(item: $editingExpense, onDismiss: { openExpenseInPayment = false }) { expense in
+            ExpenseDetailSheet(
+                expense: expense,
+                functions: event.functions,
+                category: owningCategory(of: expense),
+                startInRecordPayment: openExpenseInPayment,
+                onDelete: {
+                    deleteExpense(expense)
+                }
+            )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -184,6 +194,15 @@ struct BudgetTab: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $selectedPayer) { payer in
+            // Payment history behind a Who Paid What / Settle Up row, so an
+            // "owes $X" state is explainable payment by payment.
+            if let budget = eventBudget {
+                PayerDetailSheet(budget: budget, payerName: payer.name)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
         .alert("Record Payment", isPresented: $showSplitPaymentAlert, presenting: recordingSplit) { split in
             TextField("Amount", text: $splitPaymentText)
                 .keyboardType(.decimalPad)
@@ -193,6 +212,34 @@ struct BudgetTab: View {
             Button("Cancel", role: .cancel) {}
         } message: { split in
             Text("\(split.name) still owes \(split.owedAmount.asCurrency).")
+        }
+        .alert("Edit Share", isPresented: $showEditSplitAlert, presenting: editingSplit) { split in
+            TextField("Share amount", text: $editSplitShareText)
+                .keyboardType(.decimalPad)
+            Button("Save") {
+                saveSplitShare(split)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { split in
+            Text("Update \(split.name)'s share of the costs.")
+        }
+        .alert("Delete Split?", isPresented: $showDeleteSplitAlert, presenting: deletingSplit) { split in
+            Button("Delete", role: .destructive) {
+                deleteSplit(split)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { split in
+            Text("Removes \(split.name)'s \(split.shareAmount.asCurrency) share\(split.paidAmount > 0 ? " and their recorded payments" : ""). This cannot be undone.")
+        }
+        .confirmationDialog("Mark as paid?", isPresented: $showPayConfirm, titleVisibility: .visible, presenting: payingExpense) { expense in
+            Button("Pay \(expense.amountRemaining.asCurrency)") {
+                if let budget = eventBudget {
+                    markAsPaid(expense, in: budget)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { expense in
+            Text("Records the remaining \(expense.amountRemaining.asCurrency) on \u{201C}\(expense.name)\u{201D} as paid.")
         }
         .task {
             // First open on a new device: pull the budget the host built elsewhere.
@@ -390,16 +437,25 @@ struct BudgetTab: View {
                 }
                 .frame(height: 8)
 
-                HStack {
-                    Label("\(percentUsed)% of budget used", systemImage: isOver ? "exclamationmark.triangle.fill" : "chart.pie.fill")
+                if budget.totalBudget > 0 {
+                    HStack {
+                        Label("\(percentUsed)% of budget used", systemImage: isOver ? "exclamationmark.triangle.fill" : "chart.pie.fill")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(accent)
+                        Spacer()
+                        Text(isOver ? "\(abs(remainingAmount).asCurrency) over" : "\(remainingAmount.asCurrency) left")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(isOver ? Color.rsvpNoFallback : Color.rsvpYesFallback)
+                    }
+                } else {
+                    // No amount set yet (e.g. Edit sheet was dismissed) —
+                    // nudge toward Edit instead of showing fabricated figures.
+                    Label("Tap Edit to set your total budget", systemImage: "slider.horizontal.3")
                         .font(.caption2)
                         .fontWeight(.semibold)
-                        .foregroundStyle(accent)
-                    Spacer()
-                    Text(isOver ? "\(abs(remainingAmount).asCurrency) over" : "\(remainingAmount.asCurrency) left")
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(isOver ? Color.rsvpNoFallback : Color.rsvpYesFallback)
+                        .foregroundStyle(Color.accentPurpleFallback)
                 }
             }
         }
@@ -434,7 +490,8 @@ struct BudgetTab: View {
 
             VStack(spacing: 0) {
                 Text("\(percentUsed)%")
-                    .font(.system(size: 26, weight: .heavy))
+                    // A11Y-005: relative style so the ring center scales
+                    .font(.system(.title2, weight: .heavy))
                     .foregroundStyle(accent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -449,11 +506,11 @@ struct BudgetTab: View {
     private func summaryMetric(label: String, value: String, color: Color, emphasized: Bool) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label.uppercased())
-                .font(.system(size: 10, weight: .heavy))
-                .tracking(0.5)
+                .gatherEyebrow()
                 .foregroundStyle(Color.gatherTertiaryText)
             Text(value)
-                .font(emphasized ? .system(size: 24, weight: .heavy) : .system(size: 17, weight: .bold))
+                // A11Y-005: relative styles so key figures scale
+                .font(emphasized ? .system(.title2, weight: .heavy) : .system(.headline, weight: .bold))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -872,8 +929,7 @@ struct BudgetTab: View {
                 HStack(alignment: .center, spacing: Spacing.sm) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("TOTAL PAID")
-                            .font(.system(size: 10, weight: .heavy))
-                            .tracking(0.5)
+                            .gatherEyebrow()
                             .foregroundStyle(Color.gatherTertiaryText)
                         Text(totalPaid.asCurrency)
                             .gatherCardTitle()
@@ -888,8 +944,7 @@ struct BudgetTab: View {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("EVEN SPLIT \u{00B7} \(payers.count)")
-                            .font(.system(size: 10, weight: .heavy))
-                            .tracking(0.5)
+                            .gatherEyebrow()
                             .foregroundStyle(Color.gatherTertiaryText)
                         Text(fairShare.asCurrency)
                             .gatherCardTitle()
@@ -1172,13 +1227,15 @@ struct BudgetTab: View {
                         // A11Y-007: Section header trait
                         .accessibilityAddTraits(.isHeader)
                     Spacer()
+                    // Tinted-pill styling (amber on soft amber) keeps WCAG
+                    // contrast where white-on-amber failed.
                     Text("\(upcoming.count)")
                         .font(GatherFont.caption)
                         .fontWeight(.bold)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.rsvpMaybeFallback)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Color.rsvpMaybeFallback)
+                        .background(Color.rsvpMaybeFallback.opacity(0.15))
                         .clipShape(Capsule())
                 }
 
@@ -1274,6 +1331,9 @@ struct BudgetTab: View {
 
                 HStack(spacing: 6) {
                     Button {
+                        // Lands directly in the record-payment form — the
+                        // flow the "Partial" label promises.
+                        openExpenseInPayment = true
                         editingExpense = expense
                     } label: {
                         Text("Partial")
@@ -1281,7 +1341,8 @@ struct BudgetTab: View {
                             .fontWeight(.bold)
                             .foregroundStyle(Color.accentPurpleFallback)
                             .padding(.horizontal, 10)
-                            .padding(.vertical, Spacing.xxs)
+                            .padding(.vertical, Spacing.xs)
+                            .frame(minWidth: 60)
                             .background(Color.gatherTertiaryBackground)
                             .clipShape(Capsule())
                     }
@@ -1291,14 +1352,17 @@ struct BudgetTab: View {
                     .accessibilityLabel("Record a partial payment for \(expense.name)")
 
                     Button {
-                        markAsPaid(expense, in: budget)
+                        // Confirm before recording the full remaining balance.
+                        payingExpense = expense
+                        showPayConfirm = true
                     } label: {
                         Text("Pay")
                             .font(.caption2)
                             .fontWeight(.bold)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 10)
-                            .padding(.vertical, Spacing.xxs)
+                            .padding(.vertical, Spacing.xs)
+                            .frame(minWidth: 60)
                             .background(Color.rsvpYesFallback)
                             .clipShape(Capsule())
                     }
@@ -1576,7 +1640,8 @@ struct BudgetTab: View {
                 .foregroundStyle(Color.gatherPrimaryText)
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 9))
+                .font(.caption2)
+                .imageScale(.small)
                 .foregroundStyle(Color.gatherTertiaryText)
         }
         .padding(.vertical, 6)
@@ -1817,9 +1882,79 @@ struct BudgetTab: View {
                     .accessibilityLabel("Record a payment from \(split.name), \(split.owedAmount.asCurrency) remaining")
                 }
             }
+
+            // Visible overflow so edit/delete aren't trapped behind long-press.
+            Menu {
+                splitMenuItems(split)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.callout)
+                    .foregroundStyle(Color.gatherSecondaryText)
+                    .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Options for \(split.name)'s split")
         }
         .padding(Spacing.sm)
         .surfaceCard()
+        .contextMenu {
+            splitMenuItems(split)
+        }
+    }
+
+    /// Edit / clear / delete actions for a co-host split — shared by the
+    /// row's visible ellipsis Menu and its long-press context menu.
+    @ViewBuilder
+    private func splitMenuItems(_ split: PaymentSplit) -> some View {
+        Button {
+            HapticService.buttonTap()
+            editSplitShareText = String(format: "%.2f", split.shareAmount)
+            editingSplit = split
+            showEditSplitAlert = true
+        } label: {
+            Label("Edit Share", systemImage: "slider.horizontal.3")
+        }
+
+        if split.paidAmount > 0 {
+            Button {
+                HapticService.buttonTap()
+                split.paidAmount = 0
+                modelContext.safeSave()
+            } label: {
+                Label("Clear Recorded Payments", systemImage: "arrow.uturn.backward")
+            }
+        }
+
+        Button(role: .destructive) {
+            deletingSplit = split
+            showDeleteSplitAlert = true
+        } label: {
+            Label("Delete Split", systemImage: "trash")
+        }
+    }
+
+    private func saveSplitShare(_ split: PaymentSplit) {
+        guard let value = parseSplitPaymentAmount(editSplitShareText), value > 0 else {
+            // Invalid entry: give feedback and re-present the alert.
+            HapticService.warning()
+            DispatchQueue.main.async {
+                editingSplit = split
+                showEditSplitAlert = true
+            }
+            return
+        }
+        split.shareAmount = value
+        // Never leave more recorded than the new share allows.
+        split.paidAmount = min(split.paidAmount, value)
+        modelContext.safeSave()
+        HapticService.success()
+    }
+
+    private func deleteSplit(_ split: PaymentSplit) {
+        guard let budget = eventBudget else { return }
+        budget.splits.removeAll { $0.id == split.id }
+        modelContext.safeSave()
+        HapticService.success()
     }
 
     private func recordSplitPayment(_ split: PaymentSplit) {
@@ -1957,7 +2092,9 @@ struct BudgetTab: View {
     // MARK: - Helpers
 
     private func createBudget() {
-        let newBudget = Budget(eventId: event.id, totalBudget: 10000)
+        // Seed at 0 and immediately ask for the real amount — never show a
+        // fabricated "$10,000 total budget" the user didn't enter.
+        let newBudget = Budget(eventId: event.id, totalBudget: 0)
         let defaultCategories = BudgetCategory.createDefaultCategories(for: event.category)
         for category in defaultCategories {
             newBudget.categories.append(category)
@@ -1967,6 +2104,7 @@ struct BudgetTab: View {
         FirestoreService.shared.pushBudget(newBudget, eventId: event.id)
 
         HapticService.success()
+        showEditBudget = true
     }
 
     private func allExpenses(_ budget: Budget) -> [Expense] {
@@ -2316,6 +2454,180 @@ struct VendorDetailSheet: View {
             }
         }
         modelContext.safeSave()
+    }
+}
+
+// MARK: - Payer Detail Sheet
+
+/// One person's payment history across the whole budget — the receipts
+/// behind a Who Paid What total or a Settle Up balance.
+private struct PayerDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var budget: Budget
+    let payerName: String
+
+    /// A single recorded payment attributed to this payer, joined with the
+    /// expense it was made against.
+    private struct PayerPaymentEntry: Identifiable {
+        let id: UUID
+        let expenseName: String
+        let amount: Double
+        let date: Date
+        let method: String?
+        let note: String?
+    }
+
+    /// Payments attributed to this payer, newest first. Mirrors the
+    /// attribution rules of BudgetTab.payerTotals: a payment's own payer wins,
+    /// otherwise it falls back to the expense-level legacy `paidByName`.
+    private var entries: [PayerPaymentEntry] {
+        var result: [PayerPaymentEntry] = []
+        for category in budget.categories {
+            for expense in category.expenses {
+                for payment in expense.recordedPayments {
+                    let payer = (payment.paidByName?.isEmpty == false ? payment.paidByName : nil)
+                        ?? (expense.paidByName?.isEmpty == false ? expense.paidByName : nil)
+                    guard payer == payerName else { continue }
+                    result.append(PayerPaymentEntry(
+                        id: payment.id,
+                        expenseName: expense.name,
+                        amount: payment.amount,
+                        date: payment.date,
+                        method: payment.method,
+                        note: payment.note
+                    ))
+                }
+            }
+        }
+        return result.sorted { $0.date > $1.date }
+    }
+
+    private var totalPaid: Double {
+        entries.reduce(0) { $0 + $1.amount }
+    }
+
+    private var displayName: String {
+        payerName.isEmpty ? "Unknown" : payerName
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: Spacing.lg) {
+                    payerHeader
+
+                    if entries.isEmpty {
+                        GatherEmptyState(
+                            icon: "tray",
+                            title: "No payments",
+                            message: "Payments recorded for \(displayName) will show up here."
+                        )
+                        .padding(.vertical, Spacing.xxl)
+                    } else {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            Text("Payments")
+                                .font(GatherFont.headline)
+                                .foregroundStyle(Color.gatherPrimaryText)
+                                .accessibilityAddTraits(.isHeader)
+
+                            ForEach(entries) { entry in
+                                paymentRow(entry)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical)
+                .horizontalPadding()
+                .padding(.bottom, Spacing.xl)
+            }
+            .background(Color.gatherBackground)
+            .navigationTitle(displayName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .accessibilityLabel("Close payment history")
+                }
+            }
+        }
+    }
+
+    private var payerHeader: some View {
+        VStack(spacing: Spacing.sm) {
+            Circle()
+                .fill(payerAvatarColor)
+                .frame(width: 52, height: 52)
+                .overlay {
+                    Text(displayName.prefix(1).uppercased())
+                        .font(GatherFont.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
+
+            Text(totalPaid.asCurrency)
+                .font(GatherFont.largeTitle)
+                .foregroundStyle(Color.gatherPrimaryText)
+
+            Text("paid across \(entries.count) payment\(entries.count == 1 ? "" : "s")")
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .surfaceCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(displayName) paid \(totalPaid.asCurrency) across \(entries.count) payment\(entries.count == 1 ? "" : "s")")
+        .bouncyAppear()
+    }
+
+    private func paymentRow(_ entry: PayerPaymentEntry) -> some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.callout)
+                .foregroundStyle(Color.rsvpYesFallback)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.expenseName)
+                    .font(GatherFont.callout)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.gatherPrimaryText)
+
+                HStack(spacing: 4) {
+                    Text(entry.date.formatted(date: .abbreviated, time: .omitted))
+                    if let method = entry.method, !method.isEmpty {
+                        Text("\u{00B7}")
+                        Text(method)
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(Color.gatherSecondaryText)
+
+                if let note = entry.note, !note.isEmpty {
+                    Text(note)
+                        .font(.caption2)
+                        .foregroundStyle(Color.gatherTertiaryText)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer()
+
+            Text(entry.amount.asCurrency)
+                .font(GatherFont.callout)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.gatherPrimaryText)
+        }
+        .padding(Spacing.sm)
+        .surfaceCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(entry.amount.asCurrency) toward \(entry.expenseName) on \(entry.date.formatted(date: .abbreviated, time: .omitted))\(entry.method.map { ", via \($0)" } ?? "")")
+    }
+
+    /// Same stable avatar tint the Finance tab rows use for this person.
+    private var payerAvatarColor: Color {
+        let colors: [Color] = [.purple, .blue, .green, .orange, .pink, .teal]
+        let index = payerName.stableHash % colors.count
+        return colors[index]
     }
 }
 

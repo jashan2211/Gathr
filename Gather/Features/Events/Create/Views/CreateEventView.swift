@@ -504,7 +504,7 @@ struct CreateEventView: View {
             privacy = tmpl.suggestedPrivacy
             // Make the change visible and the step immediately completable: a
             // starter title the user can overwrite, plus a confirmation banner.
-            if title.trimmingCharacters(in: .whitespaces).isEmpty {
+            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 title = tmpl.name
             }
             appliedTemplateName = tmpl.name
@@ -544,15 +544,35 @@ struct CreateEventView: View {
             .frame(height: 20)
 
             VStack(spacing: Spacing.sm) {
-                if let hint = stepHint {
-                    HStack(spacing: 6) {
-                        Image(systemName: "info.circle.fill")
-                            .font(.caption)
-                        Text(hint)
-                            .font(.system(size: 13, weight: .medium))
-                        Spacer()
+                if let issue = blockingIssue, let hintText = stepHint {
+                    // If the problem lives on an earlier step, the row is a
+                    // one-tap jump back to it; otherwise it's a plain hint.
+                    let onOtherStep = issue.step != step
+                    Button {
+                        guard onOtherStep else { return }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                            step = issue.step
+                        }
+                        HapticService.buttonTap()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: stepHintIsError ? "exclamationmark.circle.fill" : "info.circle.fill")
+                                .font(.caption)
+                            Text(hintText)
+                                .font(.system(.footnote, weight: .medium))
+                                .multilineTextAlignment(.leading)
+                            Spacer()
+                            if onOtherStep {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                            }
+                        }
+                        .foregroundStyle(stepHintIsError ? Color.warmCoral : Color.gatherSecondaryText)
+                        .contentShape(Rectangle())
                     }
-                    .foregroundStyle(Color.gatherSecondaryText)
+                    .buttonStyle(.plain)
+                    .disabled(!onOtherStep)
+                    .accessibilityHint(onOtherStep ? "Double tap to go back to the \(issue.step.title) step" : "")
                     .transition(.opacity)
                 }
 
@@ -565,7 +585,7 @@ struct CreateEventView: View {
                                 Image(systemName: "chevron.left")
                                     .font(.caption)
                                 Text("Back")
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(.system(.callout, weight: .semibold))
                             }
                             .foregroundStyle(Color.gatherPrimaryText)
                             .padding(.horizontal, Spacing.lg)
@@ -593,7 +613,7 @@ struct CreateEventView: View {
                                     .font(.callout)
                             }
                             Text(step == .settings ? "Create Event" : "Continue")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(.body, weight: .bold))
                             if step != .settings && !isSubmitting {
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
@@ -620,10 +640,12 @@ struct CreateEventView: View {
                         createEvent(asDraft: true)
                     } label: {
                         Text("Save as draft instead")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(.footnote, weight: .semibold))
                             .foregroundStyle(Color.accentPurpleFallback)
                     }
-                    .disabled(!isValid || isSubmitting)
+                    // Drafts only need a name — don't hold them to the full
+                    // validation the Create button requires.
+                    .disabled(!canSaveDraft || isSubmitting)
                     .padding(.top, 2)
                 }
             }
@@ -661,22 +683,64 @@ struct CreateEventView: View {
 
     // MARK: - Validation
 
-    /// The reason the current step can't be completed yet, or `nil` if it's valid.
+    /// Guidance shown when a virtual event has no link yet — neutral, not an
+    /// error, since nothing wrong has been typed.
+    private static let meetingLinkGuidance = "Paste the meeting link (you can edit it later)"
+
+    /// The first problem blocking progress, and the step it lives on. Before
+    /// the final step only the CURRENT step is checked; on the final step ALL
+    /// steps are scanned so "Create Event" is never silently disabled by an
+    /// earlier step that went invalid (e.g. the start time slipping into the
+    /// past while the user filled in later steps).
+    private var blockingIssue: (step: CreateStep, hint: String)? {
+        if step == .settings {
+            for candidate in CreateStep.allCases {
+                if let issue = hint(for: candidate) {
+                    return (candidate, issue)
+                }
+            }
+            return nil
+        }
+        if let issue = hint(for: step) {
+            return (step, issue)
+        }
+        return nil
+    }
+
+    /// The reason the wizard can't proceed yet, or `nil` if it can. Issues on
+    /// an earlier step are prefixed with that step's title.
     private var stepHint: String? {
-        hint(for: step)
+        guard let issue = blockingIssue else { return nil }
+        return issue.step == step ? issue.hint : "\(issue.step.title): \(issue.hint)"
+    }
+
+    /// Pristine guidance (nothing entered yet) stays neutral grey; real
+    /// errors — bad input, or a problem left behind on an earlier step —
+    /// render in the error color so they read as blocking, not as a tip.
+    private var stepHintIsError: Bool {
+        guard let issue = blockingIssue else { return false }
+        if issue.step != step { return true }
+        if issue.hint == Self.meetingLinkGuidance { return false }
+        switch issue.step {
+        case .typeAndTitle: return !title.isEmpty
+        case .whenAndWhere, .settings: return true
+        }
     }
 
     private func hint(for step: CreateStep) -> String? {
         switch step {
         case .typeAndTitle:
-            let trimmed = title.trimmingCharacters(in: .whitespaces)
+            let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { return "Add an event name to continue" }
             if trimmed.count > 100 { return "Event name is too long (100 characters max)" }
             return nil
         case .whenAndWhere:
             if startDate <= Date().addingTimeInterval(-300) { return "Choose a start date in the future" }
             if hasEndDate, let end = endDate, end <= startDate { return "End time must be after the start time" }
-            if isVirtual, !virtualURL.isEmpty, URL(string: virtualURL) == nil { return "Enter a valid meeting link" }
+            if isVirtual {
+                if virtualURL.isEmpty { return Self.meetingLinkGuidance }
+                if !EventFormValidation.isValidMeetingLink(virtualURL) { return "Enter a valid meeting link" }
+            }
             return nil
         case .settings:
             if hasCapacity {
@@ -705,8 +769,14 @@ struct CreateEventView: View {
 
         // Build location
         var location: EventLocation?
-        if isVirtual, !virtualURL.isEmpty {
-            location = EventLocation(name: "Virtual Event", virtualURL: URL(string: virtualURL))
+        if isVirtual {
+            // Preserve the explicit "Virtual" choice even when the link is
+            // still empty (possible via drafts) — the event stays virtual and
+            // the link can be added later in Edit.
+            location = EventLocation(
+                name: "Virtual Event",
+                virtualURL: virtualURL.isEmpty ? nil : URL(string: virtualURL)
+            )
         } else if !locationName.isEmpty {
             location = EventLocation(
                 name: locationName,
@@ -721,7 +791,7 @@ struct CreateEventView: View {
 
         // Create event
         let event = Event(
-            title: title.trimmingCharacters(in: .whitespaces),
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             eventDescription: description.isEmpty ? nil : description,
             startDate: startDate,
             endDate: hasEndDate ? endDate : nil,

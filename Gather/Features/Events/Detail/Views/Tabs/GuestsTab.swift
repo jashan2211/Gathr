@@ -507,7 +507,9 @@ struct GuestsTab: View {
                     .foregroundStyle(Color.gatherPrimaryText)
                     .contentTransition(.numericText())
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .imageScale(.small)
                     .foregroundStyle(Color.gatherTertiaryText)
             }
             .padding(.horizontal, Spacing.md)
@@ -1755,7 +1757,8 @@ struct ImprovedGuestCard: View {
                 if let invitedAgo = invitedAgoText {
                     HStack(spacing: 4) {
                         Image(systemName: "paperplane")
-                            .font(.system(size: 9))
+                            .font(.caption2)
+                            .imageScale(.small)
                         Text(invitedAgo)
                             .font(.caption2)
                     }
@@ -1780,7 +1783,9 @@ struct ImprovedGuestCard: View {
                         HStack(spacing: 2) {
                             StatusBadge(status: guest.status)
                             Image(systemName: "chevron.down")
-                                .font(.system(size: 8, weight: .bold))
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .imageScale(.small)
                                 .foregroundStyle(Color.gatherSecondaryText)
                         }
                         .frame(minHeight: Layout.minTouchTarget)
@@ -1899,7 +1904,9 @@ struct FunctionStatusChip: View {
         HStack(spacing: 2) {
             if let icon = statusIcon {
                 Image(systemName: icon)
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .imageScale(.small)
             }
             Text(abbreviation)
                 .font(.caption2)

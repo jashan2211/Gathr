@@ -64,7 +64,7 @@ struct EditEventView: View {
 
     /// Whether user has made edits compared to original event values
     private var hasUnsavedChanges: Bool {
-        title.trimmingCharacters(in: .whitespaces) != event.title ||
+        title.trimmingCharacters(in: .whitespacesAndNewlines) != event.title ||
         description != (event.eventDescription ?? "") ||
         startDate != event.startDate ||
         endDate != event.endDate ||
@@ -103,7 +103,10 @@ struct EditEventView: View {
                         EventCategorySelector(
                             selectedCategory: $selectedCategory,
                             enabledFeatures: $enabledFeatures,
-                            headerTitle: "Event Type"
+                            headerTitle: "Event Type",
+                            // Recategorizing an existing event must never wipe
+                            // the host's curated feature set.
+                            resetsFeaturesOnChange: false
                         )
                         .bouncyAppear(delay: 0.05)
 
@@ -160,6 +163,7 @@ struct EditEventView: View {
                     .padding(.top, Spacing.lg)
                 }
             }
+            .background(Color.gatherCanvas.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom) {
                 saveButtonBar
@@ -260,86 +264,114 @@ struct EditEventView: View {
     private var saveButtonBar: some View {
         VStack(spacing: 0) {
             LinearGradient(
-                colors: [Color.gatherBackground.opacity(0), Color.gatherBackground],
+                colors: [Color.gatherCanvas.opacity(0), Color.gatherCanvas],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .frame(height: 20)
 
-            HStack(spacing: Spacing.sm) {
-                // Discard changes
-                Button {
-                    if hasUnsavedChanges {
-                        showDiscardAlert = true
-                    } else {
-                        dismiss()
-                    }
-                } label: {
+            VStack(spacing: Spacing.sm) {
+                // Why Save is disabled — the invalid field can be several
+                // screens up, so say it right next to the greyed-out button.
+                if let hint = validationHint {
                     HStack(spacing: 6) {
-                        Image(systemName: "xmark")
+                        Image(systemName: "exclamationmark.circle.fill")
                             .font(.caption)
-                        Text("Cancel")
-                            .font(GatherFont.callout)
-                            .fontWeight(.semibold)
+                        Text(hint)
+                            .font(.system(.footnote, weight: .medium))
+                            .multilineTextAlignment(.leading)
+                        Spacer()
                     }
-                    .foregroundStyle(Color.gatherSecondaryText)
-                    .padding(.horizontal, Spacing.lg)
-                    .frame(height: Layout.buttonHeight)
-                    .background(Color.gatherSecondaryBackground)
-                    .clipShape(Capsule())
+                    .foregroundStyle(Color.warmCoral)
+                    .transition(.opacity)
                 }
 
-                // Save changes
-                Button {
-                    saveChanges()
-                } label: {
-                    HStack(spacing: 6) {
-                        if isSubmitting {
-                            ProgressView()
-                                .tint(.white)
-                                .scaleEffect(0.8)
+                HStack(spacing: Spacing.sm) {
+                    // Discard changes
+                    Button {
+                        if hasUnsavedChanges {
+                            showDiscardAlert = true
                         } else {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.callout)
+                            dismiss()
                         }
-                        Text("Save Changes")
-                            .font(GatherFont.callout)
-                            .fontWeight(.bold)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "xmark")
+                                .font(.caption)
+                            Text("Cancel")
+                                .font(GatherFont.callout)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundStyle(Color.gatherSecondaryText)
+                        .padding(.horizontal, Spacing.lg)
+                        .frame(height: Layout.buttonHeight)
+                        .background(Color.gatherElevated)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Color.gatherSeparator.opacity(0.6), lineWidth: 1)
+                        )
                     }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: Layout.buttonHeight)
-                    .background(
-                        isValid
-                            ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
-                            : AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
-                    )
-                    .clipShape(Capsule())
+
+                    // Save changes
+                    Button {
+                        saveChanges()
+                    } label: {
+                        HStack(spacing: 6) {
+                            if isSubmitting {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.callout)
+                            }
+                            Text("Save Changes")
+                                .font(GatherFont.callout)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Layout.buttonHeight)
+                        .background(
+                            isValid
+                                ? AnyShapeStyle(LinearGradient.gatherAccentGradient)
+                                : AnyShapeStyle(Color.gatherSecondaryText.opacity(0.3))
+                        )
+                        .clipShape(Capsule())
+                    }
+                    .disabled(!isValid || isSubmitting)
+                    .scaleEffect(isValid ? 1.0 : 0.97)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isValid)
                 }
-                .disabled(!isValid || isSubmitting)
-                .scaleEffect(isValid ? 1.0 : 0.97)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isValid)
             }
             .padding(.horizontal, Layout.horizontalPadding)
             .padding(.bottom, Spacing.md)
-            .background(Color.gatherBackground)
+            .background(Color.gatherCanvas)
+            .animation(.easeInOut(duration: 0.2), value: validationHint)
         }
     }
 
-    // Validation is defined after saveChanges
+    // MARK: - Validation
 
-    // MARK: - Validation (Enhanced)
-
-    private var isValid: Bool {
-        let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
-        guard !trimmedTitle.isEmpty && trimmedTitle.count <= 100 else { return false }
-        if hasEndDate, let end = endDate, end <= startDate { return false }
-        if hasCapacity, let cap = capacity, cap <= 0 { return false }
-        if isVirtual && !virtualURL.isEmpty {
-            guard URL(string: virtualURL) != nil else { return false }
+    /// The first problem blocking Save, phrased like the create wizard's
+    /// hints, or `nil` when everything is valid.
+    private var validationHint: String? {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedTitle.isEmpty { return "Add an event name" }
+        if trimmedTitle.count > 100 { return "Event name is too long (100 characters max)" }
+        if hasEndDate, let end = endDate, end <= startDate { return "End time must be after the start time" }
+        if hasCapacity {
+            guard let cap = capacity else { return "Enter a capacity, or turn off the limit" }
+            if cap <= 0 { return "Capacity must be at least 1 guest" }
         }
-        return true
+        if isVirtual, !virtualURL.isEmpty, !EventFormValidation.isValidMeetingLink(virtualURL) {
+            return "Enter a valid meeting link"
+        }
+        return nil
     }
+
+    private var isValid: Bool { validationHint == nil }
 
     // MARK: - Save Changes
 
@@ -347,7 +379,7 @@ struct EditEventView: View {
         isSubmitting = true
 
         // Update event properties
-        event.title = title.trimmingCharacters(in: .whitespaces)
+        event.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         event.eventDescription = description.isEmpty ? nil : description
         event.startDate = startDate
         event.endDate = hasEndDate ? endDate : nil
@@ -386,8 +418,13 @@ struct EditEventView: View {
         }
 
         // Build location
-        if isVirtual, !virtualURL.isEmpty {
-            event.location = EventLocation(name: "Virtual Event", virtualURL: URL(string: virtualURL))
+        if isVirtual {
+            // Preserve the explicit "Virtual" choice even when the link is
+            // empty — the event stays virtual; the link can be added later.
+            event.location = EventLocation(
+                name: "Virtual Event",
+                virtualURL: virtualURL.isEmpty ? nil : URL(string: virtualURL)
+            )
         } else if !locationName.isEmpty {
             event.location = EventLocation(
                 name: locationName,

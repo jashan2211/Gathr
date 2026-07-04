@@ -234,6 +234,8 @@ struct AddGuestSheet: View {
                                 .textContentType(.name)
                                 .submitLabel(.done)
                                 .focused($nameFieldFocused)
+                                // Rapid batch entry: type name → return → next name.
+                                .onSubmit { if canSave { addGuest() } }
                         }
                         .padding(Spacing.sm)
                         .background(Color.gatherTertiaryBackground)
@@ -258,6 +260,7 @@ struct AddGuestSheet: View {
                                 .textContentType(.emailAddress)
                                 .textInputAutocapitalization(.never)
                                 .submitLabel(.done)
+                                .onSubmit { if canSave { addGuest() } }
                         }
                         .padding(Spacing.sm)
                         .background(Color.gatherTertiaryBackground)
@@ -292,6 +295,9 @@ struct AddGuestSheet: View {
                                 .keyboardType(.phonePad)
                                 .textContentType(.telephoneNumber)
                                 .submitLabel(.done)
+                                // No return key on .phonePad, but hardware
+                                // keyboards can still submit.
+                                .onSubmit { if canSave { addGuest() } }
                         }
                         .padding(Spacing.sm)
                         .background(Color.gatherTertiaryBackground)
@@ -314,7 +320,9 @@ struct AddGuestSheet: View {
                                 } label: {
                                     HStack(spacing: 4) {
                                         Image(systemName: guestRole.icon)
-                                            .font(.system(size: 10))
+                                            // Scales with Dynamic Type, unlike a fixed 10pt.
+                                            .font(.caption2)
+                                            .imageScale(.small)
                                         Text(guestRole.displayName)
                                             .font(.caption)
                                             .fontWeight(.bold)
@@ -835,7 +843,16 @@ struct AddGuestSheet: View {
 
     private func importSelectedContacts() {
         isImporting = true
+        // Yield one render pass so the "Importing..." spinner actually shows
+        // before the synchronous import work; the loop still runs on the
+        // main actor (SwiftData context isn't Sendable).
+        Task {
+            await Task.yield()
+            performContactImport()
+        }
+    }
 
+    private func performContactImport() {
         // Existing-guest keys for duplicate skipping (also catches dupes
         // within the selected batch as new guests are added).
         var existingEmails = Set(
@@ -885,17 +902,18 @@ struct AddGuestSheet: View {
 
         isImporting = false
 
+        // Always confirm the outcome via the Import Complete alert — the
+        // sheet dismisses when it's acknowledged.
         if importedCount == 0 {
             // Nothing was added — warn instead of celebrating.
             HapticService.warning()
             importSummary = "No new guests — all \(skippedCount) were already on the list."
         } else if skippedCount > 0 {
             HapticService.success()
-            // Report skips; sheet dismisses when the alert is confirmed.
             importSummary = "Imported \(importedCount) guest\(importedCount == 1 ? "" : "s"). Skipped \(skippedCount) already added."
         } else {
             HapticService.success()
-            dismiss()
+            importSummary = "Imported \(importedCount) guest\(importedCount == 1 ? "" : "s")."
         }
     }
 }

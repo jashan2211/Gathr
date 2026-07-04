@@ -563,10 +563,12 @@ struct GuestDetailSheet: View {
     }
 
     private func saveChanges() {
-        guard !trimmedName.isEmpty else { return }
+        guard !trimmedName.isEmpty, isEmailValid else { return }
         guest.name = trimmedName
-        guest.email = email.isEmpty ? nil : email
-        guest.phone = phone.isEmpty ? nil : phone
+        // Trim before storing — mirrors AddGuestSheet, so duplicate-detection
+        // keys and invite sending stay reliable.
+        guest.email = trimmedEmail.isEmpty ? nil : trimmedEmail
+        guest.phone = trimmedPhone.isEmpty ? nil : trimmedPhone
         guest.role = role
 
         if guest.status != status {

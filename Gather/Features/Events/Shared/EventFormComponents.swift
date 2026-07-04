@@ -291,7 +291,12 @@ struct EventBasicsSection: View {
                     .foregroundStyle(Color.gatherPrimaryText)
                     .submitLabel(.done)
                     .padding(Spacing.md)
-                    .eventFormInputSurface(isActive: !title.isEmpty)
+                    .eventFormInputSurface(
+                        isActive: !title.isEmpty,
+                        // Whitespace-only names look filled but fail validation —
+                        // flag it at the field, not just via a disabled Save.
+                        isError: !title.isEmpty && title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
                     // Event names are single-line everywhere they render, so
                     // strip pasted newlines and enforce the 100-char limit.
                     .onChange(of: title) { _, newValue in
@@ -568,7 +573,10 @@ struct EventLocationSection: View {
                     text: $virtualURL,
                     icon: "link",
                     keyboardType: .URL,
-                    autocapitalization: .never
+                    autocapitalization: .never,
+                    // Only typed-but-invalid links are errors — an empty field
+                    // is pristine guidance, not a mistake.
+                    isError: !virtualURL.isEmpty && !EventFormValidation.isValidMeetingLink(virtualURL)
                 )
             } else {
                 inPersonContent
@@ -1137,13 +1145,16 @@ struct EventFormStyledTextField: View {
     var icon: String? = nil
     var keyboardType: UIKeyboardType = .default
     var autocapitalization: TextInputAutocapitalization = .sentences
+    /// Flags invalid input at the field itself (error-colored border) instead
+    /// of only in a distant footer hint.
+    var isError: Bool = false
 
     var body: some View {
         HStack(spacing: Spacing.xs) {
             if let icon = icon {
                 Image(systemName: icon)
                     .font(.system(.subheadline, weight: .semibold))
-                    .foregroundStyle(Color.accentPurpleFallback.opacity(0.8))
+                    .foregroundStyle(isError ? Color.warmCoral.opacity(0.8) : Color.accentPurpleFallback.opacity(0.8))
                     .frame(width: 20)
             }
             TextField(placeholder, text: $text)
@@ -1155,7 +1166,7 @@ struct EventFormStyledTextField: View {
                 .textInputAutocapitalization(autocapitalization)
         }
         .padding(.horizontal, Spacing.sm)
-        .eventFormInputSurface(isActive: !text.isEmpty)
+        .eventFormInputSurface(isActive: !text.isEmpty, isError: isError)
     }
 }
 

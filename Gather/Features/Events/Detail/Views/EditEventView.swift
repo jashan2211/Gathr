@@ -62,27 +62,42 @@ struct EditEventView: View {
         _enabledFeatures = State(initialValue: event.enabledFeatures)
     }
 
-    /// Whether user has made edits compared to original event values
+    /// Whether user has made edits compared to original event values.
+    /// Split into grouped sub-expressions so the type-checker stays fast — a
+    /// single 20-term `||` chain trips SwiftUI's expression-complexity limit.
     private var hasUnsavedChanges: Bool {
+        basicsChanged || locationChanged || settingsChanged || heroImage != nil
+    }
+
+    private var basicsChanged: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines) != event.title ||
         description != (event.eventDescription ?? "") ||
         startDate != event.startDate ||
         endDate != event.endDate ||
         hasEndDate != (event.endDate != nil) ||
         selectedCategory != event.category ||
-        privacy != event.privacy ||
-        guestListVisibility != event.guestListVisibility ||
-        enabledFeatures != event.enabledFeatures ||
+        enabledFeatures != event.enabledFeatures
+    }
+
+    private var locationChanged: Bool {
         locationName != (event.location?.name ?? "") ||
         locationAddress != (event.location?.address ?? "") ||
         locationCity != (event.location?.city ?? "") ||
         locationState != (event.location?.state ?? "") ||
         locationCountry != (event.location?.country ?? "") ||
+        // Coordinates matter on their own: re-picking a venue whose name/address
+        // resolve to the same strings still moves the pin, and that edit must count.
+        locationLatitude != event.location?.latitude ||
+        locationLongitude != event.location?.longitude ||
         isVirtual != (event.location?.isVirtual ?? false) ||
-        virtualURL != (event.location?.virtualURL?.absoluteString ?? "") ||
+        virtualURL != (event.location?.virtualURL?.absoluteString ?? "")
+    }
+
+    private var settingsChanged: Bool {
+        privacy != event.privacy ||
+        guestListVisibility != event.guestListVisibility ||
         capacity != event.capacity ||
-        hasCapacity != (event.capacity != nil) ||
-        heroImage != nil
+        hasCapacity != (event.capacity != nil)
     }
 
     var body: some View {

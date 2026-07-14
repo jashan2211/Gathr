@@ -149,27 +149,10 @@ struct GuestsTab: View {
                 // Hidden mode
                 hiddenView
             } else {
-                // Full guest management (host view) or plain list (non-host)
-                // Status Summary Bar
-                statusSummaryBar
-
-                if isHost {
-                    // Headcount summary strip
-                    headcountSummaryStrip
-
-                    // Prominent bulk-invite actions
-                    if !event.guests.isEmpty {
-                        bulkInviteRow
-
-                        // Nudge invited-but-unresponded guests in one tap
-                        if !pendingInvitedGuests.isEmpty {
-                            remindPendingRow
-                        }
-                    }
-
-                    // Dietary needs summary
-                    dietarySummaryCard
-                }
+                // Roster-first: the guest list is the point of this tab, so
+                // the header, search, filters and invite actions sit above it
+                // and the reference summaries (headcount, dietary) move below.
+                // Previously ~7 chrome rows pushed every guest off the screen.
 
                 // Header with actions
                 headerSection
@@ -177,11 +160,33 @@ struct GuestsTab: View {
                 // Search Bar
                 searchBar
 
+                // Status Summary Bar (filter pills)
+                statusSummaryBar
+
+                // Prominent bulk-invite actions
+                if isHost, !event.guests.isEmpty {
+                    bulkInviteRow
+
+                    // Nudge invited-but-unresponded guests in one tap
+                    if !pendingInvitedGuests.isEmpty {
+                        remindPendingRow
+                    }
+                }
+
                 // Guest List
                 if filteredGuests.isEmpty {
                     emptyState
                 } else {
                     guestList
+                }
+
+                // Reference summaries live below the roster, still one scroll away.
+                if isHost {
+                    // Headcount summary strip
+                    headcountSummaryStrip
+
+                    // Dietary needs summary
+                    dietarySummaryCard
                 }
             }
         }

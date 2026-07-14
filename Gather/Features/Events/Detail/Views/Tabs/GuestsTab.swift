@@ -13,6 +13,9 @@ struct GuestsTab: View {
     @State private var guestPendingRemoval: Guest?
     @State private var showBulkRemoveConfirmation = false
     @State private var guestPendingPromotion: Guest?
+    /// Holds a pending bulk "Mark Going" that would exceed capacity, until
+    /// the host confirms.
+    @State private var bulkStatusOverCapacity: RSVPStatus?
     @State private var dietaryExpanded = false
     // Bulk-invite action row (host)
     @State private var showShareLinkSheet = false
@@ -274,6 +277,26 @@ struct GuestsTab: View {
                 guestPendingPromotion = nil
             }
             Button("Cancel", role: .cancel) { guestPendingPromotion = nil }
+        }
+        .confirmationDialog(
+            "This will exceed capacity",
+            isPresented: Binding(
+                get: { bulkStatusOverCapacity != nil },
+                set: { if !$0 { bulkStatusOverCapacity = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Mark Going Anyway") {
+                if let status = bulkStatusOverCapacity {
+                    performBulkApplyStatus(status)
+                }
+                bulkStatusOverCapacity = nil
+            }
+            Button("Cancel", role: .cancel) { bulkStatusOverCapacity = nil }
+        } message: {
+            if let capacity = event.capacity {
+                Text("Marking these guests Going puts attendance over the \(capacity)-guest capacity.")
+            }
         }
     }
 
@@ -1077,6 +1100,22 @@ struct GuestsTab: View {
     /// save and haptic for the whole batch. Selection stays active so the
     /// host can follow up (e.g. send invites to the same group).
     private func bulkApplyStatus(_ status: RSVPStatus) {
+        let targets = event.guests.filter { selectedGuests.contains($0.id) }
+        guard !targets.isEmpty else { return }
+        // Capacity guard: marking a batch Going can blow past capacity — the
+        // single-row waitlist promotion already confirms this, so mirror it
+        // for bulk instead of silently overfilling the event.
+        if status == .attending, let capacity = event.capacity, capacity > 0 {
+            let newlyAttending = targets.filter { $0.status != .attending }.count
+            if event.attendingCount + newlyAttending > capacity {
+                bulkStatusOverCapacity = status
+                return
+            }
+        }
+        performBulkApplyStatus(status)
+    }
+
+    private func performBulkApplyStatus(_ status: RSVPStatus) {
         let targets = event.guests.filter { selectedGuests.contains($0.id) }
         guard !targets.isEmpty else { return }
         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {

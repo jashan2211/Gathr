@@ -22,7 +22,9 @@ struct GuestsTab: View {
     @State private var shareLinkCopied = false
     // Export guest list (host)
     @State private var showExportSheet = false
-    @AppStorage("guestSortOrder") private var guestSortOrderRaw = GuestSortOrder.name.rawValue
+    // Default to status sort so the roster opens grouped (Going / Maybe /
+    // Pending …) — the most useful organizing view for a host.
+    @AppStorage("guestSortOrder") private var guestSortOrderRaw = GuestSortOrder.status.rawValue
     @EnvironmentObject var authManager: AuthManager
 
     private var sortOrder: GuestSortOrder {
@@ -953,36 +955,81 @@ struct GuestsTab: View {
         // Content-only: EventDetailView owns the page scroll.
         Group {
             LazyVStack(spacing: Spacing.sm) {
-                ForEach(filteredGuests) { guest in
-                    ImprovedGuestCard(
-                        guest: guest,
-                        event: event,
-                        inviteLookup: inviteLookup,
-                        isSelected: selectedGuests.contains(guest.id),
-                        isSelectionMode: isSelectionMode,
-                        onTap: {
-                            if isSelectionMode {
-                                toggleSelection(guest)
-                            } else {
-                                selectedGuest = guest
+                if groupByStatus {
+                    // Section landmarks make a long roster scannable when the
+                    // host is sorting by status and hasn't narrowed the list.
+                    ForEach(statusGroups, id: \.status) { group in
+                        Section {
+                            ForEach(group.guests) { guest in
+                                guestCard(guest)
                             }
-                        },
-                        onSetStatus: isHost ? { status in
-                            setStatus(status, for: guest)
-                        } : nil,
-                        onSendInvite: isHost ? {
-                            sendInvite(to: guest)
-                        } : nil,
-                        onRemove: isHost ? {
-                            HapticService.warning()
-                            guestPendingRemoval = guest
-                        } : nil
-                    )
+                        } header: {
+                            guestGroupHeader(group.status, count: group.guests.count)
+                        }
+                    }
+                } else {
+                    ForEach(filteredGuests) { guest in
+                        guestCard(guest)
+                    }
                 }
             }
             .horizontalPadding()
             .padding(.bottom, Layout.scrollBottomInset)
         }
+    }
+
+    /// Group into status sections only when sorting by status with no active
+    /// filter/search — otherwise a flat list reads cleaner.
+    private var groupByStatus: Bool {
+        sortOrder == .status && filterStatus == .all && searchText.isEmpty
+    }
+
+    private var statusGroups: [(status: RSVPStatus, guests: [Guest])] {
+        let order: [RSVPStatus] = [.attending, .maybe, .pending, .waitlisted, .declined]
+        return order.compactMap { status in
+            let guests = filteredGuests.filter { $0.status == status }
+            return guests.isEmpty ? nil : (status, guests)
+        }
+    }
+
+    private func guestGroupHeader(_ status: RSVPStatus, count: Int) -> some View {
+        HStack {
+            Text("\(status.displayName) · \(count)")
+                .gatherEyebrow()
+                .foregroundStyle(Color.gatherSecondaryText)
+            Spacer()
+        }
+        .padding(.top, Spacing.sm)
+        .padding(.bottom, Spacing.xxs)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder
+    private func guestCard(_ guest: Guest) -> some View {
+        ImprovedGuestCard(
+            guest: guest,
+            event: event,
+            inviteLookup: inviteLookup,
+            isSelected: selectedGuests.contains(guest.id),
+            isSelectionMode: isSelectionMode,
+            onTap: {
+                if isSelectionMode {
+                    toggleSelection(guest)
+                } else {
+                    selectedGuest = guest
+                }
+            },
+            onSetStatus: isHost ? { status in
+                setStatus(status, for: guest)
+            } : nil,
+            onSendInvite: isHost ? {
+                sendInvite(to: guest)
+            } : nil,
+            onRemove: isHost ? {
+                HapticService.warning()
+                guestPendingRemoval = guest
+            } : nil
+        )
     }
 
     // MARK: - Helpers

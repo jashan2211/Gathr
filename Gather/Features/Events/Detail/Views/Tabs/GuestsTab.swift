@@ -1560,6 +1560,10 @@ struct ImprovedGuestCard: View {
                         .font(GatherFont.headline)
                         .foregroundStyle(Color.gatherPrimaryText)
                         .lineLimit(1)
+                        // Shrink a long name before truncating, and let it win
+                        // width over the fixed +N / role capsules beside it.
+                        .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
 
                     if guest.totalHeadcount > 1 {
                         Text("+\(guest.totalHeadcount - 1)")
@@ -1617,11 +1621,14 @@ struct ImprovedGuestCard: View {
 
             Spacer()
 
-            // Main status badge — tappable menu for one-tap RSVP changes
+            // One trailing control: the status badge IS the menu, holding
+            // every row action (status change + Send Invite + Remove). This
+            // replaces the old badge-menu + separate ellipsis pair, which ate
+            // ~44pt and truncated longer names.
             if !isSelectionMode {
-                if onSetStatus != nil {
+                if hasQuickActions {
                     Menu {
-                        statusMenuItems
+                        quickActionMenuItems
                     } label: {
                         HStack(spacing: 2) {
                             StatusBadge(status: guest.status)
@@ -1634,31 +1641,14 @@ struct ImprovedGuestCard: View {
                         .frame(minHeight: Layout.minTouchTarget)
                         .contentShape(Rectangle())
                     }
-                    .accessibilityLabel("Change RSVP for \(guest.name), currently \(guest.status.displayName)")
+                    .accessibilityLabel("Actions for \(guest.name), currently \(guest.status.displayName)")
                 } else {
                     StatusBadge(status: guest.status)
-                }
-
-                // Visible overflow menu — the same quick actions the
-                // long-press context menu offers, but discoverable.
-                if hasQuickActions {
-                    Menu {
-                        quickActionMenuItems
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.callout)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.gatherSecondaryText)
-                            .frame(width: Layout.minTouchTarget, height: Layout.minTouchTarget)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("Actions for \(guest.name)")
                 }
             }
         }
         .padding(.vertical, Spacing.sm)
-        .padding(.leading, Spacing.sm)
-        .padding(.trailing, hasQuickActions ? Spacing.xxs : Spacing.sm)
+        .padding(.horizontal, Spacing.sm)
     }
 
     private var functionStatusRow: some View {

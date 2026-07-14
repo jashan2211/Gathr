@@ -168,7 +168,7 @@ struct PhotosTab: View {
         GatherEmptyState(
             icon: "photo.on.rectangle.angled",
             title: "No photo albums yet",
-            message: "Share a link to your Google Photos, iCloud, or Dropbox album so everyone can see the pics.",
+            message: "Keep all the album links for this event in one place — Google Photos, iCloud, or Dropbox.",
             accent: Color.forCategory(event.category)
         )
         .frame(maxWidth: .infinity)
@@ -212,7 +212,7 @@ struct AddPhotoLinkSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.md) {
-                    Text("Paste a link to a shared photo album — Google Photos, iCloud Shared Album, Dropbox, or any web link. Nothing is uploaded; guests just tap through to view.")
+                    Text("Paste a link to a shared photo album — Google Photos, iCloud Shared Album, Dropbox, or any web link. Nothing is uploaded; links open right in the browser.")
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
 

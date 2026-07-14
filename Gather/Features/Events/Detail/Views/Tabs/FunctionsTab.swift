@@ -2,9 +2,13 @@ import SwiftUI
 
 struct FunctionsTab: View {
     @Bindable var event: Event
+    @EnvironmentObject var authManager: AuthManager
     @State private var showAddFunction = false
     @State private var selectedFunction: EventFunction?
     @State private var liveActivityOn = false
+
+    /// Adding/editing functions is host-only; invitees only view the schedule.
+    private var isHost: Bool { event.isHosted(by: authManager.currentUser) }
 
     var body: some View {
         // Content-only: EventDetailView owns the page scroll.
@@ -30,15 +34,26 @@ struct FunctionsTab: View {
 
     // MARK: - Empty State
 
+    @ViewBuilder
     private var emptyState: some View {
-        GatherEmptyState(
-            icon: "calendar.day.timeline.left",
-            title: "No Functions Yet",
-            message: "Add your first function like Mehendi, Sangeet, Ceremony, or Reception",
-            actionTitle: "Add Function",
-            action: { showAddFunction = true }
-        )
-        .padding(.vertical, Spacing.xxl)
+        if isHost {
+            GatherEmptyState(
+                icon: "calendar.day.timeline.left",
+                title: "No Functions Yet",
+                message: "Add your first function like Mehendi, Sangeet, Ceremony, or Reception",
+                actionTitle: "Add Function",
+                action: { showAddFunction = true }
+            )
+            .padding(.vertical, Spacing.xxl)
+        } else {
+            // Invitee voice — no host CTA when the schedule isn't up yet.
+            GatherEmptyState(
+                icon: "calendar.day.timeline.left",
+                title: "Schedule Coming Soon",
+                message: "The host hasn't added the functions yet — check back for the full schedule."
+            )
+            .padding(.vertical, Spacing.xxl)
+        }
     }
 
     // MARK: - Functions Grid
@@ -57,12 +72,14 @@ struct FunctionsTab: View {
                     liveActivityButton
                 }
 
-                Button {
-                    showAddFunction = true
-                } label: {
-                    Label("Add", systemImage: "plus")
-                        .font(GatherFont.callout)
-                        .foregroundStyle(Color.accentPurpleFallback)
+                if isHost {
+                    Button {
+                        showAddFunction = true
+                    } label: {
+                        Label("Add", systemImage: "plus")
+                            .font(GatherFont.callout)
+                            .foregroundStyle(Color.accentPurpleFallback)
+                    }
                 }
             }
 

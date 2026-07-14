@@ -2,12 +2,55 @@ import SwiftUI
 
 struct GuestListSheet: View {
     let event: Event
+    /// Defaults to host so existing host call sites compile unchanged; the
+    /// invitee-facing caller passes `false` to enforce guest-list privacy.
+    var isHost: Bool = true
     @Environment(\.dismiss) var dismiss
     @State private var searchText = ""
     @State private var selectedFilter: RSVPStatus? = nil
 
+    // MARK: - Privacy
+
+    /// Non-hosts never see contact details, and only see who's actually coming.
+    private var showsContact: Bool { isHost }
+
+    /// Public events (or the "first names only" setting) hide surnames from guests.
+    private var firstNamesOnly: Bool {
+        !isHost && (event.guestListVisibility == .firstNamesOnly || event.privacy == .publicEvent)
+    }
+
+    private var navTitle: String {
+        isHost ? "Guests (\(event.guests.count))" : "Who's Going (\(baseGuests.count))"
+    }
+
     var body: some View {
         NavigationStack {
+            content
+                .background(Color.gatherBackground)
+                .navigationTitle(navTitle)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") {
+                            dismiss()
+                        }
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if !isHost && event.guestListVisibility == .hidden {
+            GatherEmptyState(
+                icon: "lock.fill",
+                title: "Guest List Is Private",
+                message: "The host has hidden who's coming to this event."
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if !isHost && event.guestListVisibility == .countOnly {
+            countOnlyView
+        } else {
             VStack(spacing: 0) {
                 // Filter chips
                 filterChips
@@ -19,7 +62,7 @@ struct GuestListSheet: View {
                 } else {
                     List {
                         ForEach(filteredGuests) { guest in
-                            GuestRow(guest: guest)
+                            GuestRow(guest: guest, showsContact: showsContact, firstNameOnly: firstNamesOnly)
                                 .listRowBackground(Color.gatherBackground)
                         }
                     }
@@ -27,18 +70,23 @@ struct GuestListSheet: View {
                     .scrollContentBackground(.hidden)
                 }
             }
-            .background(Color.gatherBackground)
-            .navigationTitle("Guests (\(event.guests.count))")
-            .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search guests")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
         }
+    }
+
+    private var countOnlyView: some View {
+        VStack(spacing: Spacing.md) {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.accentPurpleFallback)
+            Text("\(event.attendingCount)")
+                .font(.system(.largeTitle, weight: .heavy))
+                .foregroundStyle(Color.gatherPrimaryText)
+            Text("attending")
+                .gatherMetaText()
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Filter Chips
@@ -48,7 +96,7 @@ struct GuestListSheet: View {
             HStack(spacing: Spacing.sm) {
                 FilterChip(
                     label: "All",
-                    count: event.guests.count,
+                    count: baseGuests.count,
                     isSelected: selectedFilter == nil
                 ) {
                     selectedFilter = nil
@@ -72,22 +120,26 @@ struct GuestListSheet: View {
                     selectedFilter = .maybe
                 }
 
-                FilterChip(
-                    label: "Can't Go",
-                    count: event.declinedCount,
-                    isSelected: selectedFilter == .declined,
-                    color: .gatherDestructive
-                ) {
-                    selectedFilter = .declined
-                }
+                // Pending/declined are host bookkeeping — invitees only see
+                // who's coming (All / Going / Maybe).
+                if isHost {
+                    FilterChip(
+                        label: "Can't Go",
+                        count: event.declinedCount,
+                        isSelected: selectedFilter == .declined,
+                        color: .gatherDestructive
+                    ) {
+                        selectedFilter = .declined
+                    }
 
-                FilterChip(
-                    label: "Pending",
-                    count: event.pendingCount,
-                    isSelected: selectedFilter == .pending,
-                    color: .gatherSecondaryText
-                ) {
-                    selectedFilter = .pending
+                    FilterChip(
+                        label: "Pending",
+                        count: event.pendingCount,
+                        isSelected: selectedFilter == .pending,
+                        color: .gatherSecondaryText
+                    ) {
+                        selectedFilter = .pending
+                    }
                 }
             }
             .horizontalPadding()
@@ -118,19 +170,25 @@ struct GuestListSheet: View {
 
     // MARK: - Filtered Guests
 
+    /// The roster before search/chip filters. Hosts see everyone; invitees
+    /// only ever see confirmed + maybe guests.
+    private var baseGuests: [Guest] {
+        isHost ? event.guests : event.guests.filter { $0.status == .attending || $0.status == .maybe }
+    }
+
     private var filteredGuests: [Guest] {
-        var guests = event.guests
+        var guests = baseGuests
 
         // Apply status filter
         if let filter = selectedFilter {
             guests = guests.filter { $0.status == filter }
         }
 
-        // Apply search filter
+        // Apply search filter (name-only for guests, who can't see contacts)
         if !searchText.isEmpty {
             guests = guests.filter { guest in
                 guest.name.localizedCaseInsensitiveContains(searchText) ||
-                (guest.email?.localizedCaseInsensitiveContains(searchText) ?? false)
+                (showsContact && (guest.email?.localizedCaseInsensitiveContains(searchText) ?? false))
             }
         }
 
@@ -192,6 +250,14 @@ struct FilterChip: View {
 
 struct GuestRow: View {
     let guest: Guest
+    /// Contact line and role are host-only; guests see name + status.
+    var showsContact: Bool = true
+    /// Public/first-names-only events drop surnames for invitees.
+    var firstNameOnly: Bool = false
+
+    private var displayName: String {
+        firstNameOnly ? String(guest.name.split(separator: " ").first ?? Substring(guest.name)) : guest.name
+    }
 
     var body: some View {
         HStack(spacing: Spacing.md) {
@@ -208,10 +274,10 @@ struct GuestRow: View {
             // Info
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 HStack(spacing: Spacing.xs) {
-                    Text(guest.name)
+                    Text(displayName)
                         .font(GatherFont.body)
 
-                    if guest.role != .guest {
+                    if showsContact && guest.role != .guest {
                         Text(guest.role.displayName)
                             .font(GatherFont.caption2)
                             .padding(.horizontal, Spacing.xs)
@@ -222,7 +288,7 @@ struct GuestRow: View {
                     }
                 }
 
-                if let contact = guest.displayContact {
+                if showsContact, let contact = guest.displayContact {
                     Text(contact)
                         .font(GatherFont.caption)
                         .foregroundStyle(Color.gatherSecondaryText)
@@ -251,7 +317,7 @@ struct GuestRow: View {
         .padding(.vertical, Spacing.xs)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(guest.name), \(guest.status.displayName)\(guest.plusOneCount > 0 ? ", plus \(guest.plusOneCount)" : "")"
+            "\(displayName), \(guest.status.displayName)\(guest.plusOneCount > 0 ? ", plus \(guest.plusOneCount)" : "")"
         )
     }
 }

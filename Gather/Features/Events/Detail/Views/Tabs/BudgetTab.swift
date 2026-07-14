@@ -2207,12 +2207,6 @@ struct BudgetTab: View {
         return colors[index]
     }
 
-    private func findCategoryName(for expense: Expense, in budget: Budget) -> String? {
-        budget.categories.first { category in
-            category.expenses.contains { $0.id == expense.id }
-        }?.name
-    }
-
     private func owningCategory(of expense: Expense) -> BudgetCategory? {
         eventBudget?.categories.first { category in
             category.expenses.contains { $0.id == expense.id }

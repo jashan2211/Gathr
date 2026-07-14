@@ -66,7 +66,8 @@ struct FunctionDetailSheet: View {
                             saveChanges()
                         }
                         .disabled(editName.isEmpty)
-                    } else {
+                    } else if isHost {
+                        // Edit/Delete are host-only; invitees just view + RSVP.
                         Menu {
                             Button {
                                 loadEditState()

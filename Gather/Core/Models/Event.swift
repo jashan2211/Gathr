@@ -123,6 +123,17 @@ final class Event {
     }
 }
 
+// MARK: - Host Check
+
+extension Event {
+    /// Whether `user` is this event's host. The one place the host check
+    /// lives, so view code stops re-deriving `hostId == currentUser?.id`.
+    func isHosted(by user: User?) -> Bool {
+        guard let user else { return false }
+        return hostId == user.id
+    }
+}
+
 // MARK: - Event Privacy
 
 enum EventPrivacy: String, Codable, CaseIterable {

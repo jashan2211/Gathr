@@ -70,7 +70,6 @@ struct EventDetailView: View {
     @State private var showGuestList = false
     @State private var showEditSheet = false
     @State private var showAddGuest = false
-    @State private var showBudget = false
     @State private var showTicketPurchase = false
     @State private var showTicketManagement = false
     @State private var showWaitlist = false
@@ -254,7 +253,7 @@ struct EventDetailView: View {
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showGuestList) {
-            GuestListSheet(event: event)
+            GuestListSheet(event: event, isHost: isHost)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -883,13 +882,6 @@ struct EventDetailView: View {
             ticket.userId == userId &&
             ticket.paymentStatus == .completed
         }
-    }
-
-    private var currentRSVPStatus: String {
-        if let guest = currentUserGuest {
-            return guest.status.displayName
-        }
-        return "Not responded"
     }
 
     private var minTicketPrice: Decimal? {

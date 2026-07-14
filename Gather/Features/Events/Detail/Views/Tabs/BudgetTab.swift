@@ -10,13 +10,12 @@ private struct PayerTotal: Identifiable {
 
 /// Quick-nav slices of the Finance tab. `.all` shows everything; any other
 /// case shows just that section so the page stays short on phones.
+/// Three true segments instead of a 6-chip filter over one mega-scroll.
+/// Overview is a compact dashboard; the deep lists live one tap away.
 private enum BudgetSection: String, CaseIterable {
-    case all = "All"
     case overview = "Overview"
-    case categories = "Categories"
-    case vendors = "Vendors"
-    case splits = "Splits"
-    case transactions = "Transactions"
+    case expenses = "Expenses"
+    case people = "People"
 }
 
 struct BudgetTab: View {
@@ -34,7 +33,7 @@ struct BudgetTab: View {
     @State private var recordingSplit: PaymentSplit?
     @State private var showSplitPaymentAlert = false
     @State private var splitPaymentText = ""
-    @State private var visibleSection: BudgetSection = .all
+    @State private var visibleSection: BudgetSection = .overview
     @State private var showAllTransactions = false
     @State private var selectedPayer: PayerTotal?
     @State private var payingExpense: Expense?
@@ -73,21 +72,25 @@ struct BudgetTab: View {
                     // Overdue / Over-budget alerts (always visible)
                     alertBanners(budget, expenses: expenses)
 
-                    // Quick-nav: filter the long page down to one section.
+                    // Three-segment switcher.
                     sectionNav(budget, expenses: expenses)
-
-                    // Primary actions live right under the nav so Add Expense
-                    // is always one glance from the top of the page.
-                    quickActions(budget)
 
                     // Function Filter — drives every money figure on the page.
                     if !event.functions.isEmpty {
                         functionFilterPicker
                     }
 
-                    if isVisible(.overview) {
-                        // Budget Summary
+                    switch visibleSection {
+                    case .overview:
+                        // Compact dashboard: headline number, the primary
+                        // action, what needs attention, and a spend preview.
                         summaryCard(budget)
+
+                        // Primary actions (Add Expense / Manage Team).
+                        quickActions(budget)
+
+                        // Upcoming Payments — the "needs attention" list.
+                        upcomingPayments(budget, expenses: expenses, categoryLookup: categoryLookup)
 
                         // Payment Breakdown (Paid / Owed / Overdue)
                         paymentBreakdown(budget, expenses: expenses)
@@ -95,34 +98,25 @@ struct BudgetTab: View {
                         // Spending by category (visual share of spend)
                         spendingByCategory(budget)
 
-                        // Who Paid What
+                    case .expenses:
+                        // Every expense, grouped: by category, by vendor, then flat.
+                        categoriesSection(budget)
+
+                        if !budget.vendorSummaries.isEmpty {
+                            vendorSection(budget, expenses: expenses)
+                        }
+
+                        allTransactions(budget, expenses: expenses, categoryLookup: categoryLookup)
+
+                    case .people:
+                        // Who paid, who owes whom, and manual co-host splits.
                         whoPaidWhat(budget, expenses: expenses)
 
-                        // Settle Up (even split among payers)
                         settleUp(budget, expenses: expenses)
 
-                        // Upcoming Payments
-                        upcomingPayments(budget, expenses: expenses, categoryLookup: categoryLookup)
-                    }
-
-                    // Categories
-                    if isVisible(.categories) {
-                        categoriesSection(budget)
-                    }
-
-                    // Vendors
-                    if isVisible(.vendors) {
-                        vendorSection(budget, expenses: expenses)
-                    }
-
-                    // Co-Host Splits
-                    if isVisible(.splits), !budget.splits.isEmpty || isHost {
-                        splitsSection(budget)
-                    }
-
-                    // All Transactions
-                    if isVisible(.transactions) {
-                        allTransactions(budget, expenses: expenses, categoryLookup: categoryLookup)
+                        if !budget.splits.isEmpty || isHost {
+                            splitsSection(budget)
+                        }
                     }
                 } else {
                     emptyState
@@ -326,7 +320,7 @@ struct BudgetTab: View {
             Button {
                 HapticService.buttonTap()
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    visibleSection = .categories
+                    visibleSection = .expenses
                     expandedCategoryId = overBudgetCategories.first?.id
                 }
             } label: {
@@ -424,39 +418,15 @@ struct BudgetTab: View {
                 Spacer(minLength: 0)
             }
 
-            // Slim linear track echoing the ring, for a scannable read.
-            VStack(spacing: Spacing.xs) {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.gatherElevated)
-                        Capsule()
-                            .fill(progressGradient(budget))
-                            .frame(width: max(0, min(geometry.size.width, geometry.size.width * percent / 100)))
-                    }
-                }
-                .frame(height: 8)
-
-                if budget.totalBudget > 0 {
-                    HStack {
-                        Label("\(percentUsed)% of budget used", systemImage: isOver ? "exclamationmark.triangle.fill" : "chart.pie.fill")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(accent)
-                        Spacer()
-                        Text(isOver ? "\(abs(remainingAmount).asCurrency) over" : "\(remainingAmount.asCurrency) left")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(isOver ? Color.rsvpNoFallback : Color.rsvpYesFallback)
-                    }
-                } else {
-                    // No amount set yet (e.g. Edit sheet was dismissed) —
-                    // nudge toward Edit instead of showing fabricated figures.
-                    Label("Tap Edit to set your total budget", systemImage: "slider.horizontal.3")
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.accentPurpleFallback)
-                }
+            // The ring already encodes percent and the metric stack already
+            // shows Remaining + Total, so no linear track or caption repeats
+            // them. Only surface the zero-budget nudge when no amount is set.
+            if budget.totalBudget == 0 {
+                Label("Tap Edit to set your total budget", systemImage: "slider.horizontal.3")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.accentPurpleFallback)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(Spacing.md)
@@ -536,7 +506,7 @@ struct BudgetTab: View {
                 icon: "checkmark.circle.fill",
                 color: Color.rsvpYesFallback
             ) {
-                jumpToSection(.transactions)
+                jumpToSection(.expenses)
             }
             paymentStatCard(
                 label: "Owed",
@@ -661,7 +631,7 @@ struct BudgetTab: View {
 
                     if spending.count > 4 {
                         Button {
-                            jumpToSection(.categories)
+                            jumpToSection(.expenses)
                         } label: {
                             HStack(spacing: 4) {
                                 Text("Show all categories")
@@ -693,7 +663,7 @@ struct BudgetTab: View {
         return Button {
             HapticService.selection()
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                visibleSection = .categories
+                visibleSection = .expenses
                 expandedCategoryId = category.id
             }
         } label: {
@@ -804,32 +774,9 @@ struct BudgetTab: View {
                         .foregroundStyle(Color.gatherSecondaryText)
                 }
 
-                // In .all mode cap the list to keep the page short; the
-                // expander jumps to the Overview slice with the full list.
-                let displayPayers = visibleSection == .all ? Array(payers.prefix(3)) : payers
-
                 VStack(spacing: Spacing.sm) {
-                    ForEach(displayPayers) { payer in
+                    ForEach(payers) { payer in
                         whoPaidRow(payer, totalPaid: totalPaid)
-                    }
-
-                    if visibleSection == .all, payers.count > 3 {
-                        Button {
-                            jumpToSection(.overview)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text("See all (\(payers.count))")
-                                Image(systemName: "chevron.right")
-                            }
-                            .font(GatherFont.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.accentPurpleFallback)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Spacing.xs)
-                        }
-                        .frame(minHeight: Layout.minTouchTarget)
-                        .contentShape(Rectangle())
-                        .accessibilityLabel("See all \(payers.count) payers")
                     }
                 }
             }
@@ -959,32 +906,9 @@ struct BudgetTab: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Total paid \(totalPaid.asCurrency). Even split \(fairShare.asCurrency) each across \(payers.count) people.")
 
-                // In .all mode cap the list to keep the page short; the
-                // expander jumps to the Overview slice with the full list.
-                let displayBalances = visibleSection == .all ? Array(sortedByBalance.prefix(3)) : sortedByBalance
-
                 VStack(spacing: Spacing.sm) {
-                    ForEach(displayBalances, id: \.name) { entry in
+                    ForEach(sortedByBalance, id: \.name) { entry in
                         settleUpRow(name: entry.name, balance: entry.balance)
-                    }
-
-                    if visibleSection == .all, sortedByBalance.count > 3 {
-                        Button {
-                            jumpToSection(.overview)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text("See all (\(sortedByBalance.count))")
-                                Image(systemName: "chevron.right")
-                            }
-                            .font(GatherFont.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.accentPurpleFallback)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Spacing.xs)
-                        }
-                        .frame(minHeight: Layout.minTouchTarget)
-                        .contentShape(Rectangle())
-                        .accessibilityLabel("See all \(sortedByBalance.count) balances")
                     }
                 }
             }
@@ -1128,57 +1052,43 @@ struct BudgetTab: View {
         }
     }
 
-    // MARK: - Section Quick-Nav
+    // MARK: - Segment Switcher
 
-    /// True when `section` should render — either everything is shown
-    /// or the user picked exactly this slice from the quick-nav chips.
-    private func isVisible(_ section: BudgetSection) -> Bool {
-        visibleSection == .all || visibleSection == section
-    }
-
-    /// Only offer chips for sections that actually have content, so a tap
-    /// never lands on an empty page.
-    private func availableSections(_ budget: Budget, expenses: [Expense]) -> [BudgetSection] {
-        var sections: [BudgetSection] = [.all, .overview, .categories]
-        if !budget.vendorSummaries.isEmpty {
-            sections.append(.vendors)
-        }
-        if !budget.splits.isEmpty || isHost {
-            sections.append(.splits)
-        }
-        if !expenses.isEmpty {
-            sections.append(.transactions)
-        }
-        return sections
-    }
-
-    /// Compact horizontal chip row that toggles section visibility.
-    /// A simple state filter — the outer page scroll stays untouched.
+    /// Equal-width 3-segment capsule control (Overview / Expenses / People).
+    /// Fits one row at every Dynamic Type size — no horizontal scroll.
     @ViewBuilder
     private func sectionNav(_ budget: Budget, expenses: [Expense]) -> some View {
-        let sections = availableSections(budget, expenses: expenses)
-
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Spacing.xs) {
-                ForEach(sections, id: \.self) { section in
-                    BudgetFilterChip(title: section.rawValue, isSelected: visibleSection == section) {
-                        HapticService.selection()
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            visibleSection = section
-                        }
+        HStack(spacing: 0) {
+            ForEach(BudgetSection.allCases, id: \.self) { section in
+                let isSelected = visibleSection == section
+                Button {
+                    HapticService.selection()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        visibleSection = section
                     }
-                    .accessibilityLabel(section == .all ? "Show all finance sections" : "Show only \(section.rawValue)")
-                    .accessibilityAddTraits(visibleSection == section ? [.isSelected] : [])
+                } label: {
+                    Text(section.rawValue)
+                        .font(GatherFont.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(isSelected ? Color.accentPurpleFallback : Color.gatherSecondaryText)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: Layout.minTouchTarget)
+                        .background(
+                            isSelected
+                                ? AnyShapeStyle(Color.accentPurpleFallback.opacity(0.14))
+                                : AnyShapeStyle(Color.clear)
+                        )
+                        .clipShape(Capsule())
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(section.rawValue)
+                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
             }
         }
-        .onChange(of: sections) { _, newSections in
-            // If the selected slice disappears (e.g. last vendor removed),
-            // fall back to showing everything instead of a blank page.
-            if !newSections.contains(visibleSection) {
-                visibleSection = .all
-            }
-        }
+        .padding(4)
+        .background(Color.gatherSurface)
+        .clipShape(Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Finance sections")
     }
@@ -2172,17 +2082,6 @@ struct BudgetTab: View {
         if percent > 100 { return Color.rsvpNoFallback }
         if percent > 80 { return Color.rsvpMaybeFallback }
         return Color.gatherPrimaryText
-    }
-
-    private func progressGradient(_ budget: Budget) -> LinearGradient {
-        let percent = filteredPercentSpent(budget)
-        if percent > 100 {
-            return LinearGradient(colors: [.red, .orange], startPoint: .leading, endPoint: .trailing)
-        }
-        if percent > 80 {
-            return LinearGradient(colors: [Color.rsvpMaybeFallback, .orange], startPoint: .leading, endPoint: .trailing)
-        }
-        return LinearGradient(colors: [Color.accentPurpleFallback, Color.accentPinkFallback], startPoint: .leading, endPoint: .trailing)
     }
 
     private func categoryColor(_ colorName: String) -> Color {

@@ -97,15 +97,9 @@ struct StatusFilterPill: View {
         }
     }
 
-    private var colorForStatus: Color {
-        switch status {
-        case .all: return .accentPurpleFallback
-        case .pending: return .gatherSecondaryText
-        case .sent: return .neonBlue
-        case .confirmed: return .rsvpYesFallback
-        case .declined: return .rsvpNoFallback
-        }
-    }
+    // Defers to the enum's own color so this (unused) view never has to track
+    // GuestFilter's cases again.
+    private var colorForStatus: Color { status.color }
 }
 
 // MARK: - Preview

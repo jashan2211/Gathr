@@ -10,11 +10,6 @@ struct GuestsTab: View {
     @State private var showSendInvites = false
     @State private var selectedGuest: Guest?
     @State private var filterStatus: GuestFilter = .all
-    /// Parallel to `filterStatus` — GuestFilter can't gain a case without
-    /// breaking GuestFilterBar's exhaustive switch, so waitlist is a side filter.
-    @State private var showWaitlistedOnly = false
-    /// Side filter for Maybe, same pattern as `showWaitlistedOnly`.
-    @State private var showMaybeOnly = false
     @State private var guestPendingRemoval: Guest?
     @State private var showBulkRemoveConfirmation = false
     @State private var guestPendingPromotion: Guest?
@@ -29,14 +24,6 @@ struct GuestsTab: View {
 
     private var sortOrder: GuestSortOrder {
         GuestSortOrder(rawValue: guestSortOrderRaw) ?? .name
-    }
-
-    private var hasWaitlistedGuests: Bool {
-        event.guests.contains { $0.status == .waitlisted }
-    }
-
-    private var hasMaybeGuests: Bool {
-        event.guests.contains { $0.status == .maybe }
     }
 
     private var isHost: Bool {
@@ -109,30 +96,54 @@ struct GuestsTab: View {
         }
     }
 
+    /// One filter model for the whole tab. "Not invited" and "Awaiting reply"
+    /// are disjoint (they sum to the old catch-all "Pending"), and Maybe /
+    /// Waitlist are first-class cases now — no parallel side-pill booleans.
+    /// Labels track RSVPStatus.displayName ("Going" / "Can't Go").
     enum GuestFilter: String, CaseIterable {
         case all = "All"
-        case pending = "Pending"
-        case sent = "Awaiting reply"
-        case confirmed = "Confirmed"
-        case declined = "Declined"
+        case notInvited = "Not invited"
+        case awaitingReply = "Awaiting reply"
+        case going = "Going"
+        case maybe = "Maybe"
+        case cantGo = "Can't Go"
+        case waitlist = "Waitlist"
 
         var icon: String {
             switch self {
             case .all: return "person.3"
-            case .pending: return "clock"
-            case .sent: return "paperplane"
-            case .confirmed: return "checkmark.circle"
-            case .declined: return "xmark.circle"
+            case .notInvited: return "envelope"
+            case .awaitingReply: return "paperplane"
+            case .going: return "checkmark.circle"
+            case .maybe: return "questionmark.circle"
+            case .cantGo: return "xmark.circle"
+            case .waitlist: return "list.bullet"
             }
         }
 
         var color: Color {
             switch self {
             case .all: return .accentPurpleFallback
-            case .pending: return .gatherSecondaryText
-            case .sent: return .neonBlue
-            case .confirmed: return .rsvpYesFallback
-            case .declined: return .rsvpNoFallback
+            case .notInvited: return .gatherSecondaryText
+            case .awaitingReply: return .neonBlue
+            case .going: return .rsvpYesFallback
+            case .maybe: return .rsvpMaybeFallback
+            case .cantGo: return .rsvpNoFallback
+            case .waitlist: return .rsvpMaybeFallback
+            }
+        }
+
+        /// The single source of truth for both the pill count and the list —
+        /// so a pill's number always matches the rows it shows.
+        func matches(_ guest: Guest) -> Bool {
+            switch self {
+            case .all: return true
+            case .notInvited: return guest.status == .pending && guest.inviteSentAt == nil
+            case .awaitingReply: return guest.status == .pending && guest.inviteSentAt != nil
+            case .going: return guest.status == .attending
+            case .maybe: return guest.status == .maybe
+            case .cantGo: return guest.status == .declined
+            case .waitlist: return guest.status == .waitlisted
             }
         }
     }
@@ -264,20 +275,6 @@ struct GuestsTab: View {
             }
             Button("Cancel", role: .cancel) { guestPendingPromotion = nil }
         }
-        .onChange(of: hasWaitlistedGuests) { _, stillHasWaitlisted in
-            // If the last waitlisted guest was promoted/removed, fall back to All.
-            if !stillHasWaitlisted && showWaitlistedOnly {
-                showWaitlistedOnly = false
-                filterStatus = .all
-            }
-        }
-        .onChange(of: hasMaybeGuests) { _, stillHasMaybe in
-            // If the last maybe guest responded/was removed, fall back to All.
-            if !stillHasMaybe && showMaybeOnly {
-                showMaybeOnly = false
-                filterStatus = .all
-            }
-        }
     }
 
     // MARK: - Status Summary Bar
@@ -286,28 +283,17 @@ struct GuestsTab: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Spacing.sm) {
                 ForEach(GuestFilter.allCases, id: \.self) { filter in
-                    StatusPill(
-                        filter: filter,
-                        count: countForFilter(filter),
-                        isSelected: filterStatus == filter && !showWaitlistedOnly && !showMaybeOnly,
-                        onTap: { selectFilter(filter) }
-                    )
-                }
-
-                if hasMaybeGuests {
-                    MaybePill(
-                        count: event.guests.filter { $0.status == .maybe }.count,
-                        isSelected: showMaybeOnly,
-                        onTap: { toggleMaybeFilter() }
-                    )
-                }
-
-                if hasWaitlistedGuests {
-                    WaitlistPill(
-                        count: event.guests.filter { $0.status == .waitlisted }.count,
-                        isSelected: showWaitlistedOnly,
-                        onTap: { toggleWaitlistFilter() }
-                    )
+                    let count = countForFilter(filter)
+                    // Maybe / Waitlist only appear once someone is in that
+                    // state — no dead zero-count pills cluttering the row.
+                    if !(count == 0 && (filter == .maybe || filter == .waitlist)) {
+                        StatusPill(
+                            filter: filter,
+                            count: count,
+                            isSelected: filterStatus == filter,
+                            onTap: { selectFilter(filter) }
+                        )
+                    }
                 }
             }
             .horizontalPadding()
@@ -318,34 +304,7 @@ struct GuestsTab: View {
     /// Tap a status pill to filter; tap the active pill again to clear back to All.
     private func selectFilter(_ filter: GuestFilter) {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            if filterStatus == filter && !showWaitlistedOnly && !showMaybeOnly {
-                filterStatus = .all
-            } else {
-                filterStatus = filter
-            }
-            showWaitlistedOnly = false
-            showMaybeOnly = false
-        }
-        HapticService.selection()
-    }
-
-    /// Waitlist pill toggles on/off; leaving waitlist mode returns to All so
-    /// the visible selection always matches the list.
-    private func toggleWaitlistFilter() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            showWaitlistedOnly.toggle()
-            showMaybeOnly = false
-            filterStatus = .all
-        }
-        HapticService.selection()
-    }
-
-    /// Maybe pill toggles on/off, mirroring the waitlist side filter.
-    private func toggleMaybeFilter() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            showMaybeOnly.toggle()
-            showWaitlistedOnly = false
-            filterStatus = .all
+            filterStatus = (filterStatus == filter) ? .all : filter
         }
         HapticService.selection()
     }
@@ -955,8 +914,6 @@ struct GuestsTab: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             searchText = ""
                             filterStatus = .all
-                            showWaitlistedOnly = false
-                            showMaybeOnly = false
                         }
                         HapticService.buttonTap()
                     }
@@ -1008,20 +965,7 @@ struct GuestsTab: View {
     // MARK: - Helpers
 
     private func countForFilter(_ filter: GuestFilter) -> Int {
-        switch filter {
-        case .all:
-            return event.guests.count
-        case .pending:
-            return event.guests.filter { $0.status == .pending }.count
-        case .sent:
-            // Guests who have been sent invites but not responded — same
-            // predicate as pendingInvitedGuests, so responders don't count twice.
-            return pendingInvitedGuests.count
-        case .confirmed:
-            return event.guests.filter { $0.status == .attending }.count
-        case .declined:
-            return event.guests.filter { $0.status == .declined }.count
-        }
+        event.guests.filter { filter.matches($0) }.count
     }
 
     private var filteredGuests: [Guest] {
@@ -1036,26 +980,8 @@ struct GuestsTab: View {
             }
         }
 
-        // Status filter
-        if showWaitlistedOnly {
-            guests = guests.filter { $0.status == .waitlisted }
-        } else if showMaybeOnly {
-            guests = guests.filter { $0.status == .maybe }
-        } else {
-            switch filterStatus {
-            case .all:
-                break
-            case .pending:
-                guests = guests.filter { $0.status == .pending }
-            case .sent:
-                // Invited but not yet responded (mirrors countForFilter)
-                guests = guests.filter { $0.status == .pending && $0.inviteSentAt != nil }
-            case .confirmed:
-                guests = guests.filter { $0.status == .attending }
-            case .declined:
-                guests = guests.filter { $0.status == .declined }
-            }
-        }
+        // Status filter — one predicate shared with the pill counts.
+        guests = guests.filter { filterStatus.matches($0) }
 
         return sorted(guests)
     }
@@ -1409,6 +1335,20 @@ struct StatusPill: View {
     let isSelected: Bool
     let onTap: () -> Void
 
+    /// Amber and mid-gray fills need dark text to pass contrast in light mode
+    /// (white on amber/gray fails WCAG) — mirrors GuestListSheet's FilterChip.
+    private var usesDarkText: Bool {
+        filter == .maybe || filter == .waitlist || filter == .notInvited
+    }
+
+    private var selectedForeground: Color {
+        usesDarkText ? Color.black.opacity(0.85) : .white
+    }
+
+    private var selectedBadgeBackground: Color {
+        usesDarkText ? Color.black.opacity(0.12) : Color.white.opacity(0.3)
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: Spacing.xs) {
@@ -1422,11 +1362,11 @@ struct StatusPill: View {
                     .fontWeight(.bold)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(isSelected ? .white.opacity(0.3) : filter.color.opacity(0.2))
+                    .background(isSelected ? selectedBadgeBackground : filter.color.opacity(0.2))
                     .clipShape(Capsule())
                     .contentTransition(.numericText())
             }
-            .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
+            .foregroundStyle(isSelected ? selectedForeground : Color.gatherPrimaryText)
             .padding(.horizontal, Spacing.sm)
             .padding(.vertical, Spacing.xs)
             .background(isSelected ? filter.color : Color.gatherElevated)
@@ -1437,7 +1377,6 @@ struct StatusPill: View {
                     lineWidth: isSelected ? 1.5 : 1
                 )
             )
-            .shadow(color: isSelected ? filter.color.opacity(0.35) : .clear, radius: 5, y: 2)
             // Keep the pill visually compact but give it a full 44pt tap target.
             .frame(minHeight: Layout.minTouchTarget)
             .contentShape(Rectangle())
@@ -1446,107 +1385,6 @@ struct StatusPill: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
         .accessibilityLabel("\(filter.rawValue) filter, \(count) guests")
         .accessibilityHint(isSelected ? "Double tap to clear filter" : "Double tap to filter by \(filter.rawValue.lowercased())")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-}
-
-// MARK: - Waitlist Pill
-
-/// Waitlist filter pill. Lives outside GuestsTab.GuestFilter because that enum
-/// is switched exhaustively in GuestFilterBar and can't gain a case here.
-struct WaitlistPill: View {
-    let count: Int
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Spacing.xs) {
-                Image(systemName: "list.bullet")
-                    .font(.caption)
-                Text("Waitlist")
-                    .font(GatherFont.caption)
-                    .fontWeight(isSelected ? .semibold : .regular)
-                Text("\(count)")
-                    .font(GatherFont.caption)
-                    .fontWeight(.bold)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(isSelected ? .white.opacity(0.3) : Color.rsvpMaybeFallback.opacity(0.2))
-                    .clipShape(Capsule())
-                    .contentTransition(.numericText())
-            }
-            .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
-            .padding(.horizontal, Spacing.sm)
-            .padding(.vertical, Spacing.xs)
-            .background(isSelected ? Color.rsvpMaybeFallback : Color.gatherElevated)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule().strokeBorder(
-                    isSelected ? Color.rsvpMaybeFallback : Color.gatherSeparator.opacity(0.5),
-                    lineWidth: isSelected ? 1.5 : 1
-                )
-            )
-            .shadow(color: isSelected ? Color.rsvpMaybeFallback.opacity(0.35) : .clear, radius: 5, y: 2)
-            // Keep the pill visually compact but give it a full 44pt tap target.
-            .frame(minHeight: Layout.minTouchTarget)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-        .accessibilityLabel("Waitlist filter, \(count) guests")
-        .accessibilityHint(isSelected ? "Double tap to clear filter" : "Double tap to show waitlisted guests")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-}
-
-// MARK: - Maybe Pill
-
-/// Maybe filter pill. Same side-filter pattern as WaitlistPill — the
-/// GuestFilter enum is switched exhaustively in GuestFilterBar and can't
-/// gain a case here.
-struct MaybePill: View {
-    let count: Int
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Spacing.xs) {
-                Image(systemName: "questionmark.circle")
-                    .font(.caption)
-                Text("Maybe")
-                    .font(GatherFont.caption)
-                    .fontWeight(isSelected ? .semibold : .regular)
-                Text("\(count)")
-                    .font(GatherFont.caption)
-                    .fontWeight(.bold)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(isSelected ? .white.opacity(0.3) : Color.rsvpMaybeFallback.opacity(0.2))
-                    .clipShape(Capsule())
-                    .contentTransition(.numericText())
-            }
-            .foregroundStyle(isSelected ? .white : Color.gatherPrimaryText)
-            .padding(.horizontal, Spacing.sm)
-            .padding(.vertical, Spacing.xs)
-            .background(isSelected ? Color.rsvpMaybeFallback : Color.gatherElevated)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule().strokeBorder(
-                    isSelected ? Color.rsvpMaybeFallback : Color.gatherSeparator.opacity(0.5),
-                    lineWidth: isSelected ? 1.5 : 1
-                )
-            )
-            .shadow(color: isSelected ? Color.rsvpMaybeFallback.opacity(0.35) : .clear, radius: 5, y: 2)
-            // Keep the pill visually compact but give it a full 44pt tap target.
-            .frame(minHeight: Layout.minTouchTarget)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-        .accessibilityLabel("Maybe filter, \(count) guests")
-        .accessibilityHint(isSelected ? "Double tap to clear filter" : "Double tap to show guests who answered maybe")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

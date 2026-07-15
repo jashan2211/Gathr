@@ -104,8 +104,13 @@ struct BudgetTab: View {
                         // Payment Breakdown (Paid / Owed / Overdue)
                         paymentBreakdown(budget, expenses: expenses)
 
-                        // Spending by category (visual share of spend)
-                        spendingByCategory(budget)
+                        // Spending by category uses whole-event category totals
+                        // and allocations, which don't scope to a single
+                        // function — so it's a whole-event ("All") view only,
+                        // never shown next to a scoped "Spent under <fn>" card.
+                        if !isFunctionFiltered {
+                            spendingByCategory(budget)
+                        }
 
                     case .expenses:
                         // Every expense, grouped: by category, by vendor, then flat.
@@ -322,7 +327,10 @@ struct BudgetTab: View {
             .accessibilityAddTraits(.isButton)
         }
 
-        if !overBudgetCategories.isEmpty {
+        // Over-budget is measured against whole-event category allocations, so
+        // it's only meaningful in the unscoped ("All") view — never alongside a
+        // function-scoped spend total.
+        if !overBudgetCategories.isEmpty, !isFunctionFiltered {
             // Tapping opens Categories with the first offender expanded.
             // Tinted-pill styling (amber text on soft amber) keeps WCAG
             // contrast where white-on-amber failed.
@@ -779,13 +787,19 @@ struct BudgetTab: View {
                 continue
             }
 
+            // Cap the money attributed to this expense at its amount, so if the
+            // amount was later edited below its recorded payments the People
+            // totals don't exceed the Paid stat (which caps at min(paid, amount)).
+            let rawSum = payments.reduce(0.0) { $0 + $1.amount }
+            let scale = rawSum > expense.amount && rawSum > 0 ? expense.amount / rawSum : 1
+
             for payment in payments {
                 let payer = (payment.paidByName?.isEmpty == false ? payment.paidByName : nil)
                     ?? (expense.paidByName?.isEmpty == false ? expense.paidByName : nil)
                 // Payments with no payer used to be dropped, so the People
                 // total silently disagreed with the Paid stat. Bucket them under
                 // "Unattributed" instead — settleUp filters this sentinel out.
-                totals[payer ?? Self.unattributedPayer, default: 0] += payment.amount
+                totals[payer ?? Self.unattributedPayer, default: 0] += payment.amount * scale
             }
         }
 

@@ -222,7 +222,9 @@ struct FunctionDetailSheet: View {
                 return invite.inviteStatus == .sent ? "Pending" : "Not responded"
             }
         }
-        return "Not invited"
+        // No invite record, but RSVPing self-enrolls — so "Not invited" would
+        // contradict the RSVP button right beside it. It just means no answer yet.
+        return "Not responded"
     }
 
     private func responseColor(for response: RSVPResponse?) -> Color {
@@ -393,22 +395,37 @@ struct FunctionDetailSheet: View {
             }
             .buttonStyle(.plain)
 
-            // RSVP Summary
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                Text("Guest Responses")
-                    .font(GatherFont.headline)
-                    .foregroundStyle(Color.gatherPrimaryText)
+            // RSVP Summary — hosts get the full Pending/Declined bookkeeping;
+            // guests just get social proof (who's going), not the host's ledger.
+            if isHost {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    Text("Guest Responses")
+                        .font(GatherFont.headline)
+                        .foregroundStyle(Color.gatherPrimaryText)
 
-                HStack(spacing: Spacing.lg) {
-                    RSVPStatBox(count: function.attendingCount, label: "Attending", color: .rsvpYesFallback)
-                    RSVPStatBox(count: function.maybeCount, label: "Maybe", color: .rsvpMaybeFallback)
-                    RSVPStatBox(count: function.declinedCount, label: "Declined", color: .rsvpNoFallback)
-                    RSVPStatBox(count: function.pendingCount, label: "Pending", color: .gatherSecondaryText)
+                    HStack(spacing: Spacing.lg) {
+                        RSVPStatBox(count: function.attendingCount, label: "Attending", color: .rsvpYesFallback)
+                        RSVPStatBox(count: function.maybeCount, label: "Maybe", color: .rsvpMaybeFallback)
+                        RSVPStatBox(count: function.declinedCount, label: "Declined", color: .rsvpNoFallback)
+                        RSVPStatBox(count: function.pendingCount, label: "Pending", color: .gatherSecondaryText)
+                    }
                 }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .surfaceCard()
+            } else if function.attendingCount > 0 || function.maybeCount > 0 {
+                HStack(spacing: Spacing.sm) {
+                    Image(systemName: "person.2.fill")
+                        .foregroundStyle(Color.rsvpYesFallback)
+                    Text("\(function.attendingCount) going\(function.maybeCount > 0 ? " · \(function.maybeCount) maybe" : "")")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherPrimaryText)
+                    Spacer()
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .surfaceCard()
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .surfaceCard()
 
             // Per-function guest list — hosts pick who is invited to THIS
             // function, independent of the parent event's full guest list.

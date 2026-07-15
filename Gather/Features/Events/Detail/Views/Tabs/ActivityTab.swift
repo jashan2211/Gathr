@@ -12,6 +12,9 @@ struct ActivityTab: View {
     @State private var showComposer = false
     @State private var composerType: ActivityPostType = .question
     @State private var replyingTo: ActivityPost?
+    /// True until the first activity fetch returns, so an empty feed shows a
+    /// spinner rather than "Be the first" while it's still loading.
+    @State private var isLoadingActivity = true
 
     init(event: Event) {
         self.event = event
@@ -45,7 +48,11 @@ struct ActivityTab: View {
                 composerBar
 
                 if posts.isEmpty {
-                    emptyState
+                    if isLoadingActivity {
+                        loadingState
+                    } else {
+                        emptyState
+                    }
                 } else {
                     ForEach(posts) { post in
                         ActivityPostCard(
@@ -86,6 +93,7 @@ struct ActivityTab: View {
             // Pull the shared activity feed so posts, likes, and poll votes from
             // other attendees show up.
             await FirestoreService.shared.fetchActivity(for: event, into: modelContext)
+            isLoadingActivity = false
         }
     }
 
@@ -159,6 +167,19 @@ struct ActivityTab: View {
         }
         .padding(Spacing.md)
         .surfaceCard()
+    }
+
+    // MARK: - Loading State
+
+    private var loadingState: some View {
+        VStack(spacing: Spacing.md) {
+            ProgressView()
+            Text("Loading activity…")
+                .font(GatherFont.caption)
+                .foregroundStyle(Color.gatherSecondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.xxl)
     }
 
     // MARK: - Empty State

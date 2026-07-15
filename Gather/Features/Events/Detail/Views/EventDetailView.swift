@@ -5,21 +5,26 @@ import MapKit
 // MARK: - Event Detail Tab
 
 enum EventDetailTab: String, CaseIterable {
+    // Order = frequency of use for a host: the roster and schedule are the
+    // work surfaces; Activity has no inbound links; Finance stays findable at
+    // the right edge. Guests see this same order minus the gated tabs.
     case overview = "Overview"
-    case activity = "Activity"
-    case functions = "Functions"
     case guests = "Guests"
+    case functions = "Functions"
+    case activity = "Activity"
     case photos = "Photos"
     case budget = "Finance"
 
     var icon: String {
         switch self {
-        case .overview: return "house.fill"
-        case .activity: return "bubble.left.and.bubble.right.fill"
-        case .functions: return "calendar.badge.clock"
+        // house.fill read as "app home"; banknote/text-bubble are clearer than
+        // a bar chart (collides with analytics) and a generic speech bubble.
+        case .overview: return "list.bullet.rectangle.fill"
         case .guests: return "person.2.fill"
+        case .functions: return "calendar.badge.clock"
+        case .activity: return "text.bubble.fill"
         case .photos: return "photo.on.rectangle.angled"
-        case .budget: return "chart.bar.fill"
+        case .budget: return "banknote.fill"
         }
     }
 
@@ -400,17 +405,21 @@ struct EventDetailView: View {
 
     /// The tab bar as a pinned section header: a solid canvas backdrop with a
     /// hairline so content scrolls cleanly underneath when it settles at top.
+    /// A bare event (only Overview visible) shows no bar and reclaims the space.
+    @ViewBuilder
     private var pinnedTabBar: some View {
-        floatingTabBar
-            .padding(.vertical, Spacing.xs)
-            .background(
-                Color.gatherCanvas
-                    .overlay(alignment: .bottom) {
-                        Rectangle()
-                            .fill(Color.gatherSeparator.opacity(0.5))
-                            .frame(height: 1)
-                    }
-            )
+        if visibleTabs.count > 1 {
+            floatingTabBar
+                .padding(.vertical, Spacing.xs)
+                .background(
+                    Color.gatherCanvas
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(Color.gatherSeparator.opacity(0.5))
+                                .frame(height: 1)
+                        }
+                )
+        }
     }
 
     private var heroFormattedDate: String {
@@ -458,6 +467,11 @@ struct EventDetailView: View {
                             .font(.caption2)
                             .fontWeight(selectedTab == tab ? .bold : .medium)
                             .foregroundStyle(selectedTab == tab ? Color.gatherPrimaryText : Color.gatherSecondaryText)
+                            // 6 tabs ≈ 54pt columns — keep labels on one line
+                            // and shrink rather than wrap/clip at large text.
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .allowsTightening(true)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)

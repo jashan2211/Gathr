@@ -21,6 +21,9 @@ private enum BudgetSection: String, CaseIterable {
 struct BudgetTab: View {
     @Bindable var event: Event
     @State private var filterFunction: EventFunction?
+    /// The "General" scope chip — expenses not tied to any function. Mutually
+    /// exclusive with filterFunction.
+    @State private var filterGeneralOnly = false
     @State private var showAddCategory = false
     @State private var showAddExpense = false
     @State private var showEditBudget = false
@@ -391,51 +394,74 @@ struct BudgetTab: View {
                 .accessibilityLabel("Edit budget")
             }
 
-            HStack(alignment: .center, spacing: Spacing.lg) {
-                // Circular progress ring — the confident focal point.
-                budgetRing(percent: percent, percentUsed: percentUsed, accent: accent, isOver: isOver)
-                    .frame(width: 116, height: 116)
+            if isFunctionFiltered {
+                // The whole-event budget doesn't apply to a single function, so
+                // don't divide a scoped spend by it — just show what was spent
+                // under this scope. "All" restores the ring + remaining.
+                let scopedCount = filteredExpenses(budget).count
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text("Spent under \(filterScopeName)")
+                        .gatherEyebrow()
+                        .foregroundStyle(Color.gatherSecondaryText)
+                    Text(spentAmount.asCurrency)
+                        .font(.system(.largeTitle, weight: .heavy))
+                        .foregroundStyle(Color.gatherPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text("\(scopedCount) expense\(scopedCount == 1 ? "" : "s")")
+                        .gatherMetaText()
+                        .foregroundStyle(Color.gatherTertiaryText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .center, spacing: Spacing.lg) {
+                    // Circular progress ring — the confident focal point.
+                    budgetRing(percent: percent, percentUsed: percentUsed, accent: accent, isOver: isOver)
+                        .frame(width: 116, height: 116)
 
-                VStack(alignment: .leading, spacing: Spacing.md) {
-                    summaryMetric(
-                        label: "Spent",
-                        value: spentAmount.asCurrency,
-                        color: accent,
-                        emphasized: true
-                    )
-                    summaryMetric(
-                        label: isOver ? "Over budget" : "Remaining",
-                        value: abs(remainingAmount).asCurrency,
-                        color: isOver ? Color.rsvpNoFallback : Color.rsvpYesFallback,
-                        emphasized: false
-                    )
-                    summaryMetric(
-                        label: "Total budget",
-                        value: budget.totalBudget.asCurrency,
-                        color: Color.gatherPrimaryText,
-                        emphasized: false
-                    )
+                    VStack(alignment: .leading, spacing: Spacing.md) {
+                        summaryMetric(
+                            label: "Spent",
+                            value: spentAmount.asCurrency,
+                            color: accent,
+                            emphasized: true
+                        )
+                        summaryMetric(
+                            label: isOver ? "Over budget" : "Remaining",
+                            value: abs(remainingAmount).asCurrency,
+                            color: isOver ? Color.rsvpNoFallback : Color.rsvpYesFallback,
+                            emphasized: false
+                        )
+                        summaryMetric(
+                            label: "Total budget",
+                            value: budget.totalBudget.asCurrency,
+                            color: Color.gatherPrimaryText,
+                            emphasized: false
+                        )
+                    }
+
+                    Spacer(minLength: 0)
                 }
 
-                Spacer(minLength: 0)
-            }
-
-            // The ring already encodes percent and the metric stack already
-            // shows Remaining + Total, so no linear track or caption repeats
-            // them. Only surface the zero-budget nudge when no amount is set.
-            if budget.totalBudget == 0 {
-                Label("Tap Edit to set your total budget", systemImage: "slider.horizontal.3")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.accentPurpleFallback)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Only surface the zero-budget nudge when no amount is set.
+                if budget.totalBudget == 0 {
+                    Label("Tap Edit to set your total budget", systemImage: "slider.horizontal.3")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.accentPurpleFallback)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
         .padding(Spacing.md)
         .surfaceCard(cornerRadius: CornerRadius.featured)
         // A11Y-009: Financial data grouping for budget summary
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Finance overview. Total budget \(budget.totalBudget.asCurrency). Spent \(spentAmount.asCurrency). \(percentUsed) percent used. \(isOver ? "\(abs(remainingAmount).asCurrency) over budget." : "\(remainingAmount.asCurrency) remaining.")")
+        .accessibilityLabel(
+            isFunctionFiltered
+                ? "Spent under \(filterScopeName): \(spentAmount.asCurrency)."
+                : "Finance overview. Total budget \(budget.totalBudget.asCurrency). Spent \(spentAmount.asCurrency). \(percentUsed) percent used. \(isOver ? "\(abs(remainingAmount).asCurrency) over budget." : "\(remainingAmount.asCurrency) remaining.")"
+        )
         .bouncyAppear()
     }
 
@@ -1105,13 +1131,22 @@ struct BudgetTab: View {
                 .foregroundStyle(Color.gatherTertiaryText)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.xs) {
-                    BudgetFilterChip(title: "All", isSelected: filterFunction == nil) {
+                    BudgetFilterChip(title: "All", isSelected: !isFunctionFiltered) {
                         HapticService.selection()
                         filterFunction = nil
+                        filterGeneralOnly = false
+                    }
+                    // Reaches expenses not tied to any function — no longer
+                    // silently folded into every function's totals.
+                    BudgetFilterChip(title: "General", isSelected: filterGeneralOnly) {
+                        HapticService.selection()
+                        filterFunction = nil
+                        filterGeneralOnly = true
                     }
                     ForEach(event.functions.sorted { $0.date < $1.date }) { function in
                         BudgetFilterChip(title: function.name, isSelected: filterFunction?.id == function.id) {
                             HapticService.selection()
+                            filterGeneralOnly = false
                             filterFunction = function
                         }
                     }
@@ -2074,10 +2109,28 @@ struct BudgetTab: View {
     /// Every expense, narrowed to the selected function (general expenses
     /// with no function always stay visible). Computed once per render and
     /// fed to every money section so the whole page agrees with the filter.
+    /// True when the page is scoped to one function (or the General bucket)
+    /// rather than the whole event.
+    private var isFunctionFiltered: Bool {
+        filterFunction != nil || filterGeneralOnly
+    }
+
+    /// Human label for the active scope, for the summary card.
+    private var filterScopeName: String {
+        filterGeneralOnly ? "General" : (filterFunction?.name ?? "")
+    }
+
+    /// The one function-scope predicate. Under a specific function, general
+    /// (nil-function) expenses are EXCLUDED — they were previously counted in
+    /// every function, inflating each one. They're reachable via the General chip.
+    private func matchesFunctionFilter(_ functionId: UUID?) -> Bool {
+        if filterGeneralOnly { return functionId == nil }
+        if let function = filterFunction { return functionId == function.id }
+        return true
+    }
+
     private func filteredExpenses(_ budget: Budget) -> [Expense] {
-        let all = allExpenses(budget)
-        guard let function = filterFunction else { return all }
-        return all.filter { $0.functionId == function.id || $0.functionId == nil }
+        allExpenses(budget).filter { matchesFunctionFilter($0.functionId) }
     }
 
     /// Animated jump between quick-nav slices, used by tappable summary
@@ -2101,21 +2154,13 @@ struct BudgetTab: View {
     }
 
     private func filteredCategories(_ budget: Budget) -> [BudgetCategory] {
-        if let function = filterFunction {
-            return budget.categories.filter { $0.functionId == function.id || $0.functionId == nil }
-        }
-        return budget.categories
+        guard isFunctionFiltered else { return budget.categories }
+        return budget.categories.filter { matchesFunctionFilter($0.functionId) }
     }
 
     private func filteredSpent(_ budget: Budget) -> Double {
-        if let function = filterFunction {
-            return budget.categories.reduce(0) { total, category in
-                total + category.expenses
-                    .filter { $0.functionId == function.id || $0.functionId == nil }
-                    .reduce(0) { $0 + $1.amount }
-            }
-        }
-        return budget.totalSpent
+        guard isFunctionFiltered else { return budget.totalSpent }
+        return filteredExpenses(budget).reduce(0) { $0 + $1.amount }
     }
 
     private func filteredRemaining(_ budget: Budget) -> Double {

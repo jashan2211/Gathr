@@ -1381,9 +1381,7 @@ struct FirstNameGuestCard: View {
     }
 
     private var avatarColor: Color {
-        let colors: [Color] = [.accentPurpleFallback, .accentPinkFallback, .warmCoral, .mintGreen, .neonBlue]
-        let index = guest.name.stableHash % colors.count
-        return colors[index]
+        Color.gatherAvatarColor(for: guest.name)
     }
 
     var body: some View {
@@ -1762,9 +1760,7 @@ struct ImprovedGuestCard: View {
     }
 
     private var avatarColor: Color {
-        let colors: [Color] = [.accentPurpleFallback, .neonBlue, .mintGreen, .warmCoral, .accentPinkFallback, .softLavender]
-        let index = guest.name.stableHash % colors.count
-        return colors[index]
+        Color.gatherAvatarColor(for: guest.name)
     }
 }
 

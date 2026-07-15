@@ -150,6 +150,16 @@ struct AddGuestSheet: View {
             } message: {
                 Text(importSummary ?? "")
             }
+            .onAppear {
+                // Focus Name on first open (Manual tab only) so the host can
+                // start typing immediately — the sheet is built for batch entry
+                // but only refocused after the first add. The short delay lets
+                // the sheet settle, matching the post-add refocus.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(450))
+                    if selectedTab == 0 { nameFieldFocused = true }
+                }
+            }
         }
     }
 

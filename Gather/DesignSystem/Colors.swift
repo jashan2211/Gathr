@@ -391,3 +391,26 @@ extension String {
         return abs(hash)
     }
 }
+
+// MARK: - Avatar Palette
+
+extension Color {
+    /// The one deterministic avatar palette for the whole app — a given name
+    /// always maps to the same tint. Replaces ~9 copies of this array (one of
+    /// which had drifted to a different set of colours).
+    private static let gatherAvatarPalette: [Color] = [
+        .accentPurpleFallback, .neonBlue, .mintGreen, .warmCoral, .accentPinkFallback, .softLavender
+    ]
+
+    /// Stable per-name avatar tint. Hash a durable identity (e.g. the stored
+    /// `guest.name`), not editable field state, so the colour doesn't shift
+    /// while the user types.
+    static func gatherAvatarColor(for name: String) -> Color {
+        gatherAvatarPalette[name.stableHash % gatherAvatarPalette.count]
+    }
+
+    /// Index-keyed variant for stacks that render anonymous avatars.
+    static func gatherAvatarColor(forIndex index: Int) -> Color {
+        gatherAvatarPalette[abs(index) % gatherAvatarPalette.count]
+    }
+}

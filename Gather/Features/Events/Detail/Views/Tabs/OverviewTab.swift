@@ -9,6 +9,9 @@ struct OverviewTab: View {
     /// Jumps the parent detail view to the Functions tab (EventDetailView
     /// owns the tab selection). Defaults to a no-op for previews.
     var onShowFunctions: () -> Void = {}
+    /// Jumps the host to the live Guests tab. No-op for invitees (who have no
+    /// Guests tab) — they fall back to the read-only roster sheet.
+    var onShowGuests: () -> Void = {}
     @EnvironmentObject var authManager: AuthManager
     @State private var showSendInvites = false
     @State private var showAddGuest = false
@@ -116,6 +119,17 @@ struct OverviewTab: View {
 
     // MARK: - Is Host Check
 
+    /// Hosts jump to the live Guests tab (manage in place); invitees open the
+    /// read-only, privacy-gated roster sheet.
+    private func openGuestRoster() {
+        HapticService.buttonTap()
+        if isHost {
+            onShowGuests()
+        } else {
+            showGuestList = true
+        }
+    }
+
     private var isHost: Bool {
         event.hostId == authManager.currentUser?.id
     }
@@ -188,8 +202,7 @@ struct OverviewTab: View {
         } else {
             // Whole card opens the full, filterable guest roster.
             Button {
-                HapticService.buttonTap()
-                showGuestList = true
+                openGuestRoster()
             } label: {
                 rsvpSummaryContent
             }
@@ -554,8 +567,7 @@ struct OverviewTab: View {
             // The card opens the full roster — the avatar stack is a preview,
             // not the whole story.
             Button {
-                HapticService.buttonTap()
-                showGuestList = true
+                openGuestRoster()
             } label: {
                 HStack(spacing: Spacing.sm) {
                     AvatarStack(
@@ -901,9 +913,7 @@ struct RecentRSVPRow: View {
     }
 
     private var avatarColor: Color {
-        let colors: [Color] = [.accentPurpleFallback, .neonBlue, .mintGreen, .warmCoral, .accentPinkFallback, .softLavender]
-        let index = guest.name.stableHash % colors.count
-        return colors[index]
+        Color.gatherAvatarColor(for: guest.name)
     }
 }
 

@@ -502,6 +502,11 @@ struct EventDetailView: View {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                         selectedTab = .functions
                     }
+                },
+                onShowGuests: {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                        selectedTab = .guests
+                    }
                 }
             )
         case .activity:

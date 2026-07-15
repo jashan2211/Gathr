@@ -631,8 +631,7 @@ struct AvatarStack: View {
     }
 
     private func avatarColor(for index: Int) -> Color {
-        let colors: [Color] = [.accentPurpleFallback, .accentPinkFallback, .warmCoral, .mintGreen, .neonBlue]
-        return colors[index % colors.count]
+        Color.gatherAvatarColor(forIndex: index)
     }
 }
 

@@ -650,9 +650,9 @@ struct GuestDetailSheet: View {
     }
 
     private var avatarColor: Color {
-        let colors: [Color] = [.accentPurpleFallback, .neonBlue, .rsvpYesFallback, .rsvpMaybeFallback, .accentPinkFallback, .mintGreen]
-        let index = name.stableHash % colors.count
-        return colors[index]
+        // Hash the stored name, not the editable field, so the avatar doesn't
+        // recolour on every keystroke while editing.
+        Color.gatherAvatarColor(for: guest.name)
     }
 }
 

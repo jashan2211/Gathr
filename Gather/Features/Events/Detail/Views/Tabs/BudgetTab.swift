@@ -28,6 +28,8 @@ struct BudgetTab: View {
     @State private var addExpenseCategory: BudgetCategory?
     @State private var editingExpense: Expense?
     @State private var expandedCategoryId: UUID?
+    /// Whether the folded-away "N unused categories" group is expanded.
+    @State private var showUnusedCategories = false
     @State private var showTeam = false
     @State private var selectedVendor: VendorSummary?
     @State private var recordingSplit: PaymentSplit?
@@ -1323,12 +1325,60 @@ struct BudgetTab: View {
                     showAddCategory = true
                 }
             } else {
-                ForEach(categories) { category in
+                // A fresh wedding budget seeds ~10 categories with allocations
+                // but no spend; showing them all floods the tab. Keep the ones
+                // in use up top and fold the untouched ones behind one row.
+                let used = categories.filter { $0.spent > 0 || !$0.expenses.isEmpty }
+                let unused = categories.filter { $0.spent == 0 && $0.expenses.isEmpty }
+
+                ForEach(used) { category in
                     categoryCard(category, budget: budget)
+                }
+
+                if !unused.isEmpty {
+                    unusedCategoriesRow(unused, budget: budget)
                 }
             }
         }
         .bouncyAppear(delay: 0.1)
+    }
+
+    /// Collapsed aggregate for categories that have no expenses yet — expands
+    /// to the full cards on tap so nothing is lost, just tidied away.
+    @ViewBuilder
+    private func unusedCategoriesRow(_ unused: [BudgetCategory], budget: Budget) -> some View {
+        VStack(spacing: Spacing.sm) {
+            Button {
+                HapticService.selection()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    showUnusedCategories.toggle()
+                }
+            } label: {
+                HStack(spacing: Spacing.sm) {
+                    Image(systemName: "folder")
+                        .foregroundStyle(Color.gatherSecondaryText)
+                    Text("\(unused.count) unused \(unused.count == 1 ? "category" : "categories")")
+                        .font(GatherFont.callout)
+                        .foregroundStyle(Color.gatherSecondaryText)
+                    Spacer()
+                    Image(systemName: showUnusedCategories ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.gatherTertiaryText)
+                }
+                .frame(minHeight: Layout.minTouchTarget)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(unused.count) unused categories")
+            .accessibilityHint(showUnusedCategories ? "Double tap to collapse" : "Double tap to show them")
+
+            if showUnusedCategories {
+                ForEach(unused.sorted { $0.sortOrder < $1.sortOrder }) { category in
+                    categoryCard(category, budget: budget)
+                }
+            }
+        }
     }
 
     private func categoryCard(_ category: BudgetCategory, budget: Budget) -> some View {

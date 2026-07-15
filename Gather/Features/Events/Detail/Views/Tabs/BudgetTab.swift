@@ -24,6 +24,10 @@ struct BudgetTab: View {
     /// The "General" scope chip — expenses not tied to any function. Mutually
     /// exclusive with filterFunction.
     @State private var filterGeneralOnly = false
+
+    /// Bucket name for paid money with no recorded payer. Shown in Who Paid
+    /// What (so totals reconcile with the Paid stat) but excluded from Settle Up.
+    private static let unattributedPayer = "Unattributed"
     @State private var showAddCategory = false
     @State private var showAddExpense = false
     @State private var showEditBudget = false
@@ -764,13 +768,24 @@ struct BudgetTab: View {
 
         for expense in expenses {
             let payments = expense.recordedPayments
-            if payments.isEmpty { continue }
+            if payments.isEmpty {
+                // Legacy expense paid without a per-payment ledger — attribute
+                // the paid amount so this money isn't silently dropped.
+                let paid = min(expense.amountPaid, expense.amount)
+                if paid > 0 {
+                    let name = (expense.paidByName?.isEmpty == false ? expense.paidByName! : Self.unattributedPayer)
+                    totals[name, default: 0] += paid
+                }
+                continue
+            }
 
             for payment in payments {
                 let payer = (payment.paidByName?.isEmpty == false ? payment.paidByName : nil)
                     ?? (expense.paidByName?.isEmpty == false ? expense.paidByName : nil)
-                guard let name = payer, !name.isEmpty else { continue }
-                totals[name, default: 0] += payment.amount
+                // Payments with no payer used to be dropped, so the People
+                // total silently disagreed with the Paid stat. Bucket them under
+                // "Unattributed" instead — settleUp filters this sentinel out.
+                totals[payer ?? Self.unattributedPayer, default: 0] += payment.amount
             }
         }
 
@@ -879,7 +894,9 @@ struct BudgetTab: View {
 
     @ViewBuilder
     private func settleUp(_ budget: Budget, expenses: [Expense]) -> some View {
-        let payers = payerTotals(expenses)
+        // "Unattributed" money can't be split between people, so it's excluded
+        // from the even-split maths (it still shows in Who Paid What).
+        let payers = payerTotals(expenses).filter { $0.name != Self.unattributedPayer }
 
         // Only meaningful with 2+ distinct payers to split between.
         if payers.count >= 2 {

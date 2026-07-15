@@ -4,8 +4,12 @@ struct GuestsTab: View {
     @Bindable var event: Event
     @Environment(\.modelContext) private var modelContext
     @State private var searchText = ""
+    /// Multi-select mode only. Sends no longer borrow this set — they write
+    /// `invitePreselection` — so the two states can't leak into each other.
     @State private var selectedGuests: Set<UUID> = []
     @State private var isSelectionMode = false
+    /// Who the send sheet opens with. Set fresh by every send entry point.
+    @State private var invitePreselection: Set<UUID> = []
     @State private var showAddGuest = false
     @State private var showSendInvites = false
     @State private var selectedGuest: Guest?
@@ -213,16 +217,10 @@ struct GuestsTab: View {
                 .presentationDetents([.fraction(0.75), .large])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showSendInvites, onDismiss: {
-            // Quick-send / single-guest sends borrow the selection set;
-            // clear it so stale picks don't leak into selection mode.
-            if !isSelectionMode {
-                selectedGuests.removeAll()
-            }
-        }) {
+        .sheet(isPresented: $showSendInvites) {
             SendInvitesSheet(
                 event: event,
-                preselectedGuests: Array(selectedGuests)
+                preselectedGuests: Array(invitePreselection)
             )
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -467,11 +465,10 @@ struct GuestsTab: View {
     }
 
     /// Preselect the not-yet-invited guests (or all, if everyone's been invited)
-    /// and open the send sheet. Uses the shared selection set so the sheet's
-    /// preselection picks it up, without flipping into multi-select mode.
+    /// and open the send sheet — without flipping into multi-select mode.
     private func inviteEveryone() {
         let targets = guestsNotYetInvited.isEmpty ? event.guests : guestsNotYetInvited
-        selectedGuests = Set(targets.map { $0.id })
+        invitePreselection = Set(targets.map { $0.id })
         HapticService.buttonTap()
         showSendInvites = true
     }
@@ -520,10 +517,9 @@ struct GuestsTab: View {
     }
 
     /// Preselect exactly the invited-but-pending guests and open the send
-    /// sheet. Uses the shared selection set (same pattern as inviteEveryone)
-    /// so the sheet's preselection picks it up.
+    /// sheet (same pattern as inviteEveryone).
     private func remindPending() {
-        selectedGuests = Set(pendingInvitedGuests.map { $0.id })
+        invitePreselection = Set(pendingInvitedGuests.map { $0.id })
         HapticService.buttonTap()
         showSendInvites = true
     }
@@ -701,6 +697,8 @@ struct GuestsTab: View {
                 Spacer()
 
                 Button {
+                    // Selection mode → send: hand the current picks to the sheet.
+                    invitePreselection = selectedGuests
                     showSendInvites = true
                 } label: {
                     HStack(spacing: 4) {
@@ -828,7 +826,7 @@ struct GuestsTab: View {
 
                 // Quick send button
                 Button {
-                    selectedGuests = Set(event.guests.map { $0.id })
+                    invitePreselection = Set(event.guests.map { $0.id })
                     showSendInvites = true
                 } label: {
                     Image(systemName: "paperplane")
@@ -1136,7 +1134,7 @@ struct GuestsTab: View {
 
     /// Single-guest invite via the existing SendInvitesSheet path.
     private func sendInvite(to guest: Guest) {
-        selectedGuests = [guest.id]
+        invitePreselection = [guest.id]
         showSendInvites = true
     }
 
